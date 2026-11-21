@@ -10,10 +10,10 @@ use std::iter::FusedIterator;
 use std::slice;
 
 use crate::controlled_pauli::ControlledPauliTargetPair;
-use crate::gate::{ArgRule, GateTargetGroupKind};
+use crate::gate::{ArgRule, GateTargetGroupKind, TargetRule};
 use crate::target::{PauliTarget, QubitTarget};
 use crate::{
-    Gate, GateTargetRule, MeasureRecordOffset, ObservableId, Probability, QubitId, Target,
+    Gate, GateTargetRule, MeasureRecordOffset, ObservableId, Pauli, Probability, QubitId, Target,
 };
 
 use super::CircuitInstruction;
@@ -332,18 +332,27 @@ pair_target_view!(
 #[derive(Clone, Debug)]
 pub struct ControlledPairs<'a> {
     gate: Gate,
+    pauli: Pauli,
     pairs: slice::Iter<'a, [Target; 2]>,
 }
 
 impl<'a> ControlledPairs<'a> {
     #[inline]
-    fn new(gate: Gate, targets: &'a [Target]) -> Self {
+    fn new(gate: Gate, pauli: Pauli, targets: &'a [Target]) -> Self {
         let (pairs, remainder) = targets.as_chunks::<2>();
         debug_assert!(remainder.is_empty(), "pair targets have an odd count");
         Self {
             gate,
+            pauli,
             pairs: pairs.iter(),
         }
+    }
+
+    /// Returns the Pauli the gate applies to each pair's target when its control is set, the
+    /// same as [`Gate::controlled_pauli`].
+    #[inline]
+    pub fn controlled_pauli(&self) -> Pauli {
+        self.pauli
     }
 
     /// Returns the classified pair at `index` among those not yet iterated.
@@ -690,31 +699,29 @@ impl CircuitInstruction {
     pub fn gate_targets(&self) -> GateTargets<'_> {
         debug_assert!(self.gate.validate_targets(&self.targets).is_ok());
         let targets = self.targets.as_slice();
-        match self.gate.target_rule() {
-            GateTargetRule::None => GateTargets::None,
-            GateTargetRule::AnySingleQubit => GateTargets::Qubits(QubitIds::new(targets)),
-            GateTargetRule::MeasurementQubits => {
+        match self.gate.internal_target_rule() {
+            TargetRule::None => GateTargets::None,
+            TargetRule::AnySingleQubit => GateTargets::Qubits(QubitIds::new(targets)),
+            TargetRule::MeasurementQubits => {
                 GateTargets::MeasuredQubits(QubitTargets::new(targets))
             }
-            GateTargetRule::MeasurementPads => {
-                GateTargets::MeasurementPads(PadValues::new(targets))
+            TargetRule::MeasurementPads => GateTargets::MeasurementPads(PadValues::new(targets)),
+            TargetRule::PlainPairs => GateTargets::QubitPairs(QubitPairs::new(targets)),
+            TargetRule::ClassicalControlPairs(pauli) => {
+                GateTargets::ControlledPairs(ControlledPairs::new(self.gate, pauli, targets))
             }
-            GateTargetRule::PlainPairs => GateTargets::QubitPairs(QubitPairs::new(targets)),
-            GateTargetRule::ClassicalControlPairs => {
-                GateTargets::ControlledPairs(ControlledPairs::new(self.gate, targets))
-            }
-            GateTargetRule::MeasurementPairs => {
+            TargetRule::MeasurementPairs => {
                 GateTargets::MeasuredQubitPairs(QubitTargetPairs::new(targets))
             }
-            GateTargetRule::RecOnly => GateTargets::Records(RecordTargets::new(targets)),
-            GateTargetRule::RecOrPauli => {
+            TargetRule::RecOnly => GateTargets::Records(RecordTargets::new(targets)),
+            TargetRule::RecOrPauli => {
                 GateTargets::ObservableTargets(ObservableTargets::new(targets))
             }
-            GateTargetRule::QubitCoords => GateTargets::QubitCoords(QubitIds::new(targets)),
-            GateTargetRule::PauliProducts => GateTargets::PauliProducts(PauliProducts {
+            TargetRule::QubitCoords => GateTargets::QubitCoords(QubitIds::new(targets)),
+            TargetRule::PauliProducts => GateTargets::PauliProducts(PauliProducts {
                 products: ProductSplitter::new(targets),
             }),
-            GateTargetRule::PauliList => GateTargets::PauliTerms(PauliTerms::new(targets)),
+            TargetRule::PauliList => GateTargets::PauliTerms(PauliTerms::new(targets)),
         }
     }
 

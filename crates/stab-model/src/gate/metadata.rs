@@ -152,7 +152,7 @@ impl Gate {
         matches!(
             self.info.target_rule,
             TargetRule::PlainPairs
-                | TargetRule::ClassicalControlPairs
+                | TargetRule::ClassicalControlPairs(_)
                 | TargetRule::MeasurementPairs
         )
     }
@@ -161,7 +161,7 @@ impl Gate {
     pub fn takes_measurement_record_targets(self) -> bool {
         matches!(
             self.info.target_rule,
-            TargetRule::ClassicalControlPairs | TargetRule::RecOnly | TargetRule::RecOrPauli
+            TargetRule::ClassicalControlPairs(_) | TargetRule::RecOnly | TargetRule::RecOrPauli
         )
     }
 
@@ -201,7 +201,16 @@ impl Gate {
     /// `None` for every other gate.
     #[inline]
     pub fn controlled_pauli(self) -> Option<crate::Pauli> {
-        self.info.controlled_pauli
+        match self.info.target_rule {
+            TargetRule::ClassicalControlPairs(pauli) => Some(pauli),
+            _ => None,
+        }
+    }
+
+    /// Returns the internal target rule, which carries per-rule table data.
+    #[inline]
+    pub(crate) fn internal_target_rule(self) -> TargetRule {
+        self.info.target_rule
     }
 
     /// Returns the basis of a single-qubit measurement, reset, or measure-reset gate (`MX`,
@@ -239,7 +248,7 @@ impl From<TargetRule> for GateTargetRule {
             TargetRule::MeasurementQubits => Self::MeasurementQubits,
             TargetRule::MeasurementPads => Self::MeasurementPads,
             TargetRule::PlainPairs => Self::PlainPairs,
-            TargetRule::ClassicalControlPairs => Self::ClassicalControlPairs,
+            TargetRule::ClassicalControlPairs(_) => Self::ClassicalControlPairs,
             TargetRule::MeasurementPairs => Self::MeasurementPairs,
             TargetRule::RecOnly => Self::RecOnly,
             TargetRule::RecOrPauli => Self::RecOrPauli,

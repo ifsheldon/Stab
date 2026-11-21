@@ -64,10 +64,6 @@ pub(super) fn analysis_error_context(error: &AnalysisError) -> Value {
             "parameter": parameter.as_str(),
             "value": value,
         }),
-        AnalysisError::GateDataUnavailable { gate, data } => json!({
-            "gate": gate.canonical_name(),
-            "data": data.as_str(),
-        }),
         AnalysisError::AllocationFailed { operation, .. }
         | AnalysisError::CountOverflow { operation, .. }
         | AnalysisError::NonFiniteCoordinate { operation }

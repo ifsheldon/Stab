@@ -6,7 +6,7 @@ use stab_model::advanced::CancellationCountdown;
 use stab_model::{Cancellation, Circuit, CircuitInstruction, CircuitItem, MemoryBudget, Target};
 
 use crate::AnalysisOperation;
-use crate::{AnalysisError, AnalysisResult, gate_tableau};
+use crate::{AnalysisError, AnalysisResult};
 
 use super::canonicalize::final_canonicalize_measurement_generators;
 use super::classification::{circuit_has_instructions, circuit_requires_reverse_flow_solver};
@@ -438,9 +438,12 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
         let Some(targets) = plain_tableau_targets(group) else {
             return Ok(false);
         };
-        let local_inverse = gate_tableau(instruction.gate())?
-            .inverse()
-            .map_err(stabilizer_to_circuit_error)?;
+        let local_inverse = crate::gate::fixed_unitary_tableau(
+            instruction.gate(),
+            AnalysisOperation::FlowGeneration,
+        )?
+        .inverse()
+        .map_err(stabilizer_to_circuit_error)?;
         if local_inverse.len() != targets.len() {
             return Ok(false);
         }

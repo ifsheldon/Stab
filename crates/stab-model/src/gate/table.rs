@@ -39,7 +39,6 @@ const fn gate_with_inverse(
         can_fuse: true,
         flags: GateFlags::NONE,
         aliases: &[],
-        controlled_pauli: None,
         collapse_basis: None,
     }
 }
@@ -67,11 +66,6 @@ const _: () = {
         assert!(
             GATES[index].kind as usize == index && GateKind::ALL[index] as usize == index,
             "gate table rows must follow GateKind declaration order"
-        );
-        assert!(
-            GATES[index].controlled_pauli.is_some()
-                == matches!(GATES[index].target_rule, TargetRule::ClassicalControlPairs),
-            "exactly the classically controllable gates name a controlled Pauli"
         );
         assert!(
             GATES[index].collapse_basis.is_some()
@@ -221,9 +215,8 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
         id!(XCZ),
         GateCategory::Controlled,
         ArgRule::None,
-        TargetRule::ClassicalControlPairs,
-    )
-    .with_controlled_pauli(Pauli::X),
+        TargetRule::ClassicalControlPairs(Pauli::X),
+    ),
     gate(
         id!(YCX),
         GateCategory::Controlled,
@@ -241,32 +234,28 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
         id!(YCZ),
         GateCategory::Controlled,
         ArgRule::None,
-        TargetRule::ClassicalControlPairs,
-    )
-    .with_controlled_pauli(Pauli::Y),
+        TargetRule::ClassicalControlPairs(Pauli::Y),
+    ),
     gate(
         id!(CX),
         GateCategory::Controlled,
         ArgRule::None,
-        TargetRule::ClassicalControlPairs,
+        TargetRule::ClassicalControlPairs(Pauli::X),
     )
-    .with_controlled_pauli(Pauli::X)
     .with_aliases(&["CNOT", "CX", "ZCX"]),
     gate(
         id!(CY),
         GateCategory::Controlled,
         ArgRule::None,
-        TargetRule::ClassicalControlPairs,
+        TargetRule::ClassicalControlPairs(Pauli::Y),
     )
-    .with_controlled_pauli(Pauli::Y)
     .with_aliases(&["CY", "ZCY"]),
     gate(
         id!(CZ),
         GateCategory::Controlled,
         ArgRule::None,
-        TargetRule::ClassicalControlPairs,
+        TargetRule::ClassicalControlPairs(Pauli::Z),
     )
-    .with_controlled_pauli(Pauli::Z)
     .with_flags(GateFlags::SYMMETRIC_PAIR)
     .with_aliases(&["CZ", "ZCZ"]),
     gate(

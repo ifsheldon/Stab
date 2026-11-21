@@ -104,7 +104,7 @@ static TRACKER_CLIFFORDS: LazyLock<[Option<TrackerClifford>; GateKind::COUNT]> =
     LazyLock::new(|| {
         GateKind::ALL.map(|kind| {
             let gate = kind.gate();
-            if single_qubit_clifford_for_gate(gate).is_ok() {
+            if single_qubit_clifford_for_gate(gate).is_some() {
                 derive_single_qubit_action(gate)
                     .ok()
                     .map(TrackerClifford::One)
@@ -142,7 +142,7 @@ pub(super) fn two_qubit_action(gate: Gate) -> AnalysisResult<CliffordAction<4>> 
 
 fn derive_single_qubit_action(gate: Gate) -> AnalysisResult<CliffordAction<2>> {
     let name = gate.canonical_name();
-    let clifford = single_qubit_clifford_for_gate(gate).map_err(|_| {
+    let clifford = single_qubit_clifford_for_gate(gate).ok_or_else(|| {
         AnalysisError::unsupported(
             AnalysisOperation::ReverseFrameTracking,
             gate.kind(),
@@ -199,10 +199,11 @@ pub(super) fn two_qubit_inverse_tableau(gate: Gate) -> AnalysisResult<Tableau> {
             format!("{gate_name} does not have a unitary inverse for sparse reverse tracking"),
         )
     })?;
-    let inverse_tableau = gate_tableau(inverse).map_err(|error| {
-        AnalysisError::internal(AnalysisOperation::ReverseFrameTracking, format!(
-            "failed to load inverse tableau for {gate_name} during sparse reverse tracking: {error}"
-        ))
+    let inverse_tableau = gate_tableau(inverse).ok_or_else(|| {
+        AnalysisError::internal(
+            AnalysisOperation::ReverseFrameTracking,
+            format!("{gate_name} has no inverse tableau for sparse reverse tracking"),
+        )
     })?;
     if inverse_tableau.len() != 2 {
         return Err(AnalysisError::internal(
@@ -329,7 +330,7 @@ mod tests {
 
     use super::two_qubit_inverse_tableau;
     use super::{derive_two_qubit_action, single_qubit_action, two_qubit_action};
-    use crate::{gate_has_tableau, single_qubit_clifford_for_gate};
+    use crate::{single_qubit_clifford_for_gate, two_qubit_clifford_for_gate};
 
     const BASES: [PauliBasis; 4] = [PauliBasis::I, PauliBasis::X, PauliBasis::Y, PauliBasis::Z];
 
@@ -339,7 +340,7 @@ mod tests {
         let mut double = 0;
         for gate in Gate::all() {
             let name = gate.canonical_name();
-            if let Ok(clifford) = single_qubit_clifford_for_gate(gate) {
+            if let Some(clifford) = single_qubit_clifford_for_gate(gate) {
                 let inverse = clifford.inverse();
                 let action = single_qubit_action(gate).expect("single-qubit action");
                 for basis in [PauliBasis::X, PauliBasis::Y, PauliBasis::Z] {
@@ -352,7 +353,7 @@ mod tests {
                     );
                 }
                 single += 1;
-            } else if gate.is_two_qubit_gate() && gate_has_tableau(gate) {
+            } else if two_qubit_clifford_for_gate(gate).is_some() {
                 let tableau = two_qubit_inverse_tableau(gate).expect("two-qubit inverse tableau");
                 let action = two_qubit_action(gate).expect("two-qubit action");
                 assert_eq!(Some(action), derive_two_qubit_action(gate).ok(), "{name}");

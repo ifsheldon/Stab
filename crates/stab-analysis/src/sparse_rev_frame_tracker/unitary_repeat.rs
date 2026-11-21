@@ -10,7 +10,9 @@ use super::{
     AnticommutationPolicy, SparseReverseFrameTracker, TargetXorSet, qubit_index, replace_qubit_set,
 };
 use crate::AnalysisOperation;
-use crate::{AnalysisError, AnalysisResult, gate_has_tableau, single_qubit_clifford_for_gate};
+use crate::{
+    AnalysisError, AnalysisResult, single_qubit_clifford_for_gate, two_qubit_clifford_for_gate,
+};
 
 /// One supported unitary repeat being folded into a qubit-slot transform.
 ///
@@ -372,11 +374,10 @@ pub(crate) fn is_supported_unitary_circuit(circuit: &Circuit) -> bool {
 }
 
 fn is_supported_unitary_instruction(instruction: &CircuitInstruction) -> bool {
-    if single_qubit_clifford_for_gate(instruction.gate()).is_ok() {
+    if single_qubit_clifford_for_gate(instruction.gate()).is_some() {
         return has_plain_qubit_groups(instruction, 1);
     }
-    instruction.gate().is_two_qubit_gate()
-        && gate_has_tableau(instruction.gate())
+    two_qubit_clifford_for_gate(instruction.gate()).is_some()
         && has_plain_qubit_groups(instruction, 2)
 }
 
@@ -633,8 +634,7 @@ mod tests {
         let mut text = String::from("REPEAT 29 {\n");
         for (index, gate_name) in FIXED_TWO_QUBIT_TABLEAU_GATES.iter().enumerate() {
             let gate = Gate::from_name(gate_name).unwrap();
-            assert!(gate.is_two_qubit_gate(), "{gate_name}");
-            assert!(gate_has_tableau(gate), "{gate_name}");
+            assert!(two_qubit_clifford_for_gate(gate).is_some(), "{gate_name}");
             let left = index % 4;
             let right = (index + 1) % 4;
             text.push_str("    ");

@@ -137,12 +137,12 @@ fn unitary_gates() -> Vec<Gate> {
         .collect::<Vec<_>>();
     for gate in &gates {
         assert!(
-            stab_analysis::gate_has_tableau(*gate),
+            stab_analysis::gate_tableau(*gate).is_some(),
             "unitary gate {} has no tableau for frame lowering",
             gate.canonical_name()
         );
     }
-    for gate in Gate::all().filter(|gate| stab_analysis::gate_has_tableau(*gate)) {
+    for gate in Gate::all().filter(|gate| stab_analysis::gate_tableau(*gate).is_some()) {
         assert!(
             gates.contains(&gate),
             "tableau gate {} is not lowered as a fixed-arity unitary gate",

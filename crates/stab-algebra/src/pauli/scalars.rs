@@ -11,7 +11,7 @@ pub enum PauliSign {
 }
 
 impl PauliSign {
-    pub fn is_negative(self) -> bool {
+    pub const fn is_negative(self) -> bool {
         matches!(self, Self::Minus)
     }
 
@@ -128,7 +128,7 @@ pub enum PauliBasis {
 }
 
 impl PauliBasis {
-    pub fn from_xz(x: bool, z: bool) -> Self {
+    pub const fn from_xz(x: bool, z: bool) -> Self {
         match (x, z) {
             (false, false) => Self::I,
             (true, false) => Self::X,
@@ -137,11 +137,11 @@ impl PauliBasis {
         }
     }
 
-    pub fn x_bit(self) -> bool {
+    pub const fn x_bit(self) -> bool {
         matches!(self, Self::X | Self::Y)
     }
 
-    pub fn z_bit(self) -> bool {
+    pub const fn z_bit(self) -> bool {
         matches!(self, Self::Y | Self::Z)
     }
 

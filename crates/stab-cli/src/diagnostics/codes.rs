@@ -111,7 +111,6 @@ fn analysis_error_code(error: &AnalysisError) -> &'static str {
         AnalysisError::NonGraphlikeError => "non-graphlike-error",
         AnalysisError::InvalidRequest(_) => "invalid-analysis-request",
         AnalysisError::InvalidGeneratorParameter { .. } => "invalid-generator-parameter",
-        AnalysisError::GateDataUnavailable { .. } => "gate-data-unavailable",
         AnalysisError::CountOverflow { .. } => "analysis-count-overflow",
         AnalysisError::NonFiniteCoordinate { .. } => "non-finite-coordinate",
         AnalysisError::MeasurementRecordOutOfRange { .. } => "measurement-record-out-of-range",

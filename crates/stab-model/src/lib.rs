@@ -40,8 +40,8 @@ pub use dialect::ModelDialect;
 pub use error::{ModelError, ModelResult};
 pub use fingerprint::ModelFingerprint;
 pub use gate::{
-    Gate, GateArgumentRule, GateCategory, GateDecomposition, GateKind, GateTargetGroupKind,
-    GateTargetRule,
+    DecompositionStep, Gate, GateArgumentRule, GateCategory, GateDecomposition, GateFlowDescriptor,
+    GateKind, GatePauliString, GateTargetGroupKind, GateTargetRule, GateUnitaryRows,
 };
 pub use ids::{
     AbsoluteTolerance, CircuitDetectorId, CircuitTick, DemRepeatCount, MeasureRecordOffset,
@@ -59,20 +59,18 @@ pub use validation::{ValidationError, ValidationErrorCode};
 
 /// Low-level model operations for parsers and admitted algorithms.
 ///
-/// Every item here relies on an invariant the caller has already established, or exposes raw
-/// pinned table data whose typed interpretation belongs to a higher layer.
+/// Every item here relies on an invariant the caller has already established.
 pub mod advanced {
     use super::{
         Circuit, CircuitInstruction, DemDetectorId, DemInstruction, DemRepeatBlock, DemTarget,
-        DetectorErrorModel, Gate, GateDecomposition, ModelDialect, ModelResult, ObservableId,
-        Probability, RepeatBlock, RepeatCount, Target,
+        DetectorErrorModel, Gate, ModelDialect, ModelResult, ObservableId, Probability,
+        RepeatBlock, RepeatCount, Target,
     };
     pub use crate::circuit::{FoldedCircuitEvent, FoldedVisitError, visit_folded_circuit};
     pub use crate::dem::advanced::{
         DemBlockSummary, DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem,
         FoldedDemTraversal, FoldedDemVisitor, shifted_targets,
     };
-    pub use crate::gate::GateUnitaryRows;
     pub use stab_foundation::CancellationCountdown;
 
     /// Conservative retained bytes of one circuit declaration under [`crate::ParseLimits`].
@@ -191,23 +189,5 @@ pub mod advanced {
         tag: Option<&[u8]>,
     ) -> ModelResult<DemInstruction> {
         DemInstruction::error_from_targets(probability, targets, tag)
-    }
-
-    /// Returns the raw pinned flow descriptors for a gate.
-    #[inline]
-    pub fn gate_flow_descriptors(gate: Gate) -> Option<&'static [&'static str]> {
-        crate::gate::gate_flow_descriptors(gate.kind())
-    }
-
-    /// Returns the raw pinned scalar unitary rows for a gate.
-    #[inline]
-    pub fn gate_unitary_rows(gate: Gate) -> Option<GateUnitaryRows> {
-        crate::gate::gate_unitary_rows(gate.kind())
-    }
-
-    /// Returns the raw pinned H/S/CX/M/R decomposition descriptor for a gate.
-    #[inline]
-    pub fn gate_decomposition(gate: Gate) -> Option<GateDecomposition> {
-        crate::gate::gate_decomposition_text(gate.kind()).map(GateDecomposition::new)
     }
 }

@@ -1,5 +1,6 @@
 #![allow(
     clippy::expect_used,
+    clippy::panic,
     clippy::string_slice,
     reason = "canonical owner tests use fixed compatibility fixtures and inspect exact values"
 )]
@@ -10,10 +11,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use num_complex::Complex32;
 use stab_algebra::{Endianness, Flow, Tableau};
 use stab_analysis::{
-    circuit_to_tableau, circuit_without_noise, decomposed_circuit, flattened_circuit,
-    gate_decomposition_to_circuit, gate_flows, gate_h_s_cx_m_r_decomposition, gate_has_flows,
-    gate_has_h_s_cx_m_r_decomposition, gate_has_tableau, gate_has_unitary_matrix, gate_tableau,
-    gate_unitary_matrix,
+    circuit_to_tableau, circuit_without_noise, decomposed_circuit, flattened_circuit, gate_flows,
+    gate_tableau, gate_unitary_matrix,
 };
 use stab_model::{Circuit, CircuitItem, Gate};
 
@@ -47,10 +46,28 @@ fn pf1_gate_tableau_metadata() {
 
     let expected_tableau_names = expected_tableau_supported_gate_names();
     let actual_tableau_names = Gate::all()
-        .filter(|gate| gate_has_tableau(*gate))
+        .filter(|gate| gate_tableau(*gate).is_some())
         .map(|gate| gate.canonical_name())
         .collect::<BTreeSet<_>>();
     assert_eq!(actual_tableau_names, expected_tableau_names);
+
+    // Stim stores a unitary gate's tableau as the images of X_0, Z_0, X_1, Z_1 in `flow_data`.
+    let upstream = upstream_gate_flow_data();
+    for &gate_name in &expected_tableau_names {
+        let images = upstream.get(gate_name).expect("upstream tableau data");
+        let expected = match images.as_slice() {
+            [x, z] => Tableau::gate1(x, z),
+            [x0, z0, x1, z1] => Tableau::gate2(x0, z0, x1, z1),
+            other => panic!("{gate_name} has unexpected tableau data {other:?}"),
+        }
+        .expect("upstream tableau data parses");
+        let gate = Gate::from_name(gate_name).expect("gate");
+        assert_eq!(
+            gate_tableau(gate),
+            Some(expected),
+            "{gate_name} tableau should match pinned Stim v1.16.0"
+        );
+    }
 
     for gate_name in expected_tableau_names {
         let gate = Gate::from_name(gate_name).expect("gate");
@@ -66,18 +83,9 @@ fn pf1_gate_tableau_metadata() {
         );
     }
 
-    for gate in Gate::all() {
-        assert_eq!(gate_has_tableau(gate), gate_tableau(gate).is_ok());
-    }
-
     for unsupported in ["M", "R", "DETECTOR", "SPP"] {
         let gate = Gate::from_name(unsupported).expect("unsupported gate");
-        assert!(!gate_has_tableau(gate), "{unsupported}");
-        let error = gate_tableau(gate).expect_err("reject missing tableau data");
-        assert!(
-            error.to_string().contains("does not have tableau data"),
-            "{error}"
-        );
+        assert_eq!(gate_tableau(gate), None, "{unsupported}");
     }
 }
 
@@ -116,7 +124,6 @@ fn cq2_gate_unitary_matrix_contract() {
     let h = Gate::from_name("H").expect("H");
     let h_scale = f32::sqrt(0.5);
     let h_matrix = gate_unitary_matrix(h).expect("H matrix");
-    assert!(gate_has_unitary_matrix(h));
     assert_matrix_close(
         &h_matrix.to_vecs(),
         &[
@@ -151,7 +158,7 @@ fn cq2_gate_unitary_matrix_contract() {
 
     let expected_unitary_names = expected_tableau_supported_gate_names();
     let actual_unitary_names = Gate::all()
-        .filter(|gate| gate_has_unitary_matrix(*gate))
+        .filter(|gate| gate_unitary_matrix(*gate).is_some())
         .map(|gate| gate.canonical_name())
         .collect::<BTreeSet<_>>();
     assert_eq!(actual_unitary_names, expected_unitary_names);
@@ -209,20 +216,9 @@ fn cq2_gate_unitary_matrix_contract() {
         "CX unitary metadata must use Stim's little-endian qubit order"
     );
 
-    for gate in Gate::all() {
-        assert_eq!(
-            gate_has_unitary_matrix(gate),
-            gate_unitary_matrix(gate).is_ok(),
-            "{} has_unitary_matrix should match unitary matrix materialization",
-            gate.canonical_name()
-        );
-    }
-
     for unsupported in ["MXX", "MPP", "SPP", "SPP_DAG", "M", "DETECTOR", "X_ERROR"] {
         let gate = Gate::from_name(unsupported).expect("unsupported gate");
-        assert!(!gate_has_unitary_matrix(gate), "{unsupported}");
-        let error = gate_unitary_matrix(gate).expect_err("reject unsupported unitary matrix data");
-        assert!(error.to_string().contains("unitary matrix data"), "{error}");
+        assert_eq!(gate_unitary_matrix(gate), None, "{unsupported}");
     }
 }
 
@@ -261,42 +257,31 @@ fn cq2_circuit_api_without_noise_transform() {
 fn cq2_gate_decomposition_metadata_contract() {
     // Adapted from Stim v1.16.0 src/stim/gates/gates.test.cc and gate_data_*.cc metadata.
     let h = Gate::from_name("H").expect("H");
-    assert!(gate_has_h_s_cx_m_r_decomposition(h));
-    assert_eq!(
-        gate_h_s_cx_m_r_decomposition(h)
-            .expect("H decomposition")
-            .as_stim_str(),
-        "\nH 0\n"
-    );
-    assert_eq!(
-        gate_decomposition_to_circuit(gate_h_s_cx_m_r_decomposition(h).expect("H decomposition"))
-            .expect("parse H decomposition")
-            .to_stim_string(),
-        "H 0\n"
-    );
+    let h_decomposition = h.h_s_cx_m_r_decomposition().expect("H decomposition");
+    assert_eq!(h_decomposition.to_string(), "H 0\n");
+    assert_eq!(h_decomposition.to_circuit().to_stim_string(), "H 0\n");
 
     let cx = Gate::from_name("CX").expect("CX");
     assert_eq!(
-        gate_h_s_cx_m_r_decomposition(cx)
+        cx.h_s_cx_m_r_decomposition()
             .expect("CX decomposition")
-            .as_stim_str(),
-        "\nCNOT 0 1\n"
+            .to_string(),
+        "CX 0 1\n"
     );
 
     let mxx = Gate::from_name("MXX").expect("MXX");
     assert_eq!(
-        gate_decomposition_to_circuit(
-            gate_h_s_cx_m_r_decomposition(mxx).expect("MXX decomposition")
-        )
-        .expect("parse MXX decomposition")
-        .to_stim_string(),
+        mxx.h_s_cx_m_r_decomposition()
+            .expect("MXX decomposition")
+            .to_circuit()
+            .to_stim_string(),
         concat!("CX 0 1\n", "H 0\n", "M 0\n", "H 0\n", "CX 0 1\n")
     );
 
     let expected_decomposition_names = expected_decomposition_supported_gate_names();
     assert_eq!(expected_decomposition_names.len(), 61);
     let actual_decomposition_names = Gate::all()
-        .filter(|gate| gate_has_h_s_cx_m_r_decomposition(*gate))
+        .filter(|gate| gate.h_s_cx_m_r_decomposition().is_some())
         .map(|gate| gate.canonical_name())
         .collect::<BTreeSet<_>>();
     assert_eq!(actual_decomposition_names, expected_decomposition_names);
@@ -308,23 +293,16 @@ fn cq2_gate_decomposition_metadata_contract() {
     );
     for gate_name in expected_decomposition_names {
         let gate = Gate::from_name(gate_name).expect("gate");
-        let decomposition = gate_h_s_cx_m_r_decomposition(gate).expect("gate decomposition");
+        let decomposed = gate
+            .h_s_cx_m_r_decomposition()
+            .expect("gate decomposition")
+            .to_circuit();
         assert_eq!(
-            decomposition.as_stim_str(),
-            *upstream_texts.get(gate_name).expect("upstream text"),
-            "{gate_name} decomposition text should match pinned Stim v1.16.0"
+            decomposed,
+            circuit(upstream_texts.get(gate_name).expect("upstream text")),
+            "{gate_name} decomposition should match pinned Stim v1.16.0"
         );
-        let decomposed = gate_decomposition_to_circuit(decomposition).expect("parse decomposition");
         assert_h_s_cx_m_r_base(&decomposed, gate_name);
-    }
-
-    for gate in Gate::all() {
-        assert_eq!(
-            gate_has_h_s_cx_m_r_decomposition(gate),
-            gate_h_s_cx_m_r_decomposition(gate).is_ok(),
-            "{} has_h_s_cx_m_r_decomposition should match materialization",
-            gate.canonical_name()
-        );
     }
 
     for unsupported in [
@@ -335,10 +313,7 @@ fn cq2_gate_decomposition_metadata_contract() {
         "HERALDED_ERASE",
     ] {
         let gate = Gate::from_name(unsupported).expect("unsupported gate");
-        assert!(!gate_has_h_s_cx_m_r_decomposition(gate), "{unsupported}");
-        let error =
-            gate_h_s_cx_m_r_decomposition(gate).expect_err("reject missing decomposition data");
-        assert!(error.to_string().contains("decomposition data"), "{error}");
+        assert_eq!(gate.h_s_cx_m_r_decomposition(), None, "{unsupported}");
     }
 
     for gate_name in expected_tableau_supported_gate_names() {
@@ -346,10 +321,10 @@ fn cq2_gate_decomposition_metadata_contract() {
             continue;
         }
         let gate = Gate::from_name(gate_name).expect("gate");
-        let decomposition = gate_decomposition_to_circuit(
-            gate_h_s_cx_m_r_decomposition(gate).expect("unitary gate should have decomposition"),
-        )
-        .expect("parse decomposition");
+        let decomposition = gate
+            .h_s_cx_m_r_decomposition()
+            .expect("unitary gate should have decomposition")
+            .to_circuit();
         assert_eq!(
             circuit_to_tableau(&decomposition, false, false, false).expect("decomposition tableau"),
             gate_tableau(gate).expect("gate tableau"),
@@ -359,9 +334,9 @@ fn cq2_gate_decomposition_metadata_contract() {
 
     for gate_name in ["M", "MR", "MXX", "MPP", "SPP", "SPP_DAG"] {
         let gate = Gate::from_name(gate_name).expect("non-tableau decomposition gate");
-        assert!(gate_has_h_s_cx_m_r_decomposition(gate), "{gate_name}");
+        assert!(gate.h_s_cx_m_r_decomposition().is_some(), "{gate_name}");
         assert!(
-            gate_tableau(gate).is_err(),
+            gate_tableau(gate).is_none(),
             "{gate_name} decomposition metadata should not imply tableau metadata"
         );
     }
@@ -371,7 +346,6 @@ fn cq2_gate_decomposition_metadata_contract() {
 fn cq2_gate_flow_metadata_contract() {
     // Adapted from Stim v1.16.0 GateData flow examples and gate_data stabilizer-flow checks.
     let h = Gate::from_name("H").expect("H");
-    assert!(gate_has_flows(h));
     assert_eq!(
         flow_texts(gate_flows(h).expect("H flows")),
         ["X -> Z", "Z -> X"].map(String::from).to_vec()
@@ -443,10 +417,27 @@ fn cq2_gate_flow_metadata_contract() {
 
     let expected_flow_names = expected_flow_supported_gate_names();
     let actual_flow_names = Gate::all()
-        .filter(|gate| gate_has_flows(*gate))
+        .filter(|gate| gate_flows(*gate).is_some())
         .map(|gate| gate.canonical_name())
         .collect::<BTreeSet<_>>();
     assert_eq!(actual_flow_names, expected_flow_names);
+
+    // Non-unitary gates list their flows in Stim's `flow_data`; unitary gates list tableau images.
+    let upstream = upstream_gate_flow_data();
+    for gate in Gate::all().filter(|gate| gate.flow_descriptors().is_some()) {
+        let gate_name = gate.canonical_name();
+        let expected = upstream
+            .get(gate_name)
+            .expect("upstream flow data")
+            .iter()
+            .map(|text| text.parse::<Flow>().expect("upstream flow parses"))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            gate_flows(gate),
+            Some(expected),
+            "{gate_name} flows should match pinned Stim v1.16.0"
+        );
+    }
 
     for gate_name in expected_tableau_supported_gate_names() {
         let gate = Gate::from_name(gate_name).expect("gate");
@@ -474,9 +465,7 @@ fn cq2_gate_flow_metadata_contract() {
 
     for unsupported in ["MPAD", "DETECTOR", "X_ERROR", "PAULI_CHANNEL_1"] {
         let gate = Gate::from_name(unsupported).expect("unsupported gate");
-        assert!(!gate_has_flows(gate), "{unsupported}");
-        let error = gate_flows(gate).expect_err("reject unsupported flow data");
-        assert!(error.to_string().contains("flow metadata"), "{error}");
+        assert_eq!(gate_flows(gate), None, "{unsupported}");
     }
 }
 
@@ -524,26 +513,48 @@ fn assert_h_s_cx_m_r_base(circuit: &Circuit, gate_name: &str) {
     }
 }
 
+const UPSTREAM_GATE_DATA: [&str; 14] = [
+    include_str!("../../../vendor/stim/src/stim/gates/gate_data_annotations.cc"),
+    include_str!("../../../vendor/stim/src/stim/gates/gate_data_blocks.cc"),
+    include_str!("../../../vendor/stim/src/stim/gates/gate_data_collapsing.cc"),
+    include_str!("../../../vendor/stim/src/stim/gates/gate_data_controlled.cc"),
+    include_str!("../../../vendor/stim/src/stim/gates/gate_data_hada.cc"),
+    include_str!("../../../vendor/stim/src/stim/gates/gate_data_heralded.cc"),
+    include_str!("../../../vendor/stim/src/stim/gates/gate_data_noisy.cc"),
+    include_str!("../../../vendor/stim/src/stim/gates/gate_data_pair_measure.cc"),
+    include_str!("../../../vendor/stim/src/stim/gates/gate_data_pauli.cc"),
+    include_str!("../../../vendor/stim/src/stim/gates/gate_data_pauli_product.cc"),
+    include_str!("../../../vendor/stim/src/stim/gates/gate_data_period_3.cc"),
+    include_str!("../../../vendor/stim/src/stim/gates/gate_data_period_4.cc"),
+    include_str!("../../../vendor/stim/src/stim/gates/gate_data_pp.cc"),
+    include_str!("../../../vendor/stim/src/stim/gates/gate_data_swaps.cc"),
+];
+
 fn upstream_decomposition_texts() -> BTreeMap<&'static str, &'static str> {
-    [
-        include_str!("../../../vendor/stim/src/stim/gates/gate_data_annotations.cc"),
-        include_str!("../../../vendor/stim/src/stim/gates/gate_data_blocks.cc"),
-        include_str!("../../../vendor/stim/src/stim/gates/gate_data_collapsing.cc"),
-        include_str!("../../../vendor/stim/src/stim/gates/gate_data_controlled.cc"),
-        include_str!("../../../vendor/stim/src/stim/gates/gate_data_hada.cc"),
-        include_str!("../../../vendor/stim/src/stim/gates/gate_data_heralded.cc"),
-        include_str!("../../../vendor/stim/src/stim/gates/gate_data_noisy.cc"),
-        include_str!("../../../vendor/stim/src/stim/gates/gate_data_pair_measure.cc"),
-        include_str!("../../../vendor/stim/src/stim/gates/gate_data_pauli.cc"),
-        include_str!("../../../vendor/stim/src/stim/gates/gate_data_pauli_product.cc"),
-        include_str!("../../../vendor/stim/src/stim/gates/gate_data_period_3.cc"),
-        include_str!("../../../vendor/stim/src/stim/gates/gate_data_period_4.cc"),
-        include_str!("../../../vendor/stim/src/stim/gates/gate_data_pp.cc"),
-        include_str!("../../../vendor/stim/src/stim/gates/gate_data_swaps.cc"),
-    ]
-    .into_iter()
-    .flat_map(upstream_decompositions_from_file)
-    .collect()
+    UPSTREAM_GATE_DATA
+        .into_iter()
+        .flat_map(upstream_decompositions_from_file)
+        .collect()
+}
+
+/// Every gate's quoted `flow_data` entries, skipping `//` comments inside the list.
+fn upstream_gate_flow_data() -> BTreeMap<&'static str, Vec<&'static str>> {
+    let mut out = BTreeMap::new();
+    for file in UPSTREAM_GATE_DATA {
+        for block in file.split(".name = \"").skip(1) {
+            let (name, rest) = block.split_once('"').expect("gate name");
+            let (_, rest) = rest.split_once(".flow_data =").expect("flow_data field");
+            let (_, rest) = rest.split_once('{').expect("flow_data list");
+            let (list, _) = rest.split_once('}').expect("flow_data list end");
+            let entries = list
+                .lines()
+                .map(|line| line.split_once("//").map_or(line, |(code, _)| code))
+                .flat_map(|line| line.split('"').skip(1).step_by(2))
+                .collect();
+            out.insert(name, entries);
+        }
+    }
+    out
 }
 
 fn upstream_decompositions_from_file(text: &'static str) -> BTreeMap<&'static str, &'static str> {

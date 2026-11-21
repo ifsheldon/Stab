@@ -1,8 +1,8 @@
-use stab_algebra::{PauliBasis, PauliSign, Tableau, TableauAppender};
+use stab_algebra::{PauliBasis, PauliSign, SingleQubitClifford, Tableau, TableauAppender};
 use stab_model::{Circuit, Gate, GateKind, QubitId, Target};
 
 use crate::AnalysisOperation;
-use crate::{AnalysisError, AnalysisResult, gate_tableau};
+use crate::{AnalysisError, AnalysisResult};
 
 struct SynthesisContext {
     remaining: TableauAppender,
@@ -35,11 +35,11 @@ impl SynthesisContext {
             pending_gate: None,
             pending_targets: Vec::new(),
             qubit_targets,
-            h_tableau: gate_tableau(h_gate)?,
+            h_tableau: SingleQubitClifford::H.tableau(),
             h_gate,
-            s_tableau: gate_tableau(s_gate)?,
+            s_tableau: SingleQubitClifford::S.tableau(),
             s_gate,
-            cx_tableau: gate_tableau(cx_gate)?,
+            cx_tableau: crate::gate::CX_CLIFFORD.tableau(),
             cx_gate,
         })
     }

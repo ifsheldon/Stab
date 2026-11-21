@@ -54,6 +54,30 @@ impl Flow {
         }
     }
 
+    /// Creates a flow whose output also includes the given measurement records, with no
+    /// observable terms.
+    ///
+    /// The records are copied from a slice the caller already holds, so their storage is bounded
+    /// by memory the caller has allocated.
+    pub fn from_paulis_and_measurements(
+        input: PauliString,
+        output: PauliString,
+        measurements: &[i32],
+    ) -> Self {
+        let mut result = Self {
+            input,
+            output,
+            measurements: measurements
+                .iter()
+                .copied()
+                .map(FlowMeasurementIndex::new)
+                .collect(),
+            observables: Vec::new(),
+        };
+        result.canonicalize();
+        result
+    }
+
     /// Constructs a canonical stabilizer flow from Pauli and classical terms.
     ///
     /// # Errors

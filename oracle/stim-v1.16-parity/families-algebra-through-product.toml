@@ -923,7 +923,7 @@ name = "gate_catalog::tests::pinned_stim_catalog_matches_model_metadata"
 [[families]]
 id = "gate-catalog.flow-metadata"
 area = "gate-catalog"
-contract = "Every gate with pinned stabilizer-flow metadata exposes the same flow set, and gates without flow metadata reject the query."
+contract = "Every gate with pinned stabilizer-flow metadata exposes the same flow set, and gates without flow metadata answer with no flows."
 stim_refs = ["src/stim/gates/gates.test.cc", "src/stim/gates/gates_test.py"]
 coverage = ["capability:gate-flow-metadata"]
 status = "done"
@@ -939,7 +939,7 @@ name = "cq2_gate_flow_metadata_contract"
 [[families]]
 id = "gate-catalog.h-s-cx-m-r-decomposition-metadata"
 area = "gate-catalog"
-contract = "Every gate with pinned H/S/CX/M/R decomposition metadata matches Stim's exact decomposition text and lowers to the declared base set."
+contract = "Every gate with pinned H/S/CX/M/R decomposition metadata matches the circuit of Stim's decomposition text and lowers to the declared base set."
 stim_refs = ["src/stim/gates/gates.test.cc", "src/stim/gates/gates_test.py"]
 status = "done"
 owner = "stab-analysis"
@@ -984,7 +984,7 @@ name = "canonical_gate_registry_owns_aliases_and_metadata"
 [[families]]
 id = "gate-catalog.tableau-metadata"
 area = "gate-catalog"
-contract = "Every Clifford gate with pinned tableau metadata exposes the same local tableau, and gates without tableau metadata reject the query."
+contract = "Every Clifford gate with pinned tableau metadata exposes the same local tableau, and gates without tableau metadata answer with no tableau."
 stim_refs = ["src/stim/gates/gates.test.cc", "src/stim/gates/gates_test.py"]
 coverage = ["capability:gate-tableau-metadata"]
 status = "done"
@@ -1000,7 +1000,7 @@ name = "pf1_gate_tableau_metadata"
 [[families]]
 id = "gate-catalog.unitary-metadata"
 area = "gate-catalog"
-contract = "Every one- and two-qubit gate with pinned fixed-shape unitary metadata exposes the same little-endian matrix and inverse relation, and unsupported gates reject the query."
+contract = "Every one- and two-qubit gate with pinned fixed-shape unitary metadata exposes the same little-endian matrix and inverse relation, and unsupported gates answer with no matrix."
 stim_refs = ["src/stim/gates/gates.test.cc", "src/stim/gates/gates_test.py"]
 coverage = ["capability:gate-unitary-metadata"]
 status = "done"

@@ -384,13 +384,14 @@ Its variants now name the failure, and every message a user can reach keeps its 
 | Removed variant | Replacement |
 | --- | --- |
 | `InvalidDetectorErrorModel { message }` | `NonDeterministicTargets`, `NoiseRequiresApproximation`, `UnanalyzableNoise`, `ErrorDecompositionFailed`, `NonGraphlikeError`, `InvalidRequest`, `AntiHermitianPauliProduct`, `MeasurementRecordOutOfRange`, `UnsupportedInput`, `CountOverflow`, `AllocationFailed`, or `InternalInvariant`, by meaning |
-| `InvalidTableauConversion { message }` | `NonUnitaryOperation`, `PauliNotPreserved`, `GateDataUnavailable`, `InvalidRequest`, `AntiHermitianPauliProduct`, `MeasurementRecordOutOfRange`, `UnsupportedInput`, `CountOverflow`, or `InternalInvariant` |
+| `InvalidTableauConversion { message }` | `NonUnitaryOperation`, `PauliNotPreserved`, `InvalidRequest`, `AntiHermitianPauliProduct`, `MeasurementRecordOutOfRange`, `UnsupportedInput`, `CountOverflow`, or `InternalInvariant` |
 | `InvalidCircuitSimplification { message }` | `AntiHermitianPauliProduct` or `InternalInvariant` |
 | `InvalidDomainValue { kind, value }` | `InvalidGeneratorParameter { parameter, value }`, `ResourceLimit` for the generation budget, `CountOverflow`, `AllocationFailed`, or `InternalInvariant` |
 | `InvalidResultFormat { message }` | `NonFiniteCoordinate { operation }` |
-| `stab_analysis::ResourceOperation` | `stab_analysis::AnalysisOperation`, now `#[non_exhaustive]`, with the added operations `CircuitGeneration`, `CircuitInverse`, `CircuitSimplification`, `FlowMeasurementSolving`, `GateData`, `ReverseFrameTracking`, and `TableauSynthesis` |
+| `stab_analysis::ResourceOperation` | `stab_analysis::AnalysisOperation`, now `#[non_exhaustive]`, with the added operations `CircuitGeneration`, `CircuitInverse`, `CircuitSimplification`, `FlowMeasurementSolving`, `ReverseFrameTracking`, and `TableauSynthesis` |
 
-The typed variants carry data instead of prose: `NonDeterministicTargets` holds the detector and observable targets, `NonUnitaryOperation` the gate and a `NonUnitaryReason`, `PauliNotPreserved` the gate and a `PauliCollapse`, `NoiseRequiresApproximation` the gate and an optional `ThresholdExcess`, `ErrorDecompositionFailed` the component, `InvalidRequest` an `AnalysisRequestError`, `InvalidGeneratorParameter` a `GeneratorParameter`, and `GateDataUnavailable` the gate and a `GateData`.
+The typed variants carry data instead of prose: `NonDeterministicTargets` holds the detector and observable targets, `NonUnitaryOperation` the gate and a `NonUnitaryReason`, `PauliNotPreserved` the gate and a `PauliCollapse`, `NoiseRequiresApproximation` the gate and an optional `ThresholdExcess`, `ErrorDecompositionFailed` the component, `InvalidRequest` an `AnalysisRequestError`, and `InvalidGeneratorParameter` a `GeneratorParameter`.
+A gate without a tableau, flows, a unitary matrix, or a decomposition is not an error; see [Typed Gate Data](#typed-gate-data).
 A search that completes without finding a logical error is not an error; see [Logical Error Search Outcome](#logical-error-search-outcome).
 `CountOverflow`, `AllocationFailed`, `UnsupportedInput`, `MeasurementRecordOutOfRange`, and `InternalInvariant` carry their `AnalysisOperation` and a detail string, and `AnalysisError::operation()` returns the operation of any variant that has one.
 `AnalysisError` is deliberately not `#[non_exhaustive]`, so a consumer that maps it to codes fails to compile when a variant is added.
@@ -400,7 +401,7 @@ The generation budget refusal is now `AnalysisError::ResourceLimit` for `Analysi
 
 The command line's machine-readable codes follow the variants.
 The analysis use of `invalid-detector-error-model` is split into `non-deterministic-targets`, `approximate-disjoint-errors-required`, `unanalyzable-noise`, `error-decomposition-failed`, `non-graphlike-error`, `invalid-analysis-request`, `anti-hermitian-pauli-product`, `measurement-record-out-of-range`, `unsupported-analysis-input`, `analysis-count-overflow`, and `analysis-invariant-failed`, and that code now means only a malformed detector error model.
-`invalid-tableau-conversion` and `invalid-circuit-simplification` are removed in favour of `non-unitary-operation`, `pauli-not-preserved`, `gate-data-unavailable`, and the codes above; the analysis uses of `invalid-domain-value` and `invalid-result-format` become `invalid-generator-parameter` and `non-finite-coordinate`; and allocator refusals from analysis and from the model carry `resource-limit-exceeded`.
+`invalid-tableau-conversion` and `invalid-circuit-simplification` are removed in favour of `non-unitary-operation`, `pauli-not-preserved`, and the codes above; the analysis uses of `invalid-domain-value` and `invalid-result-format` become `invalid-generator-parameter` and `non-finite-coordinate`; and allocator refusals from analysis and from the model carry `resource-limit-exceeded`.
 The JSON `context` of these diagnostics, which was empty, now carries the typed fields, for example `targets` for non-deterministic targets and `operation`, `gate`, and `reason` for a non-unitary operation.
 
 ## Shared Foundation Crate And One Budget Refusal
@@ -443,6 +444,35 @@ Refusals that were misreported are now typed:
 - A budget refusal raised while a sample run is writing reports `resource-limit-exceeded` instead of `sampling-execution-failed`.
 - The JSON `span` of a refusal that has no source position is `null` instead of an empty span at byte zero.
 
+## Typed Gate Data
+
+Built-in gate data is typed in `stab-model` and no product crate parses gate text at run time.
+
+- `Gate::flow_descriptors()` returns `Option<&'static [GateFlowDescriptor]>` for the non-unitary gates; a descriptor has a signed `GatePauliString` input and output and `MeasureRecordOffset` measurements, and its `Display` is Stim's flow text.
+- `Gate::h_s_cx_m_r_decomposition()` returns `Option<GateDecomposition>`, whose `steps()` are `DecompositionStep::{H, S, Cx, M, R}` over local qubit indices and whose `to_circuit()` is infallible.
+- `Gate::unitary_rows()` returns `Option<GateUnitaryRows>`.
+- `stab_algebra::TwoQubitClifford` holds a two-qubit gate's Pauli images, checked at compile time, beside `SingleQubitClifford`; `Flow::from_paulis_and_measurements` builds a flow without parsing.
+- `ControlledPairs::controlled_pauli()` names the Pauli a controlled gate applies.
+
+The analysis getters answer with `Option` because "this gate has no such data" is an ordinary answer about a closed table.
+
+| Removed | Replacement |
+| --- | --- |
+| `gate_tableau`, `gate_flows`, and `gate_unitary_matrix` returning `AnalysisResult` | The same functions returning `Option` |
+| `single_qubit_clifford_for_gate` returning `StabilizerResult` | The same function returning `Option`, with `two_qubit_clifford_for_gate` beside it |
+| `gate_has_tableau`, `gate_has_flows`, `gate_has_unitary_matrix`, `gate_has_h_s_cx_m_r_decomposition` | `.is_some()` on the getter |
+| `gate_h_s_cx_m_r_decomposition(gate)` | `Gate::h_s_cx_m_r_decomposition()` |
+| `gate_decomposition_to_circuit(decomposition)` | `GateDecomposition::to_circuit()` |
+| `GateDecomposition::as_stim_str()` and `AsRef<str>` | `Display`, or `steps()` |
+| `stab_model::advanced::{gate_flow_descriptors, gate_unitary_rows, gate_decomposition, GateUnitaryRows}` | The `Gate` methods above and `stab_model::GateUnitaryRows` |
+| `AnalysisError::GateDataUnavailable`, `GateData`, `AnalysisOperation::GateData` | `None` from the getter |
+| `StabilizerError::InvalidSingleQubitCliffordGate` | `None` from `single_qubit_clifford_for_gate` |
+| Diagnostic code `gate-data-unavailable` | None; no command emitted it |
+
+`Tableau::gate1` and `Tableau::gate2` remain for caller-supplied text, as in Stim.
+`stab_core` re-exports `DecompositionStep`, `GateFlowDescriptor`, `GatePauliString`, `GateUnitaryRows`, `TwoQubitClifford`, and `TwoQubitPauli` at its root.
+No command output changes.
+
 ## Typed Instruction Views
 
 A `CircuitInstruction` is validated against its gate's rules when it is built, so its arguments and targets are read through two infallible, allocation-free views instead of fallible getters.
@@ -466,7 +496,7 @@ The view types are exported from `stab_model` and are not root re-exports of `st
 
 ## Trimmed `stab_model::advanced`
 
-`stab_model::advanced` keeps only operations that rely on an invariant the caller has already established: `CircuitBuilder`, the folded circuit and DEM traversals, the tag-byte constructors, the raw gate tables, and the admission formula the engine shares.
+`stab_model::advanced` keeps only operations that rely on an invariant the caller has already established: `CircuitBuilder`, the folded circuit and DEM traversals, the tag-byte constructors, and the admission formula the engine shares.
 Free functions that wrapped a method are inherent methods or associated items on their type.
 
 | Removed from `stab_model::advanced` | Replacement |

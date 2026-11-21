@@ -1,17 +1,11 @@
-use std::str::FromStr;
-
 use num_complex::Complex32;
 use stab_algebra::{
-    Flow, PauliBasis, PauliSign, PauliString, SingleQubitClifford, StabilizerError,
-    StabilizerResult, Tableau,
+    Flow, PauliBasis, PauliSign, PauliString, SingleQubitClifford, Tableau, TwoQubitClifford,
+    TwoQubitPauli,
 };
-use stab_model::advanced::{
-    GateUnitaryRows, gate_decomposition, gate_flow_descriptors, gate_unitary_rows,
-};
-use stab_model::{Circuit, Gate, GateDecomposition, GateKind};
+use stab_model::{Gate, GateKind, GatePauliString, GateUnitaryRows, Pauli};
 
-use crate::AnalysisOperation;
-use crate::{AnalysisError, AnalysisResult, GateData};
+use crate::{AnalysisError, AnalysisOperation, AnalysisResult};
 
 /// Fixed-shape unitary matrix metadata for a one- or two-qubit Stim gate.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -52,9 +46,10 @@ impl GateUnitaryMatrix {
     }
 }
 
-/// Resolves a closed-dialect gate into its single-qubit Clifford algebra value.
-pub fn single_qubit_clifford_for_gate(gate: Gate) -> StabilizerResult<SingleQubitClifford> {
-    let clifford = match gate.kind() {
+/// Returns the single-qubit Clifford of a one-qubit unitary gate, or `None` for every other
+/// gate.
+pub fn single_qubit_clifford_for_gate(gate: Gate) -> Option<SingleQubitClifford> {
+    Some(match gate.kind() {
         GateKind::I => SingleQubitClifford::I,
         GateKind::X => SingleQubitClifford::X,
         GateKind::Y => SingleQubitClifford::Y,
@@ -135,156 +130,41 @@ pub fn single_qubit_clifford_for_gate(gate: Gate) -> StabilizerResult<SingleQubi
         | GateKind::ISWAP_DAG
         | GateKind::MXX
         | GateKind::MYY
-        | GateKind::MZZ => {
-            return Err(StabilizerError::InvalidSingleQubitCliffordGate {
-                gate: gate.canonical_name().to_owned(),
-            });
-        }
-    };
-    Ok(clifford)
-}
-
-/// Returns the local Clifford tableau metadata for a gate with known tableau data.
-pub fn gate_tableau(gate: Gate) -> AnalysisResult<Tableau> {
-    if let Ok(clifford) = single_qubit_clifford_for_gate(gate) {
-        return Ok(clifford.tableau());
-    }
-    let outputs = two_qubit_outputs(gate.kind())
-        .ok_or_else(|| AnalysisError::gate_data_unavailable(gate.kind(), GateData::Tableau))?;
-    Tableau::gate2(outputs[0], outputs[1], outputs[2], outputs[3])
-        .map_err(|error| AnalysisError::internal(AnalysisOperation::GateData, error.to_string()))
-}
-
-/// Returns true when [`gate_tableau`] can produce local Clifford tableau metadata for `gate`.
-pub fn gate_has_tableau(gate: Gate) -> bool {
-    single_qubit_clifford_for_gate(gate).is_ok() || two_qubit_outputs(gate.kind()).is_some()
-}
-
-/// Returns Stim v1.16.0 gate-table stabilizer flow metadata.
-pub fn gate_flows(gate: Gate) -> AnalysisResult<Vec<Flow>> {
-    let gate_name = gate.canonical_name();
-    if let Some(descriptors) = gate_flow_descriptors(gate) {
-        return descriptors
-            .iter()
-            .map(|descriptor| {
-                Flow::from_str(descriptor).map_err(|error| {
-                    AnalysisError::internal(
-                        AnalysisOperation::GateData,
-                        format!("gate {gate_name} flow metadata is invalid: {error}"),
-                    )
-                })
-            })
-            .collect();
-    }
-    if !gate_has_flows(gate) {
-        return Err(AnalysisError::gate_data_unavailable(
-            gate.kind(),
-            GateData::Flows,
-        ));
-    }
-    let tableau = gate_tableau(gate)?;
-    let mut flows = Vec::with_capacity(tableau.len() * 2);
-    for index in 0..tableau.len() {
-        flows.push(Flow::from_paulis(
-            single_pauli(tableau.len(), index, PauliBasis::X),
-            tableau
-                .x_output(index)
-                .map_err(stabilizer_to_analysis_error)?
-                .clone(),
-        ));
-        flows.push(Flow::from_paulis(
-            single_pauli(tableau.len(), index, PauliBasis::Z),
-            tableau
-                .z_output(index)
-                .map_err(stabilizer_to_analysis_error)?
-                .clone(),
-        ));
-    }
-    Ok(flows)
-}
-
-/// Returns true when [`gate_flows`] can produce gate-table flow metadata.
-pub fn gate_has_flows(gate: Gate) -> bool {
-    gate_has_tableau(gate) || gate_flow_descriptors(gate).is_some()
-}
-
-/// Returns Stim v1.16.0's fixed-shape one- or two-qubit unitary matrix metadata.
-pub fn gate_unitary_matrix(gate: Gate) -> AnalysisResult<GateUnitaryMatrix> {
-    gate_unitary_rows(gate)
-        .map(|rows| match rows {
-            GateUnitaryRows::One(rows) => GateUnitaryMatrix::One(complex_matrix(rows)),
-            GateUnitaryRows::Two(rows) => GateUnitaryMatrix::Two(complex_matrix(rows)),
-        })
-        .ok_or_else(|| AnalysisError::gate_data_unavailable(gate.kind(), GateData::UnitaryMatrix))
-}
-
-/// Returns true when [`gate_unitary_matrix`] can produce fixed-shape unitary metadata.
-pub fn gate_has_unitary_matrix(gate: Gate) -> bool {
-    gate_unitary_rows(gate).is_some()
-}
-
-/// Returns Stim v1.16.0's H/S/CX/M/R decomposition metadata for `gate`.
-pub fn gate_h_s_cx_m_r_decomposition(gate: Gate) -> AnalysisResult<GateDecomposition> {
-    gate_decomposition(gate).ok_or_else(|| {
-        AnalysisError::gate_data_unavailable(gate.kind(), GateData::HSCxMRDecomposition)
+        | GateKind::MZZ => return None,
     })
 }
 
-/// Returns true when [`gate_h_s_cx_m_r_decomposition`] can produce gate-table metadata.
-pub fn gate_has_h_s_cx_m_r_decomposition(gate: Gate) -> bool {
-    gate_decomposition(gate).is_some()
-}
-
-/// Parses gate decomposition metadata into a validated circuit.
-pub fn gate_decomposition_to_circuit(decomposition: GateDecomposition) -> AnalysisResult<Circuit> {
-    Circuit::from_stim_str(decomposition.as_stim_str()).map_err(Into::into)
-}
-
-fn complex_matrix<const N: usize>(rows: [[(f32, f32); N]; N]) -> [[Complex32; N]; N] {
-    rows.map(|row| row.map(|(real, imaginary)| Complex32::new(real, imaginary)))
-}
-
-fn single_pauli(len: usize, index: usize, basis: PauliBasis) -> PauliString {
-    stab_algebra::advanced::pauli_from_bases_unbudgeted(
-        PauliSign::Plus,
-        (0..len).map(|candidate| {
-            if candidate == index {
-                basis
-            } else {
-                PauliBasis::I
-            }
-        }),
-    )
-}
-
-fn stabilizer_to_analysis_error(error: StabilizerError) -> AnalysisError {
-    AnalysisError::internal(AnalysisOperation::GateData, error.to_string())
-}
-
-fn two_qubit_outputs(kind: GateKind) -> Option<[&'static str; 4]> {
-    match kind {
-        GateKind::II => Some(["+X_", "+Z_", "+_X", "+_Z"]),
-        GateKind::XCX => Some(["+X_", "+ZX", "+_X", "+XZ"]),
-        GateKind::XCY => Some(["+X_", "+ZY", "+XX", "+XZ"]),
-        GateKind::XCZ => Some(["+X_", "+ZZ", "+XX", "+_Z"]),
-        GateKind::YCX => Some(["+XX", "+ZX", "+_X", "+YZ"]),
-        GateKind::YCY => Some(["+XY", "+ZY", "+YX", "+YZ"]),
-        GateKind::YCZ => Some(["+XZ", "+ZZ", "+YX", "+_Z"]),
-        GateKind::CX => Some(["+XX", "+Z_", "+_X", "+ZZ"]),
-        GateKind::CY => Some(["+XY", "+Z_", "+ZX", "+ZZ"]),
-        GateKind::CZ => Some(["+XZ", "+Z_", "+ZX", "+_Z"]),
-        GateKind::SWAP => Some(["+_X", "+_Z", "+X_", "+Z_"]),
-        GateKind::ISWAP => Some(["+ZY", "+_Z", "+YZ", "+Z_"]),
-        GateKind::ISWAP_DAG => Some(["-ZY", "+_Z", "-YZ", "+Z_"]),
-        GateKind::CXSWAP => Some(["+XX", "+_Z", "+X_", "+ZZ"]),
-        GateKind::SWAPCX => Some(["+_X", "+ZZ", "+XX", "+Z_"]),
-        GateKind::CZSWAP => Some(["+ZX", "+_Z", "+XZ", "+Z_"]),
-        GateKind::SQRT_XX => Some(["+X_", "-YX", "+_X", "-XY"]),
-        GateKind::SQRT_XX_DAG => Some(["+X_", "+YX", "+_X", "+XY"]),
-        GateKind::SQRT_YY => Some(["-ZY", "+XY", "-YZ", "+YX"]),
-        GateKind::SQRT_YY_DAG => Some(["+ZY", "-XY", "+YZ", "-YX"]),
-        GateKind::SQRT_ZZ => Some(["+YZ", "+Z_", "+ZY", "+_Z"]),
-        GateKind::SQRT_ZZ_DAG => Some(["-YZ", "+Z_", "-ZY", "+_Z"]),
+/// Returns the two-qubit Clifford of a fixed two-qubit unitary gate, such as `CX` or `ISWAP`, or
+/// `None` for every other gate.
+///
+/// The images are Stim v1.16.0's tableau data for each gate, checked to form a Clifford when
+/// this table is compiled.
+pub fn two_qubit_clifford_for_gate(gate: Gate) -> Option<TwoQubitClifford> {
+    use PauliBasis::{I, X, Y, Z};
+    use PauliSign::{Minus as M, Plus as P};
+    Some(match gate.kind() {
+        GateKind::II => const { clifford([(P, X, I), (P, I, X)], [(P, Z, I), (P, I, Z)]) },
+        GateKind::XCX => const { clifford([(P, X, I), (P, I, X)], [(P, Z, X), (P, X, Z)]) },
+        GateKind::XCY => const { clifford([(P, X, I), (P, X, X)], [(P, Z, Y), (P, X, Z)]) },
+        GateKind::XCZ => const { clifford([(P, X, I), (P, X, X)], [(P, Z, Z), (P, I, Z)]) },
+        GateKind::YCX => const { clifford([(P, X, X), (P, I, X)], [(P, Z, X), (P, Y, Z)]) },
+        GateKind::YCY => const { clifford([(P, X, Y), (P, Y, X)], [(P, Z, Y), (P, Y, Z)]) },
+        GateKind::YCZ => const { clifford([(P, X, Z), (P, Y, X)], [(P, Z, Z), (P, I, Z)]) },
+        GateKind::CX => CX_CLIFFORD,
+        GateKind::CY => const { clifford([(P, X, Y), (P, Z, X)], [(P, Z, I), (P, Z, Z)]) },
+        GateKind::CZ => const { clifford([(P, X, Z), (P, Z, X)], [(P, Z, I), (P, I, Z)]) },
+        GateKind::SWAP => const { clifford([(P, I, X), (P, X, I)], [(P, I, Z), (P, Z, I)]) },
+        GateKind::ISWAP => const { clifford([(P, Z, Y), (P, Y, Z)], [(P, I, Z), (P, Z, I)]) },
+        GateKind::ISWAP_DAG => const { clifford([(M, Z, Y), (M, Y, Z)], [(P, I, Z), (P, Z, I)]) },
+        GateKind::CXSWAP => const { clifford([(P, X, X), (P, X, I)], [(P, I, Z), (P, Z, Z)]) },
+        GateKind::SWAPCX => const { clifford([(P, I, X), (P, X, X)], [(P, Z, Z), (P, Z, I)]) },
+        GateKind::CZSWAP => const { clifford([(P, Z, X), (P, X, Z)], [(P, I, Z), (P, Z, I)]) },
+        GateKind::SQRT_XX => const { clifford([(P, X, I), (P, I, X)], [(M, Y, X), (M, X, Y)]) },
+        GateKind::SQRT_XX_DAG => const { clifford([(P, X, I), (P, I, X)], [(P, Y, X), (P, X, Y)]) },
+        GateKind::SQRT_YY => const { clifford([(M, Z, Y), (M, Y, Z)], [(P, X, Y), (P, Y, X)]) },
+        GateKind::SQRT_YY_DAG => const { clifford([(P, Z, Y), (P, Y, Z)], [(M, X, Y), (M, Y, X)]) },
+        GateKind::SQRT_ZZ => const { clifford([(P, Y, Z), (P, Z, Y)], [(P, Z, I), (P, I, Z)]) },
+        GateKind::SQRT_ZZ_DAG => const { clifford([(M, Y, Z), (M, Z, Y)], [(P, Z, I), (P, I, Z)]) },
         GateKind::DETECTOR
         | GateKind::OBSERVABLE_INCLUDE
         | GateKind::TICK
@@ -343,6 +223,154 @@ fn two_qubit_outputs(kind: GateKind) -> Option<[&'static str; 4]> {
         | GateKind::SPP_DAG
         | GateKind::MXX
         | GateKind::MYY
-        | GateKind::MZZ => None,
+        | GateKind::MZZ => return None,
+    })
+}
+
+/// `CX`, which tableau synthesis also uses as a base gate.
+pub(crate) const CX_CLIFFORD: TwoQubitClifford = {
+    use PauliBasis::{I, X, Z};
+    use PauliSign::Plus as P;
+    clifford([(P, X, X), (P, I, X)], [(P, Z, I), (P, Z, Z)])
+};
+
+/// Builds a table entry from Stim's `X_0`, `X_1` and `Z_0`, `Z_1` images.
+///
+/// Only called in `const` blocks, so an entry that is not a Clifford fails compilation.
+#[allow(
+    clippy::panic,
+    reason = "evaluated only at compile time, where a panic is a build error for a bad entry"
+)]
+const fn clifford(
+    x_images: [(PauliSign, PauliBasis, PauliBasis); 2],
+    z_images: [(PauliSign, PauliBasis, PauliBasis); 2],
+) -> TwoQubitClifford {
+    const fn image((sign, first, second): (PauliSign, PauliBasis, PauliBasis)) -> TwoQubitPauli {
+        TwoQubitPauli::new(sign, [first, second])
     }
+    let [x0, x1] = x_images;
+    let [z0, z1] = z_images;
+    match TwoQubitClifford::try_from_images([image(x0), image(x1)], [image(z0), image(z1)]) {
+        Some(clifford) => clifford,
+        None => panic!("a two-qubit gate table entry is not a Clifford"),
+    }
+}
+
+/// Returns the local Clifford tableau of a fixed one- or two-qubit unitary gate, or `None` for
+/// every other gate.
+pub fn gate_tableau(gate: Gate) -> Option<Tableau> {
+    if let Some(clifford) = single_qubit_clifford_for_gate(gate) {
+        return Some(clifford.tableau());
+    }
+    two_qubit_clifford_for_gate(gate).map(TwoQubitClifford::tableau)
+}
+
+/// Returns the tableau of a unitary gate that `operation` has already routed as a fixed one- or
+/// two-qubit Clifford, reporting a gate outside that table as a broken invariant.
+pub(crate) fn fixed_unitary_tableau(
+    gate: Gate,
+    operation: AnalysisOperation,
+) -> AnalysisResult<Tableau> {
+    gate_tableau(gate).ok_or_else(|| {
+        AnalysisError::internal(
+            operation,
+            format!(
+                "gate {} has no fixed Clifford tableau",
+                gate.canonical_name()
+            ),
+        )
+    })
+}
+
+/// Returns Stim v1.16.0's stabilizer flows of `gate`, or `None` when Stim gives it none.
+///
+/// A fixed unitary gate's flows map each `X_q` and `Z_q` to its tableau image, in qubit order;
+/// a non-unitary gate's flows come from the model's gate table.
+pub fn gate_flows(gate: Gate) -> Option<Vec<Flow>> {
+    if let Some(descriptors) = gate.flow_descriptors() {
+        return Some(
+            descriptors
+                .iter()
+                .map(|descriptor| {
+                    let measurements: Vec<i32> = descriptor
+                        .measurements()
+                        .iter()
+                        .map(|offset| offset.get())
+                        .collect();
+                    Flow::from_paulis_and_measurements(
+                        pauli_string(descriptor.input()),
+                        pauli_string(descriptor.output()),
+                        &measurements,
+                    )
+                })
+                .collect(),
+        );
+    }
+    if let Some(clifford) = single_qubit_clifford_for_gate(gate) {
+        return Some(vec![
+            Flow::from_paulis(single_pauli(1, 0, PauliBasis::X), clifford.x_output()),
+            Flow::from_paulis(single_pauli(1, 0, PauliBasis::Z), clifford.z_output()),
+        ]);
+    }
+    let clifford = two_qubit_clifford_for_gate(gate)?;
+    let mut flows = Vec::with_capacity(4);
+    for (qubit, (x_image, z_image)) in clifford
+        .x_images()
+        .into_iter()
+        .zip(clifford.z_images())
+        .enumerate()
+    {
+        flows.push(Flow::from_paulis(
+            single_pauli(2, qubit, PauliBasis::X),
+            x_image.to_pauli_string(),
+        ));
+        flows.push(Flow::from_paulis(
+            single_pauli(2, qubit, PauliBasis::Z),
+            z_image.to_pauli_string(),
+        ));
+    }
+    Some(flows)
+}
+
+/// Returns Stim v1.16.0's fixed-shape unitary matrix of a one- or two-qubit unitary gate, or
+/// `None` for every other gate.
+pub fn gate_unitary_matrix(gate: Gate) -> Option<GateUnitaryMatrix> {
+    gate.unitary_rows().map(|rows| match rows {
+        GateUnitaryRows::One(rows) => GateUnitaryMatrix::One(complex_matrix(rows)),
+        GateUnitaryRows::Two(rows) => GateUnitaryMatrix::Two(complex_matrix(rows)),
+    })
+}
+
+fn complex_matrix<const N: usize>(rows: [[(f32, f32); N]; N]) -> [[Complex32; N]; N] {
+    rows.map(|row| row.map(|(real, imaginary)| Complex32::new(real, imaginary)))
+}
+
+fn pauli_string(product: GatePauliString) -> PauliString {
+    let sign = if product.is_negative() {
+        PauliSign::Minus
+    } else {
+        PauliSign::Plus
+    };
+    stab_algebra::advanced::pauli_from_bases_unbudgeted(
+        sign,
+        product.paulis().iter().map(|pauli| match pauli {
+            None => PauliBasis::I,
+            Some(Pauli::X) => PauliBasis::X,
+            Some(Pauli::Y) => PauliBasis::Y,
+            Some(Pauli::Z) => PauliBasis::Z,
+        }),
+    )
+}
+
+fn single_pauli(len: usize, index: usize, basis: PauliBasis) -> PauliString {
+    stab_algebra::advanced::pauli_from_bases_unbudgeted(
+        PauliSign::Plus,
+        (0..len).map(|candidate| {
+            if candidate == index {
+                basis
+            } else {
+                PauliBasis::I
+            }
+        }),
+    )
 }

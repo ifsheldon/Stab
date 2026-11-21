@@ -3,7 +3,8 @@ use std::fmt::{Display, Formatter};
 use rand::{Rng, RngExt as _};
 
 use super::{
-    PauliBasis, PauliSign, StabilizerError, StabilizerResource, StabilizerResult, Tableau,
+    PauliBasis, PauliSign, PauliString, StabilizerError, StabilizerResource, StabilizerResult,
+    Tableau,
 };
 use crate::MemoryBudget;
 use crate::bit_runs::{extend_periodic, or_bits_at};
@@ -179,15 +180,27 @@ impl SingleQubitClifford {
             )
         };
         Tableau::from_rows(crate::tableau::PauliRows::one_qubit(
-            image(self.x_output()),
-            image(self.z_output()),
+            image(self.x_image()),
+            image(self.z_image()),
         ))
+    }
+
+    /// Returns the signed image of `X` under this Clifford as a one-qubit Pauli string.
+    pub fn x_output(self) -> PauliString {
+        let image = self.x_image();
+        PauliString::from_bases_unbudgeted(image.sign, [image.basis])
+    }
+
+    /// Returns the signed image of `Z` under this Clifford as a one-qubit Pauli string.
+    pub fn z_output(self) -> PauliString {
+        let image = self.z_image();
+        PauliString::from_bases_unbudgeted(image.sign, [image.basis])
     }
 
     /// Applies this Clifford to one Pauli basis, dropping the sign of the image.
     pub fn apply_basis(self, basis: PauliBasis) -> PauliBasis {
-        let x = self.x_output().basis;
-        let z = self.z_output().basis;
+        let x = self.x_image().basis;
+        let z = self.z_image().basis;
         match basis {
             PauliBasis::I => PauliBasis::I,
             PauliBasis::X => x,
@@ -255,7 +268,7 @@ impl SingleQubitClifford {
         }
     }
 
-    fn x_output(self) -> SignedPauli {
+    fn x_image(self) -> SignedPauli {
         let index = self.table_index();
         SignedPauli::new(
             sign_from_bit(index & 0b10 != 0),
@@ -263,7 +276,7 @@ impl SingleQubitClifford {
         )
     }
 
-    fn z_output(self) -> SignedPauli {
+    fn z_image(self) -> SignedPauli {
         let index = self.table_index();
         SignedPauli::new(
             sign_from_bit(index & 0b1 != 0),

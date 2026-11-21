@@ -14,8 +14,6 @@ pub enum AnalysisOperation {
     FlowCheck,
     FlowGeneration,
     FlowMeasurementSolving,
-    /// Reading a gate's tableau, flow, unitary-matrix, or decomposition metadata.
-    GateData,
     LogicalErrorSearch,
     MissingDetectorDiscovery,
     PauliConjugation,
@@ -43,7 +41,6 @@ impl AnalysisOperation {
             Self::FlowCheck => "flow-check",
             Self::FlowGeneration => "flow-generation",
             Self::FlowMeasurementSolving => "flow-measurement-solving",
-            Self::GateData => "gate-data",
             Self::LogicalErrorSearch => "logical-error-search",
             Self::MissingDetectorDiscovery => "missing-detector-discovery",
             Self::PauliConjugation => "pauli-conjugation",
@@ -75,7 +72,6 @@ impl AnalysisOperation {
             Self::CircuitInverse
             | Self::FlowGeneration
             | Self::FlowMeasurementSolving
-            | Self::GateData
             | Self::PauliConjugation
             | Self::TableauConversion
             | Self::TableauSynthesis

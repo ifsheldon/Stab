@@ -66,6 +66,25 @@ impl PauliRows {
         }
     }
 
+    /// Builds the four rows of a two-qubit Tableau from `(negative, x bits, z bits)` images of
+    /// `X_0`, `X_1`, `Z_0`, and `Z_1`, in row order, where bit `q` of each plane is qubit `q`.
+    pub(crate) fn two_qubit(images: [(bool, u64, u64); 4]) -> Self {
+        let mut words = Vec::with_capacity(8);
+        let mut signs = 0;
+        for (row, (negative, x_bits, z_bits)) in images.into_iter().enumerate() {
+            words.push(x_bits);
+            words.push(z_bits);
+            signs |= u64::from(negative) << row;
+        }
+        Self {
+            num_qubits: 2,
+            half_words: 1,
+            row_count: 4,
+            words,
+            signs: vec![signs],
+        }
+    }
+
     #[inline]
     pub(crate) const fn num_qubits(&self) -> usize {
         self.num_qubits

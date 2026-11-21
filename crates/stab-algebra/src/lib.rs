@@ -10,6 +10,7 @@ mod iter;
 mod kernels;
 mod pauli;
 mod tableau;
+mod two_qubit_clifford;
 mod unitary;
 
 pub use budget::StabilizerResource;
@@ -24,6 +25,7 @@ pub use iter::{
 pub use pauli::{FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString};
 pub use stab_foundation::{MemoryBudget, MemoryBudgetExceeded, ResourceAmount};
 pub use tableau::{Tableau, TableauAppender};
+pub use two_qubit_clifford::{TwoQubitClifford, TwoQubitPauli};
 pub use unitary::Endianness;
 
 /// Low-level constructors for algorithms that have already performed resource and shape admission.

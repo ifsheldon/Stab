@@ -108,9 +108,6 @@ pub enum StabilizerError {
     #[error("Pauli product has imaginary phase {phase}")]
     ImaginaryProduct { phase: PauliPhase },
 
-    #[error("gate {gate} is not a single-qubit Clifford gate")]
-    InvalidSingleQubitCliffordGate { gate: String },
-
     #[error("Clifford index {index} is outside length {len}")]
     CliffordIndexOutOfRange { index: usize, len: usize },
 

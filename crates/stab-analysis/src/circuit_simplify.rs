@@ -4,8 +4,8 @@ use std::ops::ControlFlow;
 
 use stab_algebra::{SingleQubitClifford, StabilizerError};
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, Gate, GateKind, Pauli, PauliProduct, PauliTarget,
-    QubitId, Target, TargetKind,
+    Circuit, CircuitInstruction, CircuitItem, DecompositionStep, Gate, GateDecomposition, GateKind,
+    Pauli, PauliProduct, PauliTarget, QubitId, Target, TargetKind,
 };
 
 use crate::instruction_shape;
@@ -236,16 +236,18 @@ fn append_decomposed_instruction(
         | GateKind::MYY
         | GateKind::MZZ => {}
     }
-    if (instruction.gate().is_noisy() && !instruction.gate().produces_measurements())
-        || !crate::gate_has_h_s_cx_m_r_decomposition(instruction.gate())
-    {
+    let gate = instruction.gate();
+    let decomposition = gate.h_s_cx_m_r_decomposition();
+    let Some(decomposition) =
+        decomposition.filter(|_| !gate.is_noisy() || gate.produces_measurements())
+    else {
         result.append_instruction(instruction.clone());
         return Ok(());
-    }
+    };
 
-    if instruction.gate().is_single_qubit_gate() || instruction.gate().is_two_qubit_gate() {
+    if gate.is_single_qubit_gate() || gate.is_two_qubit_gate() {
         for segment in instruction.disjoint_target_segments() {
-            append_template_decomposition(instruction, &segment, result)?;
+            append_template_decomposition(decomposition, instruction, &segment, result)?;
         }
         return Ok(());
     }
@@ -254,35 +256,36 @@ fn append_decomposed_instruction(
     Ok(())
 }
 
+/// Applies the gate's decomposition to each actual target group of a disjoint segment.
+///
+/// Each step applies to every group in turn, so a step `H 0 1` on groups `a b` and `c d`
+/// becomes `H a c b d`, exactly as Stim's simplifier substitutes its decomposition template.
 fn append_template_decomposition(
+    decomposition: GateDecomposition,
     instruction: &CircuitInstruction,
     actual_segment: &CircuitInstruction,
     result: &mut Circuit,
 ) -> AnalysisResult<()> {
-    let decomposition = crate::gate_h_s_cx_m_r_decomposition(instruction.gate())
-        .map_err(|error| invalid_simplification(error.to_string()))?;
-    let template = crate::gate_decomposition_to_circuit(decomposition)?;
     let actual_groups = actual_segment.target_groups();
-    for item in template.items() {
-        let CircuitItem::Instruction(template_instruction) = item else {
-            return Err(invalid_simplification(format!(
-                "{} decomposition metadata unexpectedly contained a repeat block",
-                instruction.gate().canonical_name()
-            )));
+    for step in decomposition.steps() {
+        let gate = step.gate();
+        let template_groups: Vec<&[u8]> = match *step {
+            DecompositionStep::Cx(pairs) => pairs.iter().map(<[u8; 2]>::as_slice).collect(),
+            DecompositionStep::H(qubits)
+            | DecompositionStep::S(qubits)
+            | DecompositionStep::M(qubits)
+            | DecompositionStep::R(qubits) => qubits.chunks(1).collect(),
         };
         let mut targets = Vec::new();
-        for template_group in template_instruction.target_groups() {
+        for template_group in template_groups {
             for actual_group in actual_groups.clone() {
-                for template_target in template_group {
+                for &template_qubit in template_group {
                     let target = substitute_template_target(
-                        template_target,
+                        template_qubit,
                         actual_group,
-                        template_instruction.gate().produces_measurements(),
+                        gate.produces_measurements(),
                     )?;
-                    if !target.is_classical_bit_target()
-                        || template_instruction
-                            .gate()
-                            .takes_measurement_record_targets()
+                    if !target.is_classical_bit_target() || gate.takes_measurement_record_targets()
                     {
                         targets.push(target);
                     }
@@ -290,7 +293,7 @@ fn append_template_decomposition(
             }
         }
         result.append_instruction(stab_model::advanced::circuit_instruction_with_tag_bytes(
-            template_instruction.gate(),
+            gate,
             Vec::new(),
             targets,
             instruction.tag_bytes(),
@@ -300,14 +303,11 @@ fn append_template_decomposition(
 }
 
 fn substitute_template_target(
-    target: &Target,
+    template_qubit: u8,
     actual_targets: &[Target],
     preserves_inversion: bool,
 ) -> AnalysisResult<Target> {
-    let TargetKind::Qubit { id, .. } = target.kind() else {
-        return Ok(*target);
-    };
-    let index = id.get() as usize;
+    let index = usize::from(template_qubit);
     let actual = actual_targets.get(index).ok_or_else(|| {
         invalid_simplification(format!(
             "decomposition template referenced missing target {index}"
@@ -422,17 +422,14 @@ fn visit_decomposed_spp<Break>(
         if completion.is_break() {
             return Ok(completion);
         }
-        let phase_gate = if product.negative ^ dagger {
-            GateKind::S_DAG.gate()
+        let phase = if product.negative ^ dagger {
+            SingleQubitClifford::SDag
         } else {
-            GateKind::S.gate()
+            SingleQubitClifford::S
         };
         let completion = visit_single_target_sequence(
             visitor,
-            &shortest_single_qubit_base_sequence(
-                crate::single_qubit_clifford_for_gate(phase_gate)
-                    .map_err(stabilizer_to_simplify_error)?,
-            )?,
+            &shortest_single_qubit_base_sequence(phase)?,
             Target::qubit(
                 product
                     .terms
@@ -501,10 +498,7 @@ fn visit_basis_change<Break>(
         ),
         Pauli::Y => visit_single_target_sequence(
             visitor,
-            &shortest_single_qubit_base_sequence(
-                crate::single_qubit_clifford_for_gate(GateKind::H_YZ.gate())
-                    .map_err(stabilizer_to_simplify_error)?,
-            )?,
+            &shortest_single_qubit_base_sequence(SingleQubitClifford::Hyz)?,
             Target::qubit(term.qubit, false),
             tag,
         ),
@@ -598,10 +592,7 @@ fn append_basis_change(
         Pauli::X => append_gate_on_qubit(result, GateKind::H.gate(), term.qubit, tag),
         Pauli::Y => append_single_target_sequence(
             result,
-            &shortest_single_qubit_base_sequence(
-                crate::single_qubit_clifford_for_gate(GateKind::H_YZ.gate())
-                    .map_err(stabilizer_to_simplify_error)?,
-            )?,
+            &shortest_single_qubit_base_sequence(SingleQubitClifford::Hyz)?,
             Target::qubit(term.qubit, false),
             tag,
         ),
@@ -661,18 +652,8 @@ fn append_gate_targets(
 
 fn shortest_single_qubit_base_sequence(clifford: SingleQubitClifford) -> AnalysisResult<Vec<Gate>> {
     let target = clifford.tableau();
-    let h = (
-        GateKind::H.gate(),
-        crate::single_qubit_clifford_for_gate(GateKind::H.gate())
-            .map_err(stabilizer_to_simplify_error)?
-            .tableau(),
-    );
-    let s = (
-        GateKind::S.gate(),
-        crate::single_qubit_clifford_for_gate(GateKind::S.gate())
-            .map_err(stabilizer_to_simplify_error)?
-            .tableau(),
-    );
+    let h = (GateKind::H.gate(), SingleQubitClifford::H.tableau());
+    let s = (GateKind::S.gate(), SingleQubitClifford::S.tableau());
     let mut queue = VecDeque::from([(
         stab_algebra::Tableau::identity(1).map_err(stabilizer_to_simplify_error)?,
         Vec::<Gate>::new(),

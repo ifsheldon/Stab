@@ -1,8 +1,8 @@
 //! Materialization of one lowered instruction into its compiled entry and arena payload.
 
 use stab_model::{
-    CircuitInstruction, ClassicalControl, ControlledPauliTargetPair, Gate, GateArguments, GateKind,
-    GateTargets, ObservableTarget, QubitId, Target,
+    CircuitInstruction, ClassicalControl, ControlledPauliTargetPair, DecompositionStep, Gate,
+    GateArguments, GateKind, GateTargets, ObservableTarget, QubitId, Target,
 };
 
 use super::super::super::helpers::{
@@ -342,15 +342,18 @@ impl ReferenceCliffordTable {
 
 fn reference_clifford(gate: Gate) -> DetectionResult<ReferenceClifford> {
     // `H` and `CX` have dedicated reference kernels; every other gate takes the general tableau
-    // path, which rejects gates without a Clifford action.
+    // path. Only gates with a frame Clifford action are lowered here, and each of those is a
+    // fixed one- or two-qubit Clifford with a tableau.
     Ok(match gate.kind() {
         GateKind::H => ReferenceClifford::Hadamard,
         GateKind::CX => ReferenceClifford::ControlledX,
         _ => {
-            let tableau = match stab_analysis::single_qubit_clifford_for_gate(gate) {
-                Ok(clifford) => clifford.tableau(),
-                Err(_) => stab_analysis::gate_tableau(gate)?,
-            };
+            let tableau = stab_analysis::gate_tableau(gate).ok_or_else(|| {
+                DetectionError::invalid_sampler_compilation(format!(
+                    "gate {} has a frame Clifford action but no tableau",
+                    gate.canonical_name()
+                ))
+            })?;
             ReferenceClifford::Tableau {
                 transform: LocalTableauTransform::from_tableau(&tableau)?,
                 steps: decomposition_steps(gate, tableau.len()),
@@ -359,43 +362,32 @@ fn reference_clifford(gate: Gate) -> DetectionResult<ReferenceClifford> {
     })
 }
 
-/// Parses the gate's pinned Stim `H`/`S`/`CX` decomposition, which is exact including signs,
+/// Lowers the gate's pinned Stim `H`/`S`/`CX` decomposition, which is exact including signs,
 /// or returns `None` when the gate has none in that form.
 fn decomposition_steps(gate: Gate, arity: usize) -> Option<Vec<CliffordStep>> {
-    let decomposition = stab_model::advanced::gate_decomposition(gate)?;
+    let decomposition = gate.h_s_cx_m_r_decomposition()?;
     let mut steps = Vec::new();
-    for line in decomposition.as_stim_str().lines() {
-        let mut tokens = line
-            .split('#')
-            .next()
-            .unwrap_or_default()
-            .split_whitespace();
-        let Some(name) = tokens.next() else {
-            continue;
-        };
-        let mut qubits = Vec::new();
-        for token in tokens {
-            let qubit = token.parse::<u8>().ok()?;
-            if usize::from(qubit) >= arity {
-                return None;
-            }
-            qubits.push(qubit);
+    for step in decomposition.steps() {
+        if step
+            .qubits()
+            .iter()
+            .any(|&qubit| usize::from(qubit) >= arity)
+        {
+            return None;
         }
-        match name {
-            "H" => steps.extend(qubits.iter().map(|&qubit| CliffordStep::H(qubit))),
-            "S" => steps.extend(qubits.iter().map(|&qubit| CliffordStep::S(qubit))),
-            "CX" | "CNOT" => {
-                let (pairs, unpaired) = qubits.as_chunks::<2>();
-                if !unpaired.is_empty() {
-                    return None;
-                }
-                steps.extend(
-                    pairs
-                        .iter()
-                        .map(|&[control, target]| CliffordStep::Cx(control, target)),
-                );
+        match *step {
+            DecompositionStep::H(qubits) => {
+                steps.extend(qubits.iter().map(|&q| CliffordStep::H(q)))
             }
-            _ => return None,
+            DecompositionStep::S(qubits) => {
+                steps.extend(qubits.iter().map(|&q| CliffordStep::S(q)))
+            }
+            DecompositionStep::Cx(pairs) => steps.extend(
+                pairs
+                    .iter()
+                    .map(|&[control, target]| CliffordStep::Cx(control, target)),
+            ),
+            DecompositionStep::M(_) | DecompositionStep::R(_) => return None,
         }
     }
     Some(steps)

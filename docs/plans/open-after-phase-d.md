@@ -18,13 +18,13 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 | D4 | Reject symlinks and unsafe path components on outputs | S | Decided on 2026-11-21: not rejected, and the CLI path trust boundary is documented. |
 | R1 | A verdict from the flow checks | M | Done on 2026-11-21, as a two-way verdict with errors for everything else. |
 | R2 | "No logical error found" as a search outcome, named search options | M | Done on 2026-11-21. |
-| R3 | `Option` from the gate-data getters | M | Do, together with R9. |
+| R3 | `Option` from the gate-data getters | M | Done on 2026-11-21, with R9. |
 | R4 | One function per operation taking an options value | L | Do, after R1 and R2, and before any Python binding. |
 | R5 | Engine run progress, status, summary, and error written once | M | Do, in the same pass as the engine half of R4. |
 | R6 | Typed gate-argument and target-group views in `stab-model` | L | Done on 2026-11-21. |
 | R7 | Nested option types for `ErrorAnalyzerOptions` | M | Do, in the same pass as R4 so call sites change once. |
 | R8 | The `Vec<Vec<bool>>` record codec family | M | Remove from the public surface; keep as a test oracle. |
-| R9 | Typed gate flow and decomposition metadata | M to L | Do after R6. |
+| R9 | Typed gate flow and decomposition metadata | M to L | Done on 2026-11-21. |
 | R10 | Trim `stab_model::advanced` | S to M | Done on 2026-11-21. |
 | S1 | `--fold_loops` circuits with a long transient are slower than Stim | M | Do as a measured performance task. |
 | S2 | `ConversionOperation` is 40 bytes | S | Try it; keep only if `m2d` does not slow down. |
@@ -33,7 +33,7 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 | S5 | Fixed caps in `stab-model` reported an invalid detector error model | S | Done with D2. |
 | N1 | Areas the review did not read | M | Run a second review pass before the next release. |
 
-Suggested order after R1, R2, R10, and R6: R9 with R3, then R4 with R5 and R7, then R8, with S1 as an independent performance task at any point.
+Remaining order: R4 with R5 and R7, then R8, with S1 as an independent performance task at any point.
 R4 goes late on purpose: R1, R2, R3, and R7 each delete or reshape functions that R4 would otherwise rewrite twice.
 
 ## Decided And Done
@@ -191,6 +191,10 @@ The Phase D taxonomy already gave "not found" its own error variant, so this is 
 
 ### R3. `Option` from the gate-data getters
 
+**Outcome, 2026-11-21.** Done with R9 as proposed below.
+`gate_tableau`, `gate_flows`, `gate_unitary_matrix`, and `single_qubit_clifford_for_gate` return `Option`, the `gate_has_*` functions and `GateDataUnavailable` are removed, and the decomposition is read from `Gate::h_s_cx_m_r_decomposition()` in the model.
+The rest of this section is the proposal as written before the work.
+
 **Today.** `stab-analysis/src/gate.rs` has four pairs: `gate_tableau` and `gate_has_tableau`, `gate_flows` and `gate_has_flows`, `gate_unitary_matrix` and `gate_has_unitary_matrix`, `gate_h_s_cx_m_r_decomposition` and `gate_has_h_s_cx_m_r_decomposition`.
 Each getter returns `AnalysisResult` and fails with `GateDataUnavailable` when the gate has no such data.
 `single_qubit_clifford_for_gate` returns `StabilizerResult` instead.
@@ -341,6 +345,14 @@ If a one-call convenience is wanted, add `RecordFormat::decode_all(input, layout
 Budgeting it would mean maintaining two codec implementations to the same standard for no product caller.
 
 ### R9. Typed gate flow and decomposition metadata
+
+**Outcome, 2026-11-21.** Done.
+Flows are `GateFlowDescriptor` values with signed dense Pauli strings and typed record offsets, and a decomposition is a list of `DecompositionStep::{H, S, Cx, M, R}`, so an odd-length `CX` or an unknown gate name cannot be written.
+Two-qubit tableaux are a `TwoQubitClifford` table whose entries are checked to be Cliffords at compile time.
+A model test renders every typed flow and decomposition and compares it with the vendored Stim gate data, and the analysis owner tests compare all tableaux and flows with the same data.
+No product crate parses gate text at run time; `Tableau::gate1` and `gate2` remain for caller-supplied text.
+Timings and outputs of `analyze_errors`, `sample`, and `detect` were unchanged.
+The rest of this section is the proposal as written before the work.
 
 **Today.** `stab-model` publishes each gate's flows as `&'static [&'static str]` and its decomposition as `.stim` text in a `GateDecomposition`.
 `stab-analysis` parses the flow strings back with `Flow::from_str` and `Tableau::gate2(&str, &str, &str, &str)`, and the engine parses the decomposition text again in two lowering sites.

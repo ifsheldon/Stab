@@ -437,7 +437,7 @@ impl CircuitInstruction {
         })
     }
 
-    fn from_validated_parts(
+    pub(crate) fn from_validated_parts(
         gate: Gate,
         args: Vec<f64>,
         targets: TargetVec,

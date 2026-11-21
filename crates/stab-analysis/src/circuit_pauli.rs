@@ -452,7 +452,10 @@ fn apply_unitary_instruction(
     }
 
     let gate_name = instruction.gate().canonical_name();
-    let local = crate::gate_tableau(instruction.gate())?;
+    let local = crate::gate::fixed_unitary_tableau(
+        instruction.gate(),
+        AnalysisOperation::PauliConjugation,
+    )?;
     let local = if inverse {
         local.inverse().map_err(map_tableau_error)?
     } else {
@@ -471,16 +474,10 @@ fn apply_unitary_instruction(
             }
         }
         GateTargets::ControlledPairs(pairs) => {
-            let conditional_basis = match instruction.gate().controlled_pauli() {
-                Some(Pauli::X) => PauliBasis::X,
-                Some(Pauli::Y) => PauliBasis::Y,
-                Some(Pauli::Z) => PauliBasis::Z,
-                None => {
-                    return Err(AnalysisError::internal(
-                        AnalysisOperation::PauliConjugation,
-                        format!("{gate_name} has controlled-Pauli targets but no controlled Pauli"),
-                    ));
-                }
+            let conditional_basis = match pairs.controlled_pauli() {
+                Pauli::X => PauliBasis::X,
+                Pauli::Y => PauliBasis::Y,
+                Pauli::Z => PauliBasis::Z,
             };
             for pair in pairs {
                 match pair {

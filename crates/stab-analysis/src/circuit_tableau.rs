@@ -189,7 +189,8 @@ impl Conversion<'_> {
             | GateCategory::Period4
             | GateCategory::ParityPhasing
             | GateCategory::Swap => {
-                let local = crate::gate_tableau(gate)?;
+                let local =
+                    crate::gate::fixed_unitary_tableau(gate, AnalysisOperation::TableauConversion)?;
                 for group in instruction.target_groups() {
                     apply_unitary_group_to_tableau(
                         gate.canonical_name(),

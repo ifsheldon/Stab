@@ -357,32 +357,3 @@ impl GeneratorParameter {
         }
     }
 }
-
-/// Gate-table metadata a gate may lack.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum GateData {
-    Tableau,
-    Flows,
-    UnitaryMatrix,
-    HSCxMRDecomposition,
-}
-
-impl GateData {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Tableau => "tableau",
-            Self::Flows => "flows",
-            Self::UnitaryMatrix => "unitary-matrix",
-            Self::HSCxMRDecomposition => "h-s-cx-m-r-decomposition",
-        }
-    }
-
-    pub(crate) const fn description(self) -> &'static str {
-        match self {
-            Self::Tableau => "tableau data",
-            Self::Flows => "flow metadata",
-            Self::UnitaryMatrix => "fixed-shape unitary matrix data",
-            Self::HSCxMRDecomposition => "H/S/CX/M/R decomposition data",
-        }
-    }
-}

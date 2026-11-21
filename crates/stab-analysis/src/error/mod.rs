@@ -10,7 +10,7 @@ mod details;
 mod operation;
 
 pub use details::{
-    AnalysisRequestError, GateData, GeneratorParameter, NonDeterministicTargets, NonUnitaryReason,
+    AnalysisRequestError, GeneratorParameter, NonDeterministicTargets, NonUnitaryReason,
     PauliCollapse, ThresholdExcess, UnanalyzableNoise,
 };
 pub use operation::AnalysisOperation;
@@ -101,9 +101,6 @@ pub enum AnalysisError {
         parameter: GeneratorParameter,
         value: u64,
     },
-
-    /// The gate table has no such metadata for this gate.
-    GateDataUnavailable { gate: GateKind, data: GateData },
 
     /// A count the input implies does not fit the integer type the operation computes it in.
     CountOverflow {
@@ -280,13 +277,6 @@ impl Display for AnalysisError {
                     parameter.description()
                 )
             }
-            Self::GateDataUnavailable { gate, data } => write!(
-                formatter,
-                "{}gate {} does not have {}",
-                AnalysisOperation::GateData.message_prefix(),
-                gate.canonical_name(),
-                data.description()
-            ),
             Self::NonFiniteCoordinate { .. } => {
                 formatter.write_str("invalid result format data: coordinate shift overflowed")
             }
@@ -418,10 +408,6 @@ impl AnalysisError {
         Self::InvalidGeneratorParameter { parameter, value }
     }
 
-    pub(crate) const fn gate_data_unavailable(gate: GateKind, data: GateData) -> Self {
-        Self::GateDataUnavailable { gate, data }
-    }
-
     /// Re-reports a Pauli-product decomposition failure from inside `operation`: an
     /// anti-Hermitian product stays one, and anything else is an internal invariant of
     /// `operation`, since decomposing a validated Pauli product cannot otherwise fail.
@@ -472,7 +458,6 @@ impl AnalysisError {
                 Some(AnalysisOperation::CircuitToDetectorErrorModel)
             }
             Self::NonGraphlikeError => Some(AnalysisOperation::LogicalErrorSearch),
-            Self::GateDataUnavailable { .. } => Some(AnalysisOperation::GateData),
             Self::InvalidGeneratorParameter { .. } => Some(AnalysisOperation::CircuitGeneration),
             Self::Model(_)
             | Self::Cancelled(_)

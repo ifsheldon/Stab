@@ -127,7 +127,7 @@ fn gate_surface_contract_fixed_tableau() {
     // Every gate with a fixed tableau, including the controlled gates whose
     // classical-control targets place them in other semantic families.
     let gates = Gate::all()
-        .filter(|gate| gate_tableau(*gate).is_ok())
+        .filter(|gate| gate_tableau(*gate).is_some())
         .collect::<Vec<_>>();
     assert_eq!(gates.len(), 46, "every fixed-tableau gate case executes");
     for gate in gates {

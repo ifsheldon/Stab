@@ -5,14 +5,12 @@ mod metadata;
 mod table;
 mod unitary;
 
-pub use decomposition::GateDecomposition;
-pub(crate) use decomposition::gate_decomposition_text;
-pub(crate) use flows::gate_flow_descriptors;
+pub use decomposition::{DecompositionStep, GateDecomposition};
+pub use flows::{GateFlowDescriptor, GatePauliString};
 pub use kind::GateKind;
 pub use metadata::{GateArgumentRule, GateTargetGroupKind, GateTargetRule};
 use table::GATES;
 pub use unitary::GateUnitaryRows;
-pub(crate) use unitary::gate_unitary_rows;
 
 use crate::{ModelResult, Pauli, Probability, Target, TargetKind, ValidationError};
 
@@ -124,6 +122,30 @@ impl Gate {
         self.info.target_rule.validate(self.info.name, targets)
     }
 
+    /// Returns Stim v1.16.0's stabilizer flows of a non-unitary gate, such as `Z -> rec[-1]` and
+    /// `Z -> Z` for `M`.
+    ///
+    /// Returns `None` for unitary gates, whose flows are the images of their tableau, and for
+    /// gates Stim gives no flows, such as noise channels and annotations.
+    #[inline]
+    pub fn flow_descriptors(self) -> Option<&'static [GateFlowDescriptor]> {
+        flows::gate_flow_descriptors(self.kind())
+    }
+
+    /// Returns Stim v1.16.0's decomposition of this gate into `H`, `S`, `CX`, `M`, and `R`, or
+    /// `None` for noise channels, annotations, and control flow.
+    #[inline]
+    pub fn h_s_cx_m_r_decomposition(self) -> Option<GateDecomposition> {
+        decomposition::gate_decomposition(self.kind())
+    }
+
+    /// Returns Stim v1.16.0's fixed-shape unitary matrix rows of a one- or two-qubit unitary
+    /// gate, or `None` for every other gate.
+    #[inline]
+    pub fn unitary_rows(self) -> Option<GateUnitaryRows> {
+        unitary::gate_unitary_rows(self.kind())
+    }
+
     /// Validates only targets against this gate's closed syntax descriptor.
     ///
     /// # Errors
@@ -147,9 +169,6 @@ struct GateInfo {
     flags: GateFlags,
     /// All accepted names in Stim v1.16.0 alias order; empty means the canonical name only.
     aliases: &'static [&'static str],
-    /// The Pauli a controlled-Pauli gate applies to its target when the control is set, for
-    /// the gates that accept measurement-record and sweep-bit controls.
-    controlled_pauli: Option<Pauli>,
     /// The basis of a single-qubit measurement, reset, or measure-reset gate.
     collapse_basis: Option<Pauli>,
 }
@@ -167,11 +186,6 @@ impl GateInfo {
 
     const fn with_collapse_basis(mut self, basis: Pauli) -> Self {
         self.collapse_basis = Some(basis);
-        self
-    }
-
-    const fn with_controlled_pauli(mut self, pauli: Pauli) -> Self {
-        self.controlled_pauli = Some(pauli);
         self
     }
 }
@@ -323,13 +337,15 @@ fn validate_probability_list(gate: &'static str, args: &[f64]) -> ModelResult<()
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum TargetRule {
+pub(crate) enum TargetRule {
     None,
     AnySingleQubit,
     MeasurementQubits,
     MeasurementPads,
     PlainPairs,
-    ClassicalControlPairs,
+    /// Pairs of a classically controllable controlled-Pauli gate, carrying the Pauli the gate
+    /// applies to its target when the control is set.
+    ClassicalControlPairs(Pauli),
     MeasurementPairs,
     RecOnly,
     RecOrPauli,
@@ -356,7 +372,7 @@ impl TargetRule {
             Self::MeasurementQubits => validate_targets(gate, targets, Target::is_qubit_target),
             Self::MeasurementPads => validate_targets(gate, targets, is_measurement_pad_target),
             Self::PlainPairs => validate_pair_targets(gate, targets, is_plain_qubit_target),
-            Self::ClassicalControlPairs => {
+            Self::ClassicalControlPairs(_) => {
                 validate_pair_targets(gate, targets, is_plain_qubit_or_classical_target)
             }
             Self::MeasurementPairs => validate_pair_targets(gate, targets, Target::is_qubit_target),
@@ -392,7 +408,7 @@ impl TargetRule {
             | Self::RecOnly
             | Self::RecOrPauli
             | Self::QubitCoords => GateTargetGroupKind::Singles,
-            Self::PlainPairs | Self::ClassicalControlPairs | Self::MeasurementPairs => {
+            Self::PlainPairs | Self::ClassicalControlPairs(_) | Self::MeasurementPairs => {
                 GateTargetGroupKind::Pairs
             }
             Self::PauliProducts => GateTargetGroupKind::PauliProducts,

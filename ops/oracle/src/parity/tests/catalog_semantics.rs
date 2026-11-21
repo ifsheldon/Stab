@@ -7,8 +7,7 @@ use stab_analysis::{
     DetectingRegionTargetOptions, ErrorAnalyzerOptions, MissingDetectorOptions,
     all_detecting_region_targets, all_detecting_region_ticks,
     circuit_detecting_regions_for_targets, circuit_flow_generators, circuit_inverse_unitary,
-    circuit_to_detector_error_model, decomposed_circuit, gate_has_h_s_cx_m_r_decomposition,
-    gate_has_tableau, missing_detectors,
+    circuit_to_detector_error_model, decomposed_circuit, gate_tableau, missing_detectors,
 };
 use stab_model::{
     Circuit, DetectorErrorModel, Gate, GateArgumentRule, GateCategory, GateTargetRule, Probability,
@@ -345,7 +344,7 @@ fn p5_catalog_missing_detectors_match_pinned_stim() {
 #[ignore = "builds and executes a metadata-driven differential against pinned libstim"]
 fn p5_catalog_base_gate_decomposition_matches_pinned_stim() {
     let gates = Gate::all()
-        .filter(|gate| gate_has_h_s_cx_m_r_decomposition(*gate))
+        .filter(|gate| gate.h_s_cx_m_r_decomposition().is_some())
         .collect::<Vec<_>>();
     let cases = gates
         .iter()
@@ -605,7 +604,7 @@ fn detecting_region_catalog_cases() -> Vec<CatalogCase> {
 
 fn fixed_tableau_gates() -> Vec<Gate> {
     let gates = Gate::all()
-        .filter(|gate| gate_has_tableau(*gate))
+        .filter(|gate| gate_tableau(*gate).is_some())
         .collect::<Vec<_>>();
     assert_eq!(gates.len(), 46, "pinned Stim fixed-tableau gate count");
     gates

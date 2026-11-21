@@ -30,6 +30,7 @@ stab_decoder::DecoderLayout
 stab_decoder::DecoderModelView
 stab_decoder::DecoderModelViewError
 stab_decoder::DecoderSession
+stab_model::DecompositionStep
 stab_model::DemDetectorId
 stab_model::DemErrorMechanismTraversalLimits
 stab_model::DemErrorMechanismView
@@ -62,9 +63,12 @@ stab_model::Gate
 stab_model::GateArgumentRule
 stab_model::GateCategory
 stab_model::GateDecomposition
+stab_model::GateFlowDescriptor
 stab_model::GateKind
+stab_model::GatePauliString
 stab_model::GateTargetGroupKind
 stab_model::GateTargetRule
+stab_model::GateUnitaryRows
 stab_model::MeasureRecordOffset
 stab_records::MeasurementBatchView
 stab_records::MeasurementSink
@@ -112,6 +116,8 @@ stab_algebra::StabilizerResult
 stab_algebra::Tableau
 stab_model::Target
 stab_model::TargetKind
+stab_algebra::TwoQubitClifford
+stab_algebra::TwoQubitPauli
 stab_decoder::ValidatedDecodeBatch
 stab_model::ValidationError
 stab_model::ValidationErrorCode

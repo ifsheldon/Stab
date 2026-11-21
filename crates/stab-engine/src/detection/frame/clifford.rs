@@ -8,7 +8,7 @@
 //! The tableau-based differential tests check each derived map against the gate's tableau.
 
 use arrayvec::ArrayVec;
-use stab_model::{Gate, GateTargetGroupKind};
+use stab_model::{DecompositionStep, Gate, GateTargetGroupKind};
 
 use super::BitPlaneDetectionFrame;
 use super::helpers::frame_qubit_out_of_range;
@@ -134,58 +134,46 @@ impl FrameCliffordAction {
         if !gate.is_unitary() {
             return Ok(None);
         }
-        let Some(decomposition) = stab_model::advanced::gate_decomposition(gate) else {
+        let Some(decomposition) = gate.h_s_cx_m_r_decomposition() else {
             return Ok(None);
         };
         let mut columns = TwoQubitFrameMatrix::IDENTITY.columns;
-        for line in decomposition.as_stim_str().lines() {
-            let mut tokens = line
-                .split('#')
-                .next()
-                .unwrap_or_default()
-                .split_whitespace();
-            let Some(name) = tokens.next() else {
-                continue;
-            };
-            let mut qubits = ArrayVec::<usize, 2>::new();
-            for token in tokens {
-                let qubit = token
-                    .parse::<usize>()
-                    .ok()
-                    .filter(|qubit| *qubit < arity)
-                    .ok_or_else(|| decomposition_error(gate))?;
-                qubits
-                    .try_push(qubit)
-                    .map_err(|_| decomposition_error(gate))?;
+        for step in decomposition.steps() {
+            // Every local qubit of a fixed-arity gate's decomposition is below its arity, which
+            // the decomposition tests check; the shifts below rely on it.
+            if step
+                .qubits()
+                .iter()
+                .any(|&qubit| usize::from(qubit) >= arity)
+            {
+                return Err(decomposition_error(gate));
             }
-            let step: fn(u8, &[usize]) -> Option<u8> = match name {
-                "H" => |column, qubits| {
-                    qubits.iter().try_fold(column, |column, &qubit| {
-                        let x = (column >> (2 * qubit)) & 1;
-                        let z = (column >> (2 * qubit + 1)) & 1;
-                        Some(column ^ ((x ^ z) * (0b11 << (2 * qubit))))
-                    })
-                },
-                "S" => |column, qubits| {
-                    qubits.iter().try_fold(column, |column, &qubit| {
-                        Some(column ^ (((column >> (2 * qubit)) & 1) << (2 * qubit + 1)))
-                    })
-                },
-                "CX" | "CNOT" => |column, qubits| {
-                    let (pairs, unpaired) = qubits.as_chunks::<2>();
-                    if !unpaired.is_empty() {
-                        return None;
-                    }
-                    pairs.iter().try_fold(column, |column, &[control, target]| {
-                        let control_x = (column >> (2 * control)) & 1;
-                        let target_z = (column >> (2 * target + 1)) & 1;
-                        Some(column ^ (control_x << (2 * target)) ^ (target_z << (2 * control + 1)))
-                    })
-                },
-                _ => return Err(decomposition_error(gate)),
-            };
             for column in &mut columns {
-                *column = step(*column, &qubits).ok_or_else(|| decomposition_error(gate))?;
+                *column = match *step {
+                    DecompositionStep::H(qubits) => {
+                        qubits.iter().fold(*column, |column, &qubit| {
+                            let x = (column >> (2 * qubit)) & 1;
+                            let z = (column >> (2 * qubit + 1)) & 1;
+                            column ^ ((x ^ z) * (0b11 << (2 * qubit)))
+                        })
+                    }
+                    DecompositionStep::S(qubits) => {
+                        qubits.iter().fold(*column, |column, &qubit| {
+                            column ^ (((column >> (2 * qubit)) & 1) << (2 * qubit + 1))
+                        })
+                    }
+                    DecompositionStep::Cx(pairs) => {
+                        pairs.iter().fold(*column, |column, &[control, target]| {
+                            let control_x = (column >> (2 * control)) & 1;
+                            let target_z = (column >> (2 * target + 1)) & 1;
+                            column ^ (control_x << (2 * target)) ^ (target_z << (2 * control + 1))
+                        })
+                    }
+                    // A unitary gate's decomposition has no collapsing step.
+                    DecompositionStep::M(_) | DecompositionStep::R(_) => {
+                        return Err(decomposition_error(gate));
+                    }
+                };
             }
         }
         if arity == 1 {

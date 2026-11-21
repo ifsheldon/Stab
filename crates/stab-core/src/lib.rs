@@ -10,7 +10,7 @@ pub use stab_engine as execution;
 pub use stab_algebra::{
     CliffordString, FlexPauliString, Flow, FlowMeasurementIndex, PauliBasis, PauliPhase, PauliSign,
     PauliString, SingleQubitClifford, StabilizerError, StabilizerResource, StabilizerResult,
-    Tableau,
+    Tableau, TwoQubitClifford, TwoQubitPauli,
 };
 pub use stab_decoder::{
     DecodeBatchError, DecodeBatchStatus, DecodeBatchSummary, DecodeContractError,
@@ -19,12 +19,13 @@ pub use stab_decoder::{
 };
 pub use stab_model::{
     AbsoluteTolerance, ByteSpan, Cancellation, Cancelled, Circuit, CircuitDetectorId,
-    CircuitInstruction, CircuitItem, CircuitTick, DemDetectorId, DemErrorMechanismTraversalLimits,
-    DemErrorMechanismView, DemErrorMechanismVisitError, DemErrorMechanismVisitor, DemErrorTarget,
-    DemErrorTargetIter, DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem,
-    DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, DiagnosticSeverity, Estimate,
-    Gate, GateArgumentRule, GateCategory, GateDecomposition, GateKind, GateTargetGroupKind,
-    GateTargetRule, MeasureRecordOffset, MemoryBudget, MemoryBudgetExceeded,
+    CircuitInstruction, CircuitItem, CircuitTick, DecompositionStep, DemDetectorId,
+    DemErrorMechanismTraversalLimits, DemErrorMechanismView, DemErrorMechanismVisitError,
+    DemErrorMechanismVisitor, DemErrorTarget, DemErrorTargetIter, DemFlattenedInstructionIter,
+    DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DemRepeatCount, DemTarget,
+    DetectorErrorModel, DiagnosticSeverity, Estimate, Gate, GateArgumentRule, GateCategory,
+    GateDecomposition, GateFlowDescriptor, GateKind, GatePauliString, GateTargetGroupKind,
+    GateTargetRule, GateUnitaryRows, MeasureRecordOffset, MemoryBudget, MemoryBudgetExceeded,
     MemoryBudgetParseError, ModelDialect, ModelError, ModelFingerprint, ModelResult, ObservableId,
     ParseError, ParseErrorCode, ParseErrorContext, ParseLimits, Pauli, Probability,
     ProbabilityStimText, QubitId, RepeatBlock, RepeatCount, RepeatNestingLimit,
