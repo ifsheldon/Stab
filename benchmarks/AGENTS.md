@@ -10,6 +10,6 @@
 - Keep the Stim parity ceiling exactly `1.25x` and the seeded Stab self-regression ceiling exactly `1.15x`. Missing baselines are `unseeded`. Do not add waivers or shrink work to pass.
 - Bump the explicit timing-boundary identity whenever controller work moves into or out of a timed region. Baselines must also match architecture, CPU, Rust target, Rust toolchain, and case digest.
 - Use the shared bounded process supervisor in `ops/process`. Preserve concurrent I/O, process-group termination, cancellation, output limits, timeouts, and tested child-RSS accounting.
-- Formal evidence requires a clean committed source, exact pinned Stim identity, fixed release builds, CPU affinity, no competing benchmark process, temperature below `100 C`, and no swap I/O.
+- Formal evidence requires a clean committed source, exact pinned Stim identity, fixed release builds, CPU affinity, no competing benchmark, measured-binary, Cargo, rustc, or CMake process, temperature below `100 C`, and no swap I/O.
 - Write every bundle to a unique, previously absent child under `target/benchmarks/`. Preserve failed runs and never reuse their paths.
 - Run `just bench::e2e-check`, targeted `stab-bench` tests, formatting, warnings-denied Clippy, and the relevant smoke workflow before a requested commit.

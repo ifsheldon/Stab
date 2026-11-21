@@ -1,6 +1,6 @@
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{Seek, SeekFrom, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -326,40 +326,11 @@ pub(crate) fn open_regular_file(path: &Path) -> Result<File, ReleaseError> {
 }
 
 pub(crate) fn read_bounded_file(
-    mut file: File,
+    file: File,
     path: &Path,
     limit: u64,
 ) -> Result<Vec<u8>, ReleaseError> {
-    let metadata = file
-        .metadata()
-        .map_err(|source| ReleaseError::io(path, source))?;
-    if !metadata.is_file() {
-        return Err(ReleaseError::NotRegularFile(path.to_path_buf()));
-    }
-    if metadata.len() > limit {
-        return Err(ReleaseError::FileTooLarge {
-            path: path.to_path_buf(),
-            limit,
-        });
-    }
-    file.seek(SeekFrom::Start(0))
-        .map_err(|source| ReleaseError::io(path, source))?;
-    let capacity = usize::try_from(metadata.len()).map_err(|_| ReleaseError::FileTooLarge {
-        path: path.to_path_buf(),
-        limit,
-    })?;
-    let mut bytes = Vec::with_capacity(capacity);
-    Read::by_ref(&mut file)
-        .take(limit.saturating_add(1))
-        .read_to_end(&mut bytes)
-        .map_err(|source| ReleaseError::io(path, source))?;
-    if !matches!(u64::try_from(bytes.len()), Ok(size) if size <= limit) {
-        return Err(ReleaseError::FileTooLarge {
-            path: path.to_path_buf(),
-            limit,
-        });
-    }
-    Ok(bytes)
+    stab_confined_fs::read_bounded(file, path, limit).map_err(ReleaseError::from)
 }
 
 pub(crate) fn file_identity(file: &File, path: &Path) -> Result<FileIdentity, ReleaseError> {
@@ -400,6 +371,13 @@ pub(crate) fn descriptor_program(
         }
         let descriptor = rustix::io::fcntl_dupfd_cloexec(file, 3)
             .map_err(|source| ReleaseError::io(display_path, source.into()))?;
+        // The program is executed through `/proc/self/fd/N`. For an ELF binary
+        // the kernel resolves that path before exec closes CLOEXEC
+        // descriptors, but for a `#!` script the kernel hands the interpreter
+        // the `/proc/self/fd/N` path to open after exec, so the descriptor
+        // must survive exec. Clearing CLOEXEC has a cost: every child spawned
+        // while this program is retained inherits one read-only descriptor of
+        // a regular file it could already execute.
         rustix::io::fcntl_setfd(&descriptor, rustix::io::FdFlags::empty())
             .map_err(|source| ReleaseError::io(display_path, source.into()))?;
         let source_identity = file_identity(file, display_path)?;
@@ -417,6 +395,41 @@ pub(crate) fn descriptor_program(
     #[cfg(not(unix))]
     {
         let _ = (file, display_path);
+        Err(ReleaseError::UnsupportedPlatform)
+    }
+}
+
+/// An in-memory copy of exactly `bytes`, sealed so that no process, including
+/// this one, can write, grow, shrink, or reseal it. Uploads read from it so
+/// the transmitted bytes are the bytes that were validated.
+pub(crate) fn sealed_copy(name: &str, bytes: &[u8]) -> Result<File, ReleaseError> {
+    #[cfg(target_os = "linux")]
+    {
+        use rustix::fs::{MemfdFlags, SealFlags};
+
+        let display = PathBuf::from(format!("sealed copy of {name}"));
+        let io_error = |source: std::io::Error| ReleaseError::io(&display, source);
+        let descriptor =
+            rustix::fs::memfd_create(name, MemfdFlags::CLOEXEC | MemfdFlags::ALLOW_SEALING)
+                .map_err(|source| io_error(source.into()))?;
+        let mut file = File::from(descriptor);
+        file.write_all(bytes).map_err(io_error)?;
+        let seals = SealFlags::WRITE | SealFlags::SHRINK | SealFlags::GROW | SealFlags::SEAL;
+        rustix::fs::fcntl_add_seals(&file, seals).map_err(|source| io_error(source.into()))?;
+        if !rustix::fs::fcntl_get_seals(&file)
+            .map_err(|source| io_error(source.into()))?
+            .contains(seals)
+        {
+            return Err(io_error(std::io::Error::other(
+                "memfd seals were not applied",
+            )));
+        }
+        file.seek(SeekFrom::Start(0)).map_err(io_error)?;
+        Ok(file)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (name, bytes);
         Err(ReleaseError::UnsupportedPlatform)
     }
 }
@@ -502,39 +515,8 @@ fn open_directory_components(
     create_missing: bool,
     display_path: &Path,
 ) -> Result<File, ReleaseError> {
-    use rustix::fs::{Mode, OFlags};
-
-    let root = rustix::fs::open(
-        "/",
-        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::DIRECTORY | OFlags::NOFOLLOW,
-        Mode::empty(),
-    )
-    .map_err(|source| ReleaseError::io(display_path, source.into()))?;
-    let mut directory = File::from(root);
-    for component in components {
-        match open_directory_at(&directory, component, display_path) {
-            Ok(next) => directory = next,
-            Err(ReleaseError::Io { source, .. })
-                if create_missing && source.kind() == std::io::ErrorKind::NotFound =>
-            {
-                rustix::fs::mkdirat(
-                    &directory,
-                    component,
-                    Mode::RUSR
-                        | Mode::WUSR
-                        | Mode::XUSR
-                        | Mode::RGRP
-                        | Mode::XGRP
-                        | Mode::ROTH
-                        | Mode::XOTH,
-                )
-                .map_err(|source| ReleaseError::io(display_path, source.into()))?;
-                directory = open_directory_at(&directory, component, display_path)?;
-            }
-            Err(error) => return Err(error),
-        }
-    }
-    Ok(directory)
+    stab_confined_fs::open_directory_components(&components, create_missing, display_path)
+        .map_err(ReleaseError::from)
 }
 
 #[cfg(unix)]
@@ -543,22 +525,7 @@ fn open_directory_at(
     name: &OsStr,
     display_path: &Path,
 ) -> Result<File, ReleaseError> {
-    use rustix::fs::{Mode, OFlags};
-
-    let descriptor = rustix::fs::openat(
-        directory,
-        name,
-        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::DIRECTORY | OFlags::NOFOLLOW,
-        Mode::empty(),
-    )
-    .map_err(|source| {
-        if source == rustix::io::Errno::LOOP {
-            ReleaseError::SymlinkPath(display_path.to_path_buf())
-        } else {
-            ReleaseError::io(display_path, source.into())
-        }
-    })?;
-    Ok(File::from(descriptor))
+    stab_confined_fs::open_directory_at(directory, name, display_path).map_err(ReleaseError::from)
 }
 
 #[cfg(unix)]
@@ -567,30 +534,7 @@ fn open_regular_at(
     name: &OsStr,
     display_path: &Path,
 ) -> Result<File, ReleaseError> {
-    use rustix::fs::{Mode, OFlags};
-
-    let descriptor = rustix::fs::openat(
-        directory,
-        name,
-        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK,
-        Mode::empty(),
-    )
-    .map_err(|source| {
-        if source == rustix::io::Errno::LOOP {
-            ReleaseError::SymlinkPath(display_path.to_path_buf())
-        } else {
-            ReleaseError::io(display_path, source.into())
-        }
-    })?;
-    let file = File::from(descriptor);
-    if !file
-        .metadata()
-        .map_err(|source| ReleaseError::io(display_path, source))?
-        .is_file()
-    {
-        return Err(ReleaseError::NotRegularFile(display_path.to_path_buf()));
-    }
-    Ok(file)
+    stab_confined_fs::open_regular_at(directory, name, display_path).map_err(ReleaseError::from)
 }
 
 #[cfg(unix)]
@@ -892,7 +836,7 @@ fn parent_display_path(path: &Path) -> &Path {
     path.parent().unwrap_or(path)
 }
 
-fn validate_relative(path: &Path) -> Result<(), ReleaseError> {
+pub(crate) fn validate_relative(path: &Path) -> Result<(), ReleaseError> {
     if path.is_empty()
         || path.is_absolute()
         || path
@@ -917,274 +861,22 @@ fn validate_name(name: &OsStr, parent: &Path) -> Result<(), ReleaseError> {
 
 #[cfg(unix)]
 fn split_absolute_file(path: &Path) -> Result<(Vec<&OsStr>, &OsStr), ReleaseError> {
-    let mut components = absolute_components(path)?;
-    let name = components
-        .pop()
-        .ok_or_else(|| ReleaseError::InvalidPath(path.to_path_buf()))?;
-    Ok((components, name))
+    stab_confined_fs::split_absolute_path(path).map_err(ReleaseError::from)
 }
 
-#[cfg(unix)]
-fn absolute_components(path: &Path) -> Result<Vec<&OsStr>, ReleaseError> {
-    let mut components = path.components();
-    if !matches!(components.next(), Some(Component::RootDir)) {
-        return Err(ReleaseError::InvalidPath(path.to_path_buf()));
+/// Maps the shared primitives' errors onto the release error variants they always produced.
+impl From<stab_confined_fs::ConfinedFsError> for ReleaseError {
+    fn from(error: stab_confined_fs::ConfinedFsError) -> Self {
+        use stab_confined_fs::ConfinedFsError;
+        match error {
+            ConfinedFsError::InvalidPath(path) => Self::InvalidPath(path),
+            ConfinedFsError::Symlink(path) => Self::SymlinkPath(path),
+            ConfinedFsError::NotRegularFile(path) => Self::NotRegularFile(path),
+            ConfinedFsError::TooLarge { path, limit } => Self::FileTooLarge { path, limit },
+            ConfinedFsError::Io { path, source } => Self::io(&path, source),
+        }
     }
-    let mut normal = Vec::new();
-    for component in components {
-        let Component::Normal(component) = component else {
-            return Err(ReleaseError::InvalidPath(path.to_path_buf()));
-        };
-        normal.push(component);
-    }
-    Ok(normal)
 }
 
 #[cfg(test)]
-mod tests {
-    use std::assert_matches;
-    use std::cell::Cell;
-    use std::fs;
-    use std::rc::Rc;
-
-    use super::*;
-
-    #[cfg(unix)]
-    #[test]
-    fn descriptor_and_path_stats_share_file_identity_normalization() {
-        let root = tempfile::tempdir().expect("root");
-        let path = root.path().join("artifact");
-        fs::write(&path, b"artifact").expect("artifact");
-        let file = File::open(&path).expect("file");
-        let directory = File::open(root.path()).expect("directory");
-
-        let descriptor_identity = file_identity(&file, &path).expect("descriptor identity");
-        let path_identity =
-            identity_at(&directory, OsStr::new("artifact"), &path).expect("path identity");
-
-        assert_eq!(descriptor_identity, path_identity);
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn retained_program_rejects_source_path_replacement() {
-        let root = tempfile::tempdir().expect("root");
-        let path = root.path().join("program");
-        fs::write(&path, b"original").expect("program");
-        let file = open_regular_file(&path).expect("file");
-        let program = descriptor_program(&file, &path).expect("retained program");
-
-        fs::rename(&path, root.path().join("displaced")).expect("displace program");
-        fs::write(&path, b"replacement").expect("replacement program");
-
-        assert_matches!(
-            program.revalidate(),
-            Err(ReleaseError::FileIdentityChanged(_))
-        );
-    }
-
-    #[test]
-    fn retained_directory_rejects_replacement_and_symlink_entries() {
-        let root = tempfile::tempdir().expect("root");
-        fs::create_dir(root.path().join("target")).expect("target");
-        let directory = RetainedDirectory::create_new_under(
-            root.path(),
-            Path::new("target/release-review"),
-            None,
-        )
-        .expect("retained directory");
-        directory
-            .write_new(OsStr::new("reviewed.crate"), b"reviewed")
-            .expect("reviewed file");
-
-        fs::rename(
-            root.path().join("target/release-review"),
-            root.path().join("target/displaced"),
-        )
-        .expect("displace directory");
-        fs::create_dir(root.path().join("target/release-review")).expect("replacement");
-        assert_matches!(
-            directory.revalidate(),
-            Err(ReleaseError::FileIdentityChanged(_))
-        );
-    }
-
-    #[test]
-    fn descriptor_enumeration_is_bounded_and_exact() {
-        let root = tempfile::tempdir().expect("root");
-        fs::create_dir(root.path().join("target")).expect("target");
-        let directory = RetainedDirectory::create_new_under(
-            root.path(),
-            Path::new("target/release-review"),
-            None,
-        )
-        .expect("retained directory");
-        directory
-            .write_new(OsStr::new("alpha"), b"a")
-            .expect("alpha");
-        directory.write_new(OsStr::new("beta"), b"b").expect("beta");
-
-        let mut names = directory.entry_names(2).expect("entry names");
-        names.sort();
-        assert_eq!(names, [OsString::from("alpha"), OsString::from("beta")]);
-        assert_matches!(
-            directory.entry_names(1),
-            Err(ReleaseError::DirectoryTooLarge { limit: 1, .. })
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn descriptor_cleanup_removes_nested_entries_without_following_symlinks() {
-        use std::os::unix::fs::symlink;
-
-        let root = tempfile::tempdir().expect("root");
-        fs::create_dir(root.path().join("target")).expect("target");
-        let work = RetainedDirectory::create_new_under(
-            root.path(),
-            Path::new("target/release-work"),
-            None,
-        )
-        .expect("work");
-        let nested = work.create_directory(OsStr::new("nested")).expect("nested");
-        nested
-            .write_new(OsStr::new("artifact"), b"bytes")
-            .expect("artifact");
-        let outside = root.path().join("outside");
-        fs::write(&outside, b"sentinel").expect("outside");
-        symlink(&outside, work.path().join("alias")).expect("symlink");
-        let work_path = work.path().to_path_buf();
-
-        work.remove_tree().expect("remove tree");
-        assert!(!work_path.exists());
-        assert_eq!(fs::read(&outside).expect("outside bytes"), b"sentinel");
-    }
-
-    #[test]
-    fn descriptor_cleanup_rejects_replaced_root_without_deleting_it() {
-        let root = tempfile::tempdir().expect("root");
-        fs::create_dir(root.path().join("target")).expect("target");
-        let work = RetainedDirectory::create_new_under(
-            root.path(),
-            Path::new("target/release-work"),
-            None,
-        )
-        .expect("work");
-        let work_path = work.path().to_path_buf();
-        fs::rename(&work_path, root.path().join("target/displaced")).expect("displace");
-        fs::create_dir(&work_path).expect("replacement");
-        fs::write(work_path.join("sentinel"), b"replacement").expect("sentinel");
-
-        assert_matches!(
-            work.remove_tree(),
-            Err(ReleaseError::FileIdentityChanged(_))
-        );
-        assert_eq!(
-            fs::read(work_path.join("sentinel")).expect("replacement survives"),
-            b"replacement"
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn descriptor_cleanup_preserves_root_replacement_installed_before_tombstone_move() {
-        let root = tempfile::tempdir().expect("root");
-        fs::create_dir(root.path().join("target")).expect("target");
-        let work = RetainedDirectory::create_new_under(
-            root.path(),
-            Path::new("target/release-work"),
-            None,
-        )
-        .expect("work");
-        work.write_new(OsStr::new("artifact"), b"original")
-            .expect("artifact");
-        let work_path = work.path().to_path_buf();
-        let displaced_path = root.path().join("target/displaced-original");
-        let replacement_seen = Rc::new(Cell::new(false));
-        let hook_seen = Rc::clone(&replacement_seen);
-        let hook_work_path = work_path.clone();
-        let hook_displaced_path = displaced_path.clone();
-
-        let result = with_remove_tree_hook(
-            move |event| {
-                if event.point == RemoveTreeHookPoint::BeforeRoot
-                    && event.original_path == hook_work_path
-                    && !hook_seen.replace(true)
-                {
-                    fs::rename(&hook_work_path, &hook_displaced_path).expect("displace retained");
-                    fs::create_dir(&hook_work_path).expect("replacement root");
-                    fs::write(hook_work_path.join("sentinel"), b"replacement")
-                        .expect("replacement sentinel");
-                }
-            },
-            || work.remove_tree(),
-        );
-
-        assert_matches!(result, Err(ReleaseError::FileIdentityChanged(_)));
-        assert!(replacement_seen.get());
-        assert_eq!(
-            fs::read(work_path.join("sentinel")).expect("replacement survives"),
-            b"replacement"
-        );
-        assert_eq!(
-            fs::read(displaced_path.join("artifact")).expect("retained tree survives"),
-            b"original"
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn descriptor_cleanup_preserves_root_replacement_installed_after_tombstone_move() {
-        let root = tempfile::tempdir().expect("root");
-        fs::create_dir(root.path().join("target")).expect("target");
-        let work = RetainedDirectory::create_new_under(
-            root.path(),
-            Path::new("target/release-work"),
-            None,
-        )
-        .expect("work");
-        work.write_new(OsStr::new("artifact"), b"original")
-            .expect("artifact");
-        let work_path = work.path().to_path_buf();
-        let replacement_seen = Rc::new(Cell::new(false));
-        let hook_seen = Rc::clone(&replacement_seen);
-        let hook_work_path = work_path.clone();
-
-        with_remove_tree_hook(
-            move |event| {
-                if event.point == RemoveTreeHookPoint::RootMoved
-                    && event.original_path == hook_work_path
-                    && !hook_seen.replace(true)
-                {
-                    let tombstone_path = event.tombstone_path.expect("tombstone path");
-                    assert!(tombstone_path.exists());
-                    fs::create_dir(&hook_work_path).expect("replacement root");
-                    fs::write(hook_work_path.join("sentinel"), b"replacement")
-                        .expect("replacement sentinel");
-                }
-            },
-            || work.remove_tree(),
-        )
-        .expect("remove retained tree");
-
-        assert!(replacement_seen.get());
-        assert_eq!(
-            fs::read(work_path.join("sentinel")).expect("replacement survives"),
-            b"replacement"
-        );
-        assert!(!work_path.join("artifact").exists());
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn regular_file_open_rejects_symlink_substitution() {
-        use std::os::unix::fs::symlink;
-
-        let root = tempfile::tempdir().expect("root");
-        let real = root.path().join("real");
-        fs::write(&real, b"bytes").expect("real file");
-        let alias = root.path().join("alias");
-        symlink(&real, &alias).expect("symlink");
-        assert_matches!(open_regular_file(&alias), Err(ReleaseError::SymlinkPath(_)));
-    }
-}
+mod tests;

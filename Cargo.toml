@@ -14,6 +14,7 @@ members = [
     "crates/stab-records",
     "ops/architecture",
     "ops/bench",
+    "ops/confined-fs",
     "ops/oracle",
     "ops/pre-commit",
     "ops/process",

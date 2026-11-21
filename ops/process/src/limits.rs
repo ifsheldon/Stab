@@ -2,6 +2,8 @@
 
 use std::path::PathBuf;
 
+use super::group::process_id;
+
 const MAX_AFFINITY_PASSES: usize = 8;
 const MAX_CHILD_TASKS: usize = 4_096;
 
@@ -79,21 +81,6 @@ pub(super) fn set_child_affinity(pid: u32, cpu: usize) -> Result<(), std::io::Er
     ))
 }
 
-fn process_id(pid: u32) -> Result<rustix::process::Pid, std::io::Error> {
-    let raw_pid = i32::try_from(pid).map_err(|_| {
-        std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            format!("child process id {pid} exceeds the supported Linux pid range"),
-        )
-    })?;
-    rustix::process::Pid::from_raw(raw_pid).ok_or_else(|| {
-        std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            format!("child process id {pid} is invalid"),
-        )
-    })
-}
-
 fn set_task_affinity(
     task_id: rustix::process::Pid,
     set: &rustix::thread::CpuSet,
@@ -145,28 +132,16 @@ fn affinity_is_singleton(set: &rustix::thread::CpuSet, cpu: usize) -> bool {
         .all(|candidate| set.is_set(candidate) == (candidate == cpu))
 }
 
-pub(super) fn set_child_file_limit(pid: u32, requested_maximum: u64) -> Result<(), std::io::Error> {
-    let raw_pid = i32::try_from(pid).map_err(|_| {
-        std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            format!("child process id {pid} exceeds the supported Linux pid range"),
-        )
-    })?;
-    let pid = rustix::process::Pid::from_raw(raw_pid).ok_or_else(|| {
-        std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            format!("child process id {pid} is invalid"),
-        )
-    })?;
+/// Lowers the calling process's own regular-file limit, soft and hard, so
+/// every process it spawns afterwards inherits the bound.
+pub(super) fn limit_own_file_size(requested_maximum: u64) -> Result<(), std::io::Error> {
     let maximum = bounded_file_limit(requested_maximum)?;
-    rustix::process::prlimit(
-        Some(pid),
+    rustix::process::setrlimit(
         rustix::process::Resource::Fsize,
         rustix::process::Rlimit {
             current: Some(maximum),
             maximum: Some(maximum),
         },
     )
-    .map(|_| ())
     .map_err(Into::into)
 }

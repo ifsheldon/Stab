@@ -92,6 +92,11 @@ pub(crate) fn check(root: &Path, output: &Path) -> Result<PathBuf, ReleaseError>
             &package.version,
             &commit,
         )?;
+        registry::require_manifest_dependencies(
+            &package.registry_metadata,
+            &reviewed.normalized_manifest,
+            &source,
+        )?;
         archive::write_immutable_copy(&packages_directory, OsStr::new(&archive_name), &reviewed)?;
         let metadata_name = registry_metadata_name(&package.name, &package.version);
         write_immutable_bytes(
@@ -266,6 +271,11 @@ fn validate_report(
             registry::MAX_REGISTRY_METADATA_BYTES,
         )?;
         registry::validate_reviewed_metadata(&metadata_bytes, &package.name, &package.version)?;
+        registry::require_manifest_dependencies(
+            &metadata_bytes,
+            &reviewed.normalized_manifest,
+            &archive_path,
+        )?;
         if registry::metadata_sha256(&metadata_bytes) != package.registry_metadata_sha256
             || u64::try_from(metadata_bytes.len()).ok() != Some(package.registry_metadata_bytes)
         {

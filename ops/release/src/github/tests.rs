@@ -150,6 +150,16 @@ impl DraftPublisher for MovingTagPublisher {
             "unexpected release query in tag-guard test".to_string(),
         ))
     }
+
+    fn releases_with_tag(
+        &mut self,
+        _tag: &str,
+        _token: &GitHubToken,
+    ) -> Result<Vec<RemoteRelease>, ReleaseError> {
+        Err(ReleaseError::GitHubRelease(
+            "unexpected release listing in tag-guard test".to_string(),
+        ))
+    }
 }
 
 #[test]
@@ -624,6 +634,16 @@ impl DraftPublisher for StateRoutingPublisher {
         self.events.push("unique-draft-lookup");
         Ok(remote_release(42, true))
     }
+
+    fn releases_with_tag(
+        &mut self,
+        _tag: &str,
+        _token: &GitHubToken,
+    ) -> Result<Vec<RemoteRelease>, ReleaseError> {
+        Err(ReleaseError::GitHubRelease(
+            "unexpected release listing in state-routing test".to_string(),
+        ))
+    }
 }
 
 #[test]
@@ -880,4 +900,161 @@ fn read_request_headers(stream: &mut std::net::TcpStream) -> String {
         request.extend_from_slice(buffer.get(..read).expect("bounded read"));
     }
     String::from_utf8_lossy(&request).into_owned()
+}
+
+struct ExistingReleasePublisher {
+    existing_draft: bool,
+    events: Vec<&'static str>,
+}
+
+impl DraftPublisher for ExistingReleasePublisher {
+    fn require_release_tag_ruleset(&mut self, _token: &GitHubToken) -> Result<(), ReleaseError> {
+        self.events.push("ruleset-check");
+        Ok(())
+    }
+
+    fn require_remote_annotated_tag(
+        &mut self,
+        _tag: &str,
+        _commit: &str,
+        _token: &GitHubToken,
+    ) -> Result<(), ReleaseError> {
+        self.events.push("tag-check");
+        Ok(())
+    }
+
+    fn create_draft(
+        &mut self,
+        _tag: &str,
+        _commit: &str,
+        _token: &GitHubToken,
+    ) -> Result<RemoteRelease, ReleaseError> {
+        self.events.push("create-draft");
+        Ok(remote_release(99, true))
+    }
+
+    fn upload_asset(
+        &mut self,
+        _release_id: u64,
+        _name: &str,
+        _file: File,
+        _token: &GitHubToken,
+    ) -> Result<RemoteAsset, ReleaseError> {
+        self.events.push("upload-asset");
+        Err(ReleaseError::GitHubRelease(
+            "unexpected asset upload after an existing release".to_string(),
+        ))
+    }
+
+    fn published_release_by_tag(
+        &mut self,
+        _tag: &str,
+        _token: &GitHubToken,
+    ) -> Result<RemoteRelease, ReleaseError> {
+        Err(ReleaseError::GitHubRelease(
+            "unexpected by-tag query in existing-release test".to_string(),
+        ))
+    }
+
+    fn unique_draft_release(
+        &mut self,
+        _tag: &str,
+        _token: &GitHubToken,
+    ) -> Result<RemoteRelease, ReleaseError> {
+        Err(ReleaseError::GitHubRelease(
+            "unexpected draft lookup in existing-release test".to_string(),
+        ))
+    }
+
+    fn releases_with_tag(
+        &mut self,
+        _tag: &str,
+        _token: &GitHubToken,
+    ) -> Result<Vec<RemoteRelease>, ReleaseError> {
+        self.events.push("release-listing");
+        Ok(vec![remote_release(7, self.existing_draft)])
+    }
+}
+
+/// Regression: rerunning create-draft after an interrupted run created a
+/// second draft for the same tag instead of stopping.
+#[test]
+fn draft_creation_refuses_a_tag_that_already_has_a_release() {
+    let (root, assets) = crate::artifact::tests::tagged_asset_repository();
+    let token = GitHubToken(SecretString::from("reviewed-token"));
+    for (existing_draft, recovery) in [
+        (true, "delete that draft"),
+        (false, "do not rerun create-draft"),
+    ] {
+        let mut reviewed =
+            artifact::review_assets(root.path(), &assets, RELEASE_TAG).expect("review assets");
+        let commit = reviewed.commit().to_string();
+        let mut publisher = ExistingReleasePublisher {
+            existing_draft,
+            events: Vec::new(),
+        };
+        let error = publish_draft(
+            &mut publisher,
+            &mut reviewed,
+            RELEASE_TAG,
+            &commit,
+            target::PRODUCTION,
+            &token,
+            &ReleaseCancellation::for_test(),
+        )
+        .expect_err("an existing release must stop draft creation");
+        let detail = error.to_string();
+        assert!(detail.contains("already has a release"), "{detail}");
+        assert!(detail.contains(recovery), "{detail}");
+        assert_eq!(
+            publisher.events,
+            ["ruleset-check", "tag-check", "release-listing"]
+        );
+    }
+}
+
+#[test]
+fn release_listing_returns_drafts_and_published_releases_for_the_tag() {
+    let mut first_page = vec![
+        release_entry(1, RELEASE_TAG, false),
+        release_entry(2, "v0.1.9", true),
+    ];
+    while first_page.len() < RELEASE_LIST_PAGE_SIZE {
+        let id = first_page.len() as u64 + 100;
+        first_page.push(release_entry(id, &format!("other-{id}"), false));
+    }
+    let second_page = vec![release_entry(77, RELEASE_TAG, true)];
+    let listener = TcpListener::bind("127.0.0.1:0").expect("listener");
+    let address = listener.local_addr().expect("address");
+    let server = serve_json_get_requests(
+        listener,
+        vec![
+            (200, serde_json::to_string(&first_page).expect("first page")),
+            (
+                200,
+                serde_json::to_string(&second_page).expect("second page"),
+            ),
+        ],
+    );
+    let host = format!("http://{address}");
+    let mut api = GitHubApi::with_hosts(
+        host.clone(),
+        host,
+        target::PRODUCTION,
+        ReleaseCancellation::for_test(),
+    );
+    let releases = api
+        .releases_with_tag(
+            RELEASE_TAG,
+            &GitHubToken(SecretString::from("reviewed-token")),
+        )
+        .expect("release listing");
+    assert_eq!(
+        releases
+            .iter()
+            .map(|release| (release.id, release.draft))
+            .collect::<Vec<_>>(),
+        [(1, false), (77, true)]
+    );
+    assert_eq!(server.join().expect("server").len(), 2);
 }

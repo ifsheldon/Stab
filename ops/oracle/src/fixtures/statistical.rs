@@ -1,8 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::statistical_contract::AcceptedCountRange;
+use super::row::CliArgv;
+use crate::statistical_contract::{CountTolerance, two_sided_normal_tail_bound};
 
 const PROBABILITY_SUM_TOLERANCE: f64 = 1e-9;
+/// Every one-sample row checks Stim's output and Stab's output against the same analytic
+/// distribution, so its Bonferroni bound counts each checked rate twice.
+const ONE_SAMPLE_CHECKED_OUTPUTS: usize = 2;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum StatisticalSource {
@@ -10,69 +14,45 @@ pub(super) enum StatisticalSource {
     FixtureOutput,
 }
 
-pub(super) fn source_for_plan(plan: &str) -> Result<StatisticalSource, String> {
-    parse_statistical_plan(plan).map(|plan| plan.source)
-}
+impl StatisticalPlan {
+    pub(super) fn parse(plan: &str) -> Result<Self, String> {
+        parse_statistical_plan(plan)
+    }
 
-pub(super) fn compare_statistical_plan(plan: &str, bytes: &[u8]) -> Option<String> {
-    evaluate_statistical_plan(plan, bytes).reason
-}
+    pub(super) const fn source(&self) -> StatisticalSource {
+        self.source
+    }
 
-struct StatisticalEvaluation {
-    reason: Option<String>,
-}
-
-impl StatisticalEvaluation {
-    fn incomplete(reason: impl Into<String>) -> Self {
-        Self {
-            reason: Some(reason.into()),
+    /// Checks one output against the plan, returning a failure reason.
+    pub(super) fn compare(&self, bytes: &[u8]) -> Option<String> {
+        let text = match std::str::from_utf8(bytes) {
+            Ok(text) => text,
+            Err(error) => return Some(format!("statistical output is not UTF-8: {error}")),
+        };
+        match &self.tolerance {
+            StatisticalTolerance::Binomial {
+                expected_probability,
+                sigma,
+            } => compare_binomial_samples(text, self.sample_count, *expected_probability, *sigma),
+            StatisticalTolerance::Buckets { expected, sigma } => {
+                compare_bucket_samples(text, self.sample_count, expected, *sigma)
+            }
         }
     }
 
-    fn complete(reason: Option<String>) -> Self {
-        Self { reason }
+    /// Checks that the argv requests the plan's sample count and seed.
+    pub(super) fn validate_argv(&self, argv: &CliArgv) -> Option<String> {
+        validate_shots_and_seed(self.sample_count, self.fixed_seed, argv)
     }
-}
-
-fn evaluate_statistical_plan(plan: &str, bytes: &[u8]) -> StatisticalEvaluation {
-    let plan = match parse_statistical_plan(plan) {
-        Ok(plan) => plan,
-        Err(reason) => return StatisticalEvaluation::incomplete(reason),
-    };
-    let text = match std::str::from_utf8(bytes) {
-        Ok(text) => text,
-        Err(error) => {
-            return StatisticalEvaluation::incomplete(format!(
-                "statistical output is not UTF-8: {error}"
-            ));
-        }
-    };
-    match plan.tolerance {
-        StatisticalTolerance::Binomial {
-            expected_probability,
-            sigma,
-        } => compare_binomial_samples(text, plan.sample_count, expected_probability, sigma),
-        StatisticalTolerance::Buckets { expected, sigma } => {
-            compare_bucket_samples(text, plan.sample_count, &expected, sigma)
-        }
-    }
-}
-
-pub(super) fn validate_statistical_plan(plan: &str, argv_tokens: &[String]) -> Option<String> {
-    let plan = match parse_statistical_plan(plan) {
-        Ok(plan) => plan,
-        Err(reason) => return Some(reason),
-    };
-    validate_shots_and_seed(plan.sample_count, plan.fixed_seed, argv_tokens)
 }
 
 /// Checks that a plan's declared sample count and seed are the ones the argv requests.
 pub(super) fn validate_shots_and_seed(
     sample_count: usize,
     fixed_seed: u64,
-    argv_tokens: &[String],
+    argv: &CliArgv,
 ) -> Option<String> {
-    let shots = match option_value(argv_tokens, "--shots") {
+    let shots = match argv.option_value("--shots") {
         Some(value) => value,
         None => return Some("statistical fixture argv does not declare --shots".to_string()),
     };
@@ -85,7 +65,7 @@ pub(super) fn validate_shots_and_seed(
             "statistical plan sample_count={sample_count} does not match --shots {shots}"
         ));
     }
-    let seed = match option_value(argv_tokens, "--seed") {
+    let seed = match argv.option_value("--seed") {
         Some(value) => value,
         None => return Some("statistical fixture argv does not declare --seed".to_string()),
     };
@@ -106,7 +86,7 @@ fn compare_binomial_samples(
     sample_count: usize,
     expected_probability: f64,
     sigma: f64,
-) -> StatisticalEvaluation {
+) -> Option<String> {
     let mut total = 0usize;
     let mut hits = 0usize;
     for line in text.lines() {
@@ -117,47 +97,40 @@ fn compare_binomial_samples(
                 hits += 1;
             }
             _ => {
-                return StatisticalEvaluation::incomplete(format!(
+                return Some(format!(
                     "statistical comparator expected one 0/1 bit per shot, got {line:?}"
                 ));
             }
         }
     }
     if total == 0 {
-        return StatisticalEvaluation::incomplete("statistical comparator received no samples");
+        return Some("statistical comparator received no samples".to_string());
     }
     if total != sample_count {
-        return StatisticalEvaluation::incomplete(format!(
+        return Some(format!(
             "statistical comparator expected {sample_count} samples, got {total}",
         ));
     }
     let standard_deviation = binomial_standard_deviation(expected_probability, total);
     let allowed_delta = sigma * standard_deviation;
     let Ok(total_u64) = u64::try_from(total) else {
-        return StatisticalEvaluation::incomplete(
-            "statistical sample count exceeds the supported u64 range",
-        );
+        return Some("statistical sample count exceeds the supported u64 range".to_string());
     };
-    let Some(accepted) =
-        AcceptedCountRange::try_new(total_u64, expected_probability, allowed_delta)
+    let Some(accepted) = CountTolerance::try_new(total_u64, expected_probability, allowed_delta)
     else {
-        return StatisticalEvaluation::incomplete(
-            "statistical comparator could not derive an accepted integer count range",
+        return Some(
+            "statistical comparator could not derive an accepted integer count range".to_string(),
         );
     };
     let Ok(hits) = u64::try_from(hits) else {
-        return StatisticalEvaluation::incomplete(
-            "statistical hit count exceeds the supported u64 range",
-        );
+        return Some("statistical hit count exceeds the supported u64 range".to_string());
     };
-    let reason = (!accepted.contains(hits)).then(|| {
+    (!accepted.accepts(hits)).then(|| {
         format!(
-            "actual hit count {hits}/{total} is outside the accepted integer range {}..={} around expected {expected_probability:.6}",
-            accepted.minimum(),
-            accepted.maximum()
+            "actual hit count {hits}/{total} is outside the {}",
+            accepted.describe()
         )
-    });
-    StatisticalEvaluation::complete(reason)
+    })
 }
 
 fn compare_bucket_samples(
@@ -165,7 +138,7 @@ fn compare_bucket_samples(
     sample_count: usize,
     expected: &[(String, f64)],
     sigma: f64,
-) -> StatisticalEvaluation {
+) -> Option<String> {
     let mut counts = expected
         .iter()
         .map(|(bucket, _)| (bucket.as_str(), 0usize))
@@ -173,7 +146,7 @@ fn compare_bucket_samples(
     let mut total = 0usize;
     for line in text.lines() {
         let Some(count) = counts.get_mut(line) else {
-            return StatisticalEvaluation::incomplete(format!(
+            return Some(format!(
                 "statistical comparator saw unplanned bucket {line:?}"
             ));
         };
@@ -181,10 +154,10 @@ fn compare_bucket_samples(
         total += 1;
     }
     if total == 0 {
-        return StatisticalEvaluation::incomplete("statistical comparator received no samples");
+        return Some("statistical comparator received no samples".to_string());
     }
     if total != sample_count {
-        return StatisticalEvaluation::incomplete(format!(
+        return Some(format!(
             "statistical comparator expected {sample_count} samples, got {total}",
         ));
     }
@@ -193,31 +166,26 @@ fn compare_bucket_samples(
         let standard_deviation = binomial_standard_deviation(*expected_probability, total);
         let allowed_delta = sigma * standard_deviation;
         let Ok(total_u64) = u64::try_from(total) else {
-            return StatisticalEvaluation::incomplete(
-                "statistical sample count exceeds the supported u64 range",
-            );
+            return Some("statistical sample count exceeds the supported u64 range".to_string());
         };
         let Some(accepted) =
-            AcceptedCountRange::try_new(total_u64, *expected_probability, allowed_delta)
+            CountTolerance::try_new(total_u64, *expected_probability, allowed_delta)
         else {
-            return StatisticalEvaluation::incomplete(format!(
+            return Some(format!(
                 "statistical comparator could not derive an accepted integer count range for bucket {bucket:?}"
             ));
         };
         let Ok(count) = u64::try_from(count) else {
-            return StatisticalEvaluation::incomplete(
-                "statistical bucket count exceeds the supported u64 range",
-            );
+            return Some("statistical bucket count exceeds the supported u64 range".to_string());
         };
-        if !accepted.contains(count) {
-            return StatisticalEvaluation::complete(Some(format!(
-                "actual bucket {bucket:?} count {count}/{total} is outside the accepted integer range {}..={} around expected {expected_probability:.6}",
-                accepted.minimum(),
-                accepted.maximum()
-            )));
+        if !accepted.accepts(count) {
+            return Some(format!(
+                "actual bucket {bucket:?} count {count}/{total} is outside the {}",
+                accepted.describe()
+            ));
         }
     }
-    StatisticalEvaluation::complete(None)
+    None
 }
 
 fn binomial_standard_deviation(probability: f64, sample_count: usize) -> f64 {
@@ -225,7 +193,7 @@ fn binomial_standard_deviation(probability: f64, sample_count: usize) -> f64 {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct StatisticalPlan {
+pub(super) struct StatisticalPlan {
     sample_count: usize,
     fixed_seed: u64,
     false_positive_rate: f64,
@@ -266,18 +234,24 @@ fn parse_statistical_plan(plan: &str) -> Result<StatisticalPlan, String> {
         }
         if let Some(rest) = token.strip_prefix("tolerate binomial p=") {
             let (probability, sigma) = parse_probability_and_sigma(token, rest, "binomial")?;
-            tolerance = Some(StatisticalTolerance::Binomial {
+            let parsed = StatisticalTolerance::Binomial {
                 expected_probability: probability,
                 sigma,
-            });
+            };
+            if tolerance.replace(parsed).is_some() {
+                return Err("statistical plan declares its tolerance more than once".to_string());
+            }
             continue;
         }
         if let Some(rest) = token.strip_prefix("tolerate buckets ") {
             let (bucket_text, sigma) = parse_bucket_text_and_sigma(token, rest)?;
-            tolerance = Some(StatisticalTolerance::Buckets {
+            let parsed = StatisticalTolerance::Buckets {
                 expected: parse_bucket_probabilities(bucket_text)?,
                 sigma,
-            });
+            };
+            if tolerance.replace(parsed).is_some() {
+                return Err("statistical plan declares its tolerance more than once".to_string());
+            }
             continue;
         }
         return Err(format!("unknown statistical plan token {token:?}"));
@@ -313,15 +287,18 @@ impl CommonPlanFields {
             if parsed == 0 {
                 return Err("sample_count must be positive".to_string());
             }
-            self.sample_count = Some(parsed);
+            if self.sample_count.replace(parsed).is_some() {
+                return Err("statistical plan declares sample_count more than once".to_string());
+            }
             return Ok(true);
         }
         if let Some(value) = token.strip_prefix("fixed_seed=") {
-            self.fixed_seed = Some(
-                value
-                    .parse::<u64>()
-                    .map_err(|error| format!("invalid fixed_seed {value:?}: {error}"))?,
-            );
+            let parsed = value
+                .parse::<u64>()
+                .map_err(|error| format!("invalid fixed_seed {value:?}: {error}"))?;
+            if self.fixed_seed.replace(parsed).is_some() {
+                return Err("statistical plan declares fixed_seed more than once".to_string());
+            }
             return Ok(true);
         }
         if let Some(value) = token.strip_prefix("false_positive_rate<=") {
@@ -333,7 +310,11 @@ impl CommonPlanFields {
                     "false_positive_rate {parsed} must be positive and at most 1"
                 ));
             }
-            self.false_positive_rate = Some(parsed);
+            if self.false_positive_rate.replace(parsed).is_some() {
+                return Err(
+                    "statistical plan declares false_positive_rate more than once".to_string(),
+                );
+            }
             return Ok(true);
         }
         Ok(false)
@@ -358,22 +339,18 @@ fn validate_false_positive_budget(
     false_positive_rate: f64,
     tolerance: &StatisticalTolerance,
 ) -> Result<(), String> {
-    let (sigma, checked_rates) = match tolerance {
+    let (sigma, rates) = match tolerance {
         StatisticalTolerance::Binomial { sigma, .. } => (*sigma, 1usize),
         StatisticalTolerance::Buckets { expected, sigma } => (*sigma, expected.len()),
     };
+    let checked_rates = rates * ONE_SAMPLE_CHECKED_OUTPUTS;
     let estimated_bound = (checked_rates as f64 * two_sided_normal_tail_bound(sigma)).min(1.0);
     if estimated_bound > false_positive_rate {
         return Err(format!(
-            "false_positive_rate<={false_positive_rate} is tighter than the estimated {estimated_bound:.6e} false-positive bound from {sigma} sigma over {checked_rates} checked rate(s)"
+            "false_positive_rate<={false_positive_rate} is tighter than the estimated {estimated_bound:.6e} false-positive bound from {sigma} sigma over {checked_rates} checked rate(s) ({rates} per output, Stim and Stab)"
         ));
     }
     Ok(())
-}
-
-pub(super) fn two_sided_normal_tail_bound(sigma: f64) -> f64 {
-    (std::f64::consts::FRAC_2_SQRT_PI / std::f64::consts::SQRT_2) * (-0.5 * sigma * sigma).exp()
-        / sigma
 }
 
 fn parse_probability_and_sigma(token: &str, rest: &str, kind: &str) -> Result<(f64, f64), String> {
@@ -456,17 +433,4 @@ fn parse_bucket_probabilities(text: &str) -> Result<Vec<(String, f64)>, String> 
         ));
     }
     Ok(buckets)
-}
-
-pub(super) fn option_value<'a>(tokens: &'a [String], option: &str) -> Option<&'a str> {
-    let with_equals = format!("{option}=");
-    for (index, token) in tokens.iter().enumerate() {
-        if token == option {
-            return tokens.get(index + 1).map(String::as_str);
-        }
-        if let Some(value) = token.strip_prefix(&with_equals) {
-            return Some(value);
-        }
-    }
-    None
 }

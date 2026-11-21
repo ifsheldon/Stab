@@ -4,15 +4,12 @@ use std::io::Read;
 use std::path::Path;
 
 use super::paths::{fixture_file, validate_fixture_path};
-use super::statistical::{self, StatisticalSource};
+use super::row::{ArgToken, RowCommand};
+use super::statistical::{StatisticalPlan, StatisticalSource};
 use super::{
     ExpectedStdoutPolicy, FixtureComparator, FixtureError, FixturePathRequirement, FixtureRow,
-    RepoRoot, is_core_fixture,
+    RepoRoot,
 };
-
-const FIXTURE_INPUT_TOKEN_PREFIX: &str = "{fixture_input:";
-const FIXTURE_OUTPUT_TOKEN_PREFIX: &str = "{fixture_output:";
-const FIXTURE_TOKEN_SUFFIX: &str = "}";
 pub(super) const AUXILIARY_OUTPUT_LIMIT_BYTES: u64 = 1024 * 1024;
 
 #[derive(Debug)]
@@ -50,39 +47,23 @@ impl FixtureOutput {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum FixtureArgToken<'a> {
-    Input(&'a str),
-    Output(&'a str),
-}
-
 pub(super) fn validate_row_tokens(
     row: &FixtureRow,
     fixture_root: &Path,
     expected_stdout_policy: ExpectedStdoutPolicy,
     violations: &mut Vec<String>,
 ) {
-    let mut has_placeholder = false;
-    let mut fixture_outputs = BTreeSet::new();
-    let statistical_source = if row.comparator == FixtureComparator::Statistical {
-        statistical::source_for_plan(&row.statistical_plan).ok()
-    } else {
-        None
+    let RowCommand::Cli(argv) = &row.command else {
+        return;
     };
-    let uses_statistical_fixture_output =
-        statistical_source == Some(StatisticalSource::FixtureOutput);
-    for token in row.argv_tokens() {
-        let parsed = match parse_fixture_arg_token(row.id.as_str(), &token) {
-            Ok(Some(parsed)) => parsed,
-            Ok(None) => continue,
-            Err(violation) => {
-                violations.push(violation);
-                continue;
-            }
-        };
-        has_placeholder = true;
-        match parsed {
-            FixtureArgToken::Input(relative) => {
+    let mut fixture_outputs = BTreeSet::new();
+    let uses_statistical_fixture_output = row
+        .statistical_plan()
+        .is_some_and(|plan| plan.source() == StatisticalSource::FixtureOutput);
+    for token in argv.tokens() {
+        match token {
+            ArgToken::Literal(_) => {}
+            ArgToken::Input(relative) => {
                 validate_fixture_path(
                     fixture_root,
                     row.id.as_str(),
@@ -92,7 +73,7 @@ pub(super) fn validate_row_tokens(
                 )
                 .unwrap_or_else(|violation| violations.push(violation));
             }
-            FixtureArgToken::Output(relative) => {
+            ArgToken::Output(relative) => {
                 if row.comparator != FixtureComparator::ExactOutput
                     && !uses_statistical_fixture_output
                 {
@@ -101,7 +82,7 @@ pub(super) fn validate_row_tokens(
                         row.id
                     ));
                 }
-                if !fixture_outputs.insert(relative.to_string()) {
+                if !fixture_outputs.insert(relative.as_str()) {
                     violations.push(format!(
                         "{} declares duplicate fixture output {relative}",
                         row.id
@@ -130,12 +111,6 @@ pub(super) fn validate_row_tokens(
             }
         }
     }
-    if has_placeholder && is_core_fixture(row) {
-        violations.push(format!(
-            "{} fixture placeholders are only supported for CLI fixture rows",
-            row.id
-        ));
-    }
     if uses_statistical_fixture_output && fixture_outputs.len() != 1 {
         violations.push(format!(
             "{} statistical source=fixture_output requires exactly one fixture output placeholder",
@@ -144,57 +119,26 @@ pub(super) fn validate_row_tokens(
     }
 }
 
-pub(super) fn parse_fixture_arg_token<'a>(
-    id: &str,
-    token: &'a str,
-) -> Result<Option<FixtureArgToken<'a>>, String> {
-    if let Some(relative) = parse_prefixed_token(id, token, FIXTURE_INPUT_TOKEN_PREFIX, "input")? {
-        return Ok(Some(FixtureArgToken::Input(relative)));
-    }
-    if let Some(relative) = parse_prefixed_token(id, token, FIXTURE_OUTPUT_TOKEN_PREFIX, "output")?
-    {
-        return Ok(Some(FixtureArgToken::Output(relative)));
-    }
-    Ok(None)
-}
-
-fn parse_prefixed_token<'a>(
-    id: &str,
-    token: &'a str,
-    prefix: &str,
-    label: &str,
-) -> Result<Option<&'a str>, String> {
-    if let Some(without_prefix) = token.strip_prefix(prefix) {
-        if let Some(relative) = without_prefix.strip_suffix(FIXTURE_TOKEN_SUFFIX) {
-            if relative.is_empty() {
-                return Err(format!("{id} has empty fixture {label} token"));
-            }
-            return Ok(Some(relative));
-        }
-        return Err(format!("{id} has malformed fixture {label} token {token}"));
-    }
-    if token.contains(prefix) {
-        return Err(format!("{id} has malformed fixture {label} token {token}"));
-    }
-    Ok(None)
-}
-
 pub(super) fn prepare_command(
     root: &RepoRoot,
     row: &FixtureRow,
     process_label: &str,
 ) -> Result<PreparedFixtureCommand, FixtureError> {
+    let RowCommand::Cli(tokens) = &row.command else {
+        return Err(FixtureError::CoreFixtureFailed {
+            id: row.id.clone(),
+            reason: "core fixtures run in process, not as a command".to_string(),
+        });
+    };
     let mut argv = Vec::new();
     let mut outputs = Vec::new();
     let mut scratch_dir = None;
-    for token in row.argv_tokens() {
-        match parse_fixture_arg_token(row.id.as_str(), &token)
-            .map_err(|violation| FixtureError::Validation(violation.into_boxed_str()))?
-        {
-            Some(FixtureArgToken::Input(relative)) => {
+    for token in tokens.tokens() {
+        match token {
+            ArgToken::Input(relative) => {
                 argv.push(fixture_file(root, relative)?.into_os_string());
             }
-            Some(FixtureArgToken::Output(relative)) => {
+            ArgToken::Output(relative) => {
                 let run_dir = match &mut scratch_dir {
                     Some(existing) => existing,
                     None => scratch_dir.insert(ScratchRunDirectory::create(process_label)?),
@@ -207,11 +151,11 @@ pub(super) fn prepare_command(
                 let actual = run_dir.output_location(file_name);
                 argv.push(actual.display_path().as_os_str().to_owned());
                 outputs.push(FixtureOutput {
-                    expected_relative: relative.to_string(),
+                    expected_relative: relative.clone(),
                     actual,
                 });
             }
-            None => argv.push(OsString::from(token)),
+            ArgToken::Literal(literal) => argv.push(OsString::from(literal)),
         }
     }
     Ok(PreparedFixtureCommand {
@@ -296,17 +240,12 @@ pub(super) fn compare_outputs(
     stim_outputs: &[FixtureOutput],
     stab_outputs: &[FixtureOutput],
 ) -> Result<(), FixtureError> {
-    if row.comparator == FixtureComparator::Statistical {
-        return match statistical::source_for_plan(&row.statistical_plan) {
-            Ok(StatisticalSource::Stdout) => Ok(()),
-            Ok(StatisticalSource::FixtureOutput) => {
-                compare_statistical_fixture_output(row, stim_outputs, stab_outputs)
+    if let Some(plan) = row.statistical_plan() {
+        return match plan.source() {
+            StatisticalSource::Stdout => Ok(()),
+            StatisticalSource::FixtureOutput => {
+                compare_statistical_fixture_output(row, plan, stim_outputs, stab_outputs)
             }
-            Err(reason) => Err(FixtureError::ComparatorMismatch {
-                id: row.id.clone(),
-                comparator: row.comparator.as_str(),
-                reason,
-            }),
         };
     }
     if stim_outputs.len() != stab_outputs.len() {
@@ -346,6 +285,7 @@ pub(super) fn compare_outputs(
 
 fn compare_statistical_fixture_output(
     row: &FixtureRow,
+    plan: &StatisticalPlan,
     stim_outputs: &[FixtureOutput],
     stab_outputs: &[FixtureOutput],
 ) -> Result<(), FixtureError> {
@@ -372,16 +312,14 @@ fn compare_statistical_fixture_output(
     }
     let stim_bytes = read_actual_fixture_output(row, stim)?;
     let stab_bytes = read_actual_fixture_output(row, stab)?;
-    if let Some(reason) = statistical::compare_statistical_plan(&row.statistical_plan, &stim_bytes)
-    {
+    if let Some(reason) = plan.compare(&stim_bytes) {
         return Err(FixtureError::ComparatorMismatch {
             id: row.id.clone(),
             comparator: row.comparator.as_str(),
             reason: format!("Stim fixture output {}: {reason}", stim.expected_relative),
         });
     }
-    if let Some(reason) = statistical::compare_statistical_plan(&row.statistical_plan, &stab_bytes)
-    {
+    if let Some(reason) = plan.compare(&stab_bytes) {
         return Err(FixtureError::ComparatorMismatch {
             id: row.id.clone(),
             comparator: row.comparator.as_str(),

@@ -10,6 +10,8 @@ use crate::{
 };
 
 const CORPUS_PATH: &str = "oracle/result-format-corpus.json";
+/// Bound on the committed corpus file; it is source-owned but read as hostile input.
+const CORPUS_LIMIT_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Debug, Error)]
 pub(super) enum ResultFormatCorpusError {
@@ -52,6 +54,8 @@ pub(super) fn run(
         let stab_binary = ensure_stab_cli_binary(root)
             .map_err(|error| ResultFormatCorpusError::Process(Box::new(error)))?;
         for checked_case in checked.cases() {
+            crate::check_cancelled()
+                .map_err(|error| ResultFormatCorpusError::Process(Box::new(error)))?;
             let args = convert_args(checked_case);
             let stim = run_process(&stim_binary, &args, checked_case.input(), &root.path)
                 .map_err(|error| ResultFormatCorpusError::Process(Box::new(error)))?;
@@ -113,10 +117,12 @@ pub(super) fn run(
 
 fn load(root: &RepoRoot) -> Result<CheckedCorpus, ResultFormatCorpusError> {
     let path = root.path.join(CORPUS_PATH);
-    let bytes = std::fs::read(&path).map_err(|source| ResultFormatCorpusError::Read {
-        path: path.clone(),
-        source,
-    })?;
+    let bytes = crate::safe_file::read_regular_file_bounded(&path, CORPUS_LIMIT_BYTES).map_err(
+        |source| ResultFormatCorpusError::Read {
+            path: path.clone(),
+            source: std::io::Error::other(source),
+        },
+    )?;
     CheckedCorpus::parse(&bytes).map_err(|source| ResultFormatCorpusError::Corpus { path, source })
 }
 

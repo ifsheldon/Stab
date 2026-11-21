@@ -4,8 +4,8 @@ use super::{
     ExpectedStdoutPolicy, FixtureComparator, FixtureManifest, FixturePathRequirement,
     compare_fixture,
     hex_payload::decode as decode_hex_payload,
-    is_recordable,
-    outputs::{self, FixtureArgToken},
+    is_recordable, outputs,
+    row::{ArgToken, RowCommand},
     run_core_fixture, statistical, validate_fixture_path,
 };
 
@@ -28,6 +28,30 @@ fn hex_fixture_payloads_preserve_arbitrary_bytes_and_reject_malformed_text() {
             .expect_err("non-hex digit must reject")
             .contains("0x67")
     );
+}
+
+/// Parses `plan` and compares `bytes`, reporting a parse failure as the comparison failure.
+fn compare_plan(plan: &str, bytes: &[u8]) -> Option<String> {
+    match statistical::StatisticalPlan::parse(plan) {
+        Ok(plan) => plan.compare(bytes),
+        Err(reason) => Some(reason),
+    }
+}
+
+/// The manifest violation `csv` produces, whether at typed parsing or at path validation.
+fn manifest_violation(csv: &str, policy: ExpectedStdoutPolicy) -> String {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("repo root");
+    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
+    match FixtureManifest::from_csv(csv) {
+        Ok(manifest) => manifest
+            .check_with_expected_stdout_policy(&root, policy)
+            .expect_err("manifest must be rejected")
+            .to_string(),
+        Err(error) => error.to_string(),
+    }
 }
 
 fn process_output(status: Option<i32>, stdout: &[u8], stderr: &[u8]) -> crate::ProcessOutput {
@@ -113,14 +137,15 @@ fn m4_core_parse_print_rows_run_in_process() {
             .iter()
             .find(|row| row.id.as_str() == id)
             .expect("M4 core row");
-        let output = run_core_fixture(&root, row).expect("core fixture");
+        let core = row.core().expect("core fixture kind");
+        let output = run_core_fixture(&root, row, core).expect("core fixture");
 
         assert_eq!(output.status, Some(0), "{id}");
     }
 }
 
 #[test]
-fn only_upstream_executable_core_exact_rows_are_recordable() {
+fn every_exact_row_with_a_golden_is_recordable_from_pinned_stim() {
     let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
     let core_exact_row = manifest
         .rows
@@ -138,9 +163,16 @@ fn only_upstream_executable_core_exact_rows_are_recordable() {
         .find(|row| row.id.as_str() == "pfm-b1-exact-flow-reverse-measurement")
         .expect("PFM-B1 pinned reverse-flow row");
 
-    assert!(!is_recordable(core_exact_row));
+    let core_structural_row = manifest
+        .rows
+        .iter()
+        .find(|row| row.id.as_str() == "m4-parser-basic")
+        .expect("M4 structural core row");
+
+    assert!(is_recordable(core_exact_row));
     assert!(is_recordable(cli_exact_row));
     assert!(is_recordable(reverse_flow_exact_row));
+    assert!(!is_recordable(core_structural_row));
 }
 
 #[test]
@@ -190,24 +222,25 @@ fn repository_fixture_placeholder_files_exist() {
     let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
 
     for row in &manifest.rows {
-        for token in row.argv_tokens() {
-            match outputs::parse_fixture_arg_token(row.id.as_str(), &token)
-                .expect("parse fixture placeholder token")
-            {
-                Some(FixtureArgToken::Input(relative)) => {
+        let RowCommand::Cli(argv) = &row.command else {
+            continue;
+        };
+        let statistical_side_output = row
+            .statistical_plan()
+            .is_some_and(|plan| plan.source() == statistical::StatisticalSource::FixtureOutput);
+        for token in argv.tokens() {
+            match token {
+                ArgToken::Input(relative) => {
                     let path = super::fixture_file(&root, relative).unwrap();
                     assert!(path.is_file(), "{} {}", row.id, relative);
                 }
-                Some(FixtureArgToken::Output(_relative))
-                    if row.comparator == FixtureComparator::Statistical
-                        && statistical::source_for_plan(&row.statistical_plan).unwrap()
-                            == statistical::StatisticalSource::FixtureOutput => {}
-                Some(FixtureArgToken::Output(relative)) => {
+                ArgToken::Output(_) if statistical_side_output => {}
+                ArgToken::Output(relative) => {
                     let path = super::fixture_file(&root, relative).unwrap();
                     assert!(path.is_file(), "{} {}", row.id, relative);
                 }
-                None => {}
-            };
+                ArgToken::Literal(_) => {}
+            }
         }
     }
 }
@@ -320,17 +353,9 @@ fn validation_rejects_statistical_row_without_plan() {
     let csv = format!(
         "{HEADER}bad,src/stim/cmd/command_sample.test.cc,statistical,stim sample,sample|--shots|10,inputs/sample_noisy.stim,,0,empty,,hand-authored\n"
     );
-    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(std::path::Path::parent)
-        .expect("repo root");
-    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
-    let error = manifest.check(&root).expect_err("missing plan should fail");
 
     assert!(
-        error
-            .to_string()
+        manifest_violation(&csv, ExpectedStdoutPolicy::RequireExisting)
             .contains("comparator needs structural or statistical plan text")
     );
 }
@@ -340,7 +365,7 @@ fn statistical_plan_source_defaults_to_stdout() {
     let plan = "sample_count=1000; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001";
 
     assert_eq!(
-        statistical::source_for_plan(plan).unwrap(),
+        statistical::StatisticalPlan::parse(plan).unwrap().source(),
         statistical::StatisticalSource::Stdout
     );
 }
@@ -350,7 +375,7 @@ fn statistical_plan_source_accepts_fixture_output() {
     let plan = "sample_count=1000; fixed_seed=5; source=fixture_output; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001";
 
     assert_eq!(
-        statistical::source_for_plan(plan).unwrap(),
+        statistical::StatisticalPlan::parse(plan).unwrap().source(),
         statistical::StatisticalSource::FixtureOutput
     );
 }
@@ -360,7 +385,7 @@ fn statistical_plan_source_rejects_unknown_values() {
     let plan = "sample_count=1000; fixed_seed=5; source=sidecar; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001";
 
     assert!(
-        statistical::source_for_plan(plan)
+        statistical::StatisticalPlan::parse(plan)
             .expect_err("unknown source should fail")
             .contains("unknown statistical source")
     );
@@ -502,7 +527,7 @@ fn binomial_statistical_comparator_accepts_samples_within_tolerance() {
     stdout.extend(std::iter::repeat_n(b"1\n", 250).flatten());
     stdout.extend(std::iter::repeat_n(b"0\n", 750).flatten());
 
-    assert_eq!(statistical::compare_statistical_plan(plan, &stdout), None);
+    assert_eq!(compare_plan(plan, &stdout), None);
 }
 
 #[test]
@@ -513,9 +538,9 @@ fn binomial_statistical_comparator_rejects_samples_outside_tolerance() {
     stdout.extend(std::iter::repeat_n(b"0\n", 500).flatten());
 
     assert!(
-        statistical::compare_statistical_plan(plan, &stdout)
+        compare_plan(plan, &stdout)
             .expect("statistical rejection")
-            .contains("outside the accepted integer range")
+            .contains("is outside the accepted count")
     );
 }
 
@@ -524,7 +549,7 @@ fn binomial_statistical_comparator_rejects_non_bit_output() {
     let plan = "sample_count=1; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001";
 
     assert!(
-        statistical::compare_statistical_plan(plan, b"shot M0\n")
+        compare_plan(plan, b"shot M0\n")
             .expect("statistical rejection")
             .contains("expected one 0/1 bit per shot")
     );
@@ -535,7 +560,7 @@ fn binomial_statistical_comparator_rejects_sample_count_mismatch() {
     let plan = "sample_count=2; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001";
 
     assert!(
-        statistical::compare_statistical_plan(plan, b"0\n")
+        compare_plan(plan, b"0\n")
             .expect("statistical rejection")
             .contains("expected 2 samples")
     );
@@ -550,7 +575,7 @@ fn bucket_statistical_comparator_accepts_samples_within_tolerance() {
     stdout.extend(std::iter::repeat_n(b"10\n", 200).flatten());
     stdout.extend(std::iter::repeat_n(b"11\n", 200).flatten());
 
-    assert_eq!(statistical::compare_statistical_plan(plan, &stdout), None);
+    assert_eq!(compare_plan(plan, &stdout), None);
 }
 
 #[test]
@@ -558,7 +583,7 @@ fn bucket_statistical_comparator_rejects_unplanned_buckets() {
     let plan = "sample_count=1; fixed_seed=5; tolerate buckets 00=0.5,01=0.5 within 5 sigma; false_positive_rate<=0.001";
 
     assert!(
-        statistical::compare_statistical_plan(plan, b"10\n")
+        compare_plan(plan, b"10\n")
             .expect("statistical rejection")
             .contains("unplanned bucket")
     );
@@ -572,7 +597,7 @@ fn bucket_statistical_comparator_rejects_samples_outside_tolerance() {
     stdout.extend(std::iter::repeat_n(b"01\n", 100).flatten());
 
     assert!(
-        statistical::compare_statistical_plan(plan, &stdout)
+        compare_plan(plan, &stdout)
             .expect("statistical rejection")
             .contains("actual bucket")
     );
@@ -583,7 +608,7 @@ fn bucket_statistical_plan_rejects_mixed_width_buckets() {
     let plan = "sample_count=1; fixed_seed=5; tolerate buckets 0=0.5,11=0.5 within 5 sigma; false_positive_rate<=0.001";
 
     assert!(
-        statistical::compare_statistical_plan(plan, b"0\n")
+        compare_plan(plan, b"0\n")
             .expect("statistical rejection")
             .contains("mixes bucket widths")
     );
@@ -593,14 +618,14 @@ fn bucket_statistical_plan_rejects_mixed_width_buckets() {
 fn statistical_plan_rejects_unenforced_false_positive_claims() {
     let zero_budget = "sample_count=1; fixed_seed=5; tolerate binomial p=0.5 within 5 sigma; false_positive_rate<=0";
     assert!(
-        statistical::compare_statistical_plan(zero_budget, b"0\n")
+        compare_plan(zero_budget, b"0\n")
             .expect("zero false-positive budget should fail")
             .contains("must be positive")
     );
 
     let impossible_budget = "sample_count=1000; fixed_seed=5; tolerate buckets 00=0.4,01=0.2,10=0.2,11=0.2 within 5 sigma; false_positive_rate<=0.0000001";
     assert!(
-        statistical::compare_statistical_plan(impossible_budget, b"00\n")
+        compare_plan(impossible_budget, b"00\n")
             .expect("overstated false-positive budget should fail")
             .contains("is tighter than the estimated")
     );
@@ -611,21 +636,76 @@ fn validation_rejects_statistical_plan_that_disagrees_with_argv() {
     let csv = format!(
         "{HEADER}bad,src/stim/cmd/command_sample.test.cc,statistical,stim sample,sample|--shots|10|--seed|5,inputs/sample_noisy.stim,,0,empty,sample_count=11; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001,hand-authored\n"
     );
-    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(std::path::Path::parent)
-        .expect("repo root");
-    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
-    let error = manifest
-        .check(&root)
-        .expect_err("mismatched plan should fail");
 
     assert!(
-        error
-            .to_string()
+        manifest_violation(&csv, ExpectedStdoutPolicy::RequireExisting)
             .contains("sample_count=11 does not match --shots 10")
     );
+}
+
+#[test]
+fn statistical_plans_reject_repeated_tokens_instead_of_keeping_the_last() {
+    let base = "sample_count=1000; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001";
+    for (token, expected) in [
+        ("sample_count=10", "sample_count more than once"),
+        ("fixed_seed=6", "fixed_seed more than once"),
+        (
+            "false_positive_rate<=0.5",
+            "false_positive_rate more than once",
+        ),
+        (
+            "tolerate binomial p=0.5 within 5 sigma",
+            "tolerance more than once",
+        ),
+        (
+            "tolerate buckets 0=0.5,1=0.5 within 5 sigma",
+            "tolerance more than once",
+        ),
+    ] {
+        let plan = format!("{base}; {token}");
+        let reason =
+            statistical::StatisticalPlan::parse(&plan).expect_err("duplicate token must reject");
+        assert!(reason.contains(expected), "{token}: {reason}");
+    }
+}
+
+#[test]
+fn one_sample_budget_counts_both_checked_outputs() {
+    // 5 sigma bounds one rate at ~5.7e-7: one output fits a 1e-6 budget, Stim plus Stab do not.
+    let plan = "sample_count=1000; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.000001";
+    let reason = statistical::StatisticalPlan::parse(plan).expect_err("two outputs overspend");
+    assert!(reason.contains("over 2 checked rate(s)"), "{reason}");
+
+    let honest = "sample_count=1000; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.000002";
+    statistical::StatisticalPlan::parse(honest).expect("budget for both outputs");
+}
+
+#[test]
+fn malformed_core_argv_is_rejected_at_load() {
+    for (argv, expected) in [
+        (
+            "core-parse-print|junk",
+            "core-parse-print takes no arguments",
+        ),
+        (
+            "core-dem-parse-print|junk",
+            "core-dem-parse-print takes no arguments",
+        ),
+        (
+            "core-time-reverse-flows",
+            "requires exactly one case id argument",
+        ),
+        (
+            "core-time-reverse-flows|a|b",
+            "requires exactly one case id argument",
+        ),
+    ] {
+        let csv = format!(
+            "{HEADER}bad,src/stim/circuit/circuit.test.cc,structural,stab-model parse print,{argv},inputs/parser_basic.stim,,0,any,structural plan,hand-authored\n"
+        );
+        let error = FixtureManifest::from_csv(&csv).expect_err("malformed core argv");
+        assert!(error.to_string().contains(expected), "{argv}: {error}");
+    }
 }
 
 #[test]
@@ -633,17 +713,11 @@ fn validation_rejects_empty_argv_tokens() {
     let csv = format!(
         "{HEADER}bad,src/stim/cmd/command_sample.test.cc,statistical,stim sample,sample||--shots|10,inputs/sample_noisy.stim,,0,empty,sample_count=10; fixed_seed=1; false_positive_rate<=0.001,hand-authored\n"
     );
-    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(std::path::Path::parent)
-        .expect("repo root");
-    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
-    let error = manifest
-        .check(&root)
-        .expect_err("empty argv token should fail");
 
-    assert!(error.to_string().contains("has an empty argv token"));
+    assert!(
+        manifest_violation(&csv, ExpectedStdoutPolicy::RequireExisting)
+            .contains("has an empty argv token")
+    );
 }
 
 #[test]
@@ -695,19 +769,9 @@ fn validation_rejects_malformed_fixture_output_placeholder() {
     let csv = format!(
         "{HEADER}bad,src/stim/cmd/command_sample_dem.test.cc,exact-output,stim sample_dem,sample_dem|--obs_out|{{fixture_output:expected/missing.stdout,inputs/sample_dem_deterministic.dem,expected/m11_sample_dem_deterministic.stdout,0,empty,,hand-authored\n"
     );
-    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(std::path::Path::parent)
-        .expect("repo root");
-    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
-    let error = manifest
-        .check_with_expected_stdout_policy(&root, ExpectedStdoutPolicy::AllowMissing)
-        .expect_err("malformed fixture output should fail");
 
     assert!(
-        error
-            .to_string()
+        manifest_violation(&csv, ExpectedStdoutPolicy::AllowMissing)
             .contains("bad has malformed fixture output token")
     );
 }

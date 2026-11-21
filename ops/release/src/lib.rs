@@ -82,7 +82,7 @@ pub fn print_publish_order() -> Result<(), ReleaseError> {
 }
 
 pub fn publish_reviewed(preflight: &Path, confirmation: &str) -> Result<(), ReleaseError> {
-    credentials::require_scope(credentials::CredentialScope::PublishReviewed)?;
+    credentials::enter_scope(credentials::CredentialScope::PublishReviewed)?;
     let root = repository_root()?;
     publish::publish_reviewed(&root, preflight, confirmation)
 }
@@ -118,7 +118,7 @@ pub fn create_verified_draft(
     tag: &str,
     confirmation: &str,
 ) -> Result<(), ReleaseError> {
-    credentials::require_scope(credentials::CredentialScope::CreateDraft)?;
+    credentials::enter_scope(credentials::CredentialScope::CreateDraft)?;
     let root = repository_root()?;
     github::create_verified_draft(&root, assets, tag, confirmation)?;
     println!("[stab-release] created and verified private draft {tag} with exact reviewed assets");
@@ -126,7 +126,7 @@ pub fn create_verified_draft(
 }
 
 pub fn verify_remote_draft(assets: &Path, tag: &str) -> Result<(), ReleaseError> {
-    credentials::require_scope(credentials::CredentialScope::VerifyRemoteRelease)?;
+    credentials::enter_scope(credentials::CredentialScope::VerifyRemoteRelease)?;
     let root = repository_root()?;
     github::verify_remote_release(&root, assets, tag, github::RemoteReleaseState::Draft)?;
     println!("[stab-release] verified private draft {tag} with exact reviewed assets");
@@ -134,7 +134,7 @@ pub fn verify_remote_draft(assets: &Path, tag: &str) -> Result<(), ReleaseError>
 }
 
 pub fn verify_published_release(assets: &Path, tag: &str) -> Result<(), ReleaseError> {
-    credentials::require_scope(credentials::CredentialScope::VerifyRemoteRelease)?;
+    credentials::enter_scope(credentials::CredentialScope::VerifyRemoteRelease)?;
     let root = repository_root()?;
     github::verify_remote_release(&root, assets, tag, github::RemoteReleaseState::Published)?;
     println!("[stab-release] verified published release {tag} with exact reviewed assets");

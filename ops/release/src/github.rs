@@ -88,6 +88,7 @@ fn publish_draft(
 ) -> Result<(), ReleaseError> {
     cancellation.check("GitHub draft publication")?;
     with_stable_remote_tag(publisher, tag, commit, token, |publisher| {
+        require_no_release_for_tag(publisher, tag, token)?;
         reviewed.revalidate()?;
         let created = publisher.create_draft(tag, commit, token)?;
         validate_release(&created, tag, &[], RemoteReleaseState::Draft, target)?;
@@ -179,6 +180,36 @@ where
     publisher.require_release_tag_ruleset(token)
 }
 
+/// `create-draft` never reuses, replaces, or duplicates a release: any
+/// release that already carries the tag, draft or published, stops it.
+fn require_no_release_for_tag(
+    publisher: &mut impl DraftPublisher,
+    tag: &str,
+    token: &GitHubToken,
+) -> Result<(), ReleaseError> {
+    let existing = publisher.releases_with_tag(tag, token)?;
+    if existing.is_empty() {
+        return Ok(());
+    }
+    let described = existing
+        .iter()
+        .map(|release| {
+            format!(
+                "{} {}",
+                if release.draft { "draft" } else { "published" },
+                release.id
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    Err(ReleaseError::GitHubRelease(format!(
+        "GitHub already has a release for {tag} ({described}), so create-draft will not create another. \
+         If it is a draft left by an interrupted create-draft, delete that draft and its assets on GitHub \
+         and rerun create-draft; if it is published, do not rerun create-draft and verify it with the \
+         published-release verification instead"
+    )))
+}
+
 fn release_in_state<P: DraftPublisher>(
     publisher: &mut P,
     tag: &str,
@@ -223,6 +254,14 @@ trait DraftPublisher {
         tag: &str,
         token: &GitHubToken,
     ) -> Result<RemoteRelease, ReleaseError>;
+
+    /// Every release, draft or published, that carries `tag`, from the release
+    /// list, the only endpoint that exposes drafts.
+    fn releases_with_tag(
+        &mut self,
+        tag: &str,
+        token: &GitHubToken,
+    ) -> Result<Vec<RemoteRelease>, ReleaseError>;
 
     /// Find exactly one draft release carrying `tag` in the release list, the
     /// only endpoint that exposes drafts; zero or several matches must fail.
@@ -610,42 +649,55 @@ impl DraftPublisher for GitHubApi {
         self.get_json(&url, token, "GitHub published release query")
     }
 
-    fn unique_draft_release(
+    fn releases_with_tag(
         &mut self,
         tag: &str,
         token: &GitHubToken,
-    ) -> Result<RemoteRelease, ReleaseError> {
+    ) -> Result<Vec<RemoteRelease>, ReleaseError> {
         self.target.require_tag(tag)?;
-        let mut matches: Vec<RemoteRelease> = Vec::new();
+        let mut matches = Vec::new();
         for page in 1..=RELEASE_LIST_PAGE_BOUND {
             let url = format!(
                 "{}/repos/{}/releases?per_page={RELEASE_LIST_PAGE_SIZE}&page={page}",
                 self.api_host, self.target.repository
             );
             let releases: Vec<RemoteRelease> =
-                self.get_json(&url, token, "GitHub draft release listing")?;
+                self.get_json(&url, token, "GitHub release listing")?;
             let last_page = releases.len() < RELEASE_LIST_PAGE_SIZE;
             matches.extend(
                 releases
                     .into_iter()
-                    .filter(|release| release.tag_name == tag && release.draft),
+                    .filter(|release| release.tag_name == tag),
             );
-            if matches.len() > 1 {
-                return Err(ReleaseError::GitHubRelease(format!(
-                    "GitHub lists {} draft releases for {tag}, expected exactly one",
-                    matches.len()
-                )));
-            }
             if last_page {
-                return matches.pop().ok_or_else(|| {
-                    ReleaseError::GitHubRelease(format!("GitHub lists no draft release for {tag}"))
-                });
+                return Ok(matches);
             }
         }
         Err(ReleaseError::GitHubRelease(format!(
             "GitHub release list still returned full pages after {RELEASE_LIST_PAGE_BOUND} pages \
-             of {RELEASE_LIST_PAGE_SIZE}, so a unique draft for {tag} cannot be verified"
+             of {RELEASE_LIST_PAGE_SIZE}, so the releases for {tag} cannot be verified"
         )))
+    }
+
+    fn unique_draft_release(
+        &mut self,
+        tag: &str,
+        token: &GitHubToken,
+    ) -> Result<RemoteRelease, ReleaseError> {
+        let mut drafts = self
+            .releases_with_tag(tag, token)?
+            .into_iter()
+            .filter(|release| release.draft)
+            .collect::<Vec<_>>();
+        if drafts.len() > 1 {
+            return Err(ReleaseError::GitHubRelease(format!(
+                "GitHub lists {} draft releases for {tag}, expected exactly one",
+                drafts.len()
+            )));
+        }
+        drafts.pop().ok_or_else(|| {
+            ReleaseError::GitHubRelease(format!("GitHub lists no draft release for {tag}"))
+        })
     }
 }
 

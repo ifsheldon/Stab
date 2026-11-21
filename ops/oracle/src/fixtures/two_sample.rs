@@ -3,7 +3,9 @@
 //! Exact Stim random streams are not part of the compatibility contract, so a two-sample row runs
 //! the same argv through pinned Stim and Stab and asks whether both outputs are plausibly draws
 //! from one distribution. Every column's hit rate, plus every declared joint statistic over a
-//! column set, is scored with a pooled two-proportion z-test. The plan's false-positive budget is
+//! column set, is scored with a pooled two-proportion z-test, or with Fisher's exact conditional
+//! test when one side's count is constant (0 or every shot), where the z-test has little power.
+//! The exact test rejects below the same per-test rate the sigma implies. The plan's false-positive budget is
 //! Bonferroni-bounded over all of those tests when the plan is parsed, and the declared column
 //! count is enforced on every output line, so the budget checked at validation time is the one the
 //! comparison actually spends.
@@ -11,11 +13,11 @@
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 
-use super::statistical::{
-    CommonPlanFields, option_value, parse_sigma, two_sided_normal_tail_bound,
-    validate_shots_and_seed,
+use super::row::CliArgv;
+use super::statistical::{CommonPlanFields, parse_sigma, validate_shots_and_seed};
+use crate::statistical_contract::{
+    TwoProportionOutcome, two_proportion_outcome, two_sided_normal_tail_bound,
 };
-use crate::statistical_contract::{TwoProportionOutcome, two_proportion_outcome};
 
 /// Upper bound on the number of failing tests spelled out in one mismatch report.
 const REPORTED_FAILURE_LIMIT: usize = 16;
@@ -206,19 +208,18 @@ fn parse_column(text: &str) -> Result<usize, String> {
         .map_err(|error| format!("invalid two-sample joint column {text:?}: {error}"))
 }
 
-pub(super) fn validate_two_sample_plan(plan: &str, argv_tokens: &[String]) -> Option<String> {
-    let plan = match TwoSamplePlan::parse(plan) {
-        Ok(plan) => plan,
-        Err(reason) => return Some(reason),
-    };
-    if let Some(format) = option_value(argv_tokens, "--out_format")
-        && format != "01"
-    {
-        return Some(format!(
-            "two-sample rows parse 01 records, but argv requests --out_format {format}"
-        ));
+impl TwoSamplePlan {
+    /// Checks that the argv requests `01` records and the plan's sample count and seed.
+    pub(super) fn validate_argv(&self, argv: &CliArgv) -> Option<String> {
+        if let Some(format) = argv.option_value("--out_format")
+            && format != "01"
+        {
+            return Some(format!(
+                "two-sample rows parse 01 records, but argv requests --out_format {format}"
+            ));
+        }
+        validate_shots_and_seed(self.sample_count, self.fixed_seed, argv)
     }
-    validate_shots_and_seed(plan.sample_count, plan.fixed_seed, argv_tokens)
 }
 
 /// Hit counts for one side: one entry per column followed by one entry per joint statistic.
@@ -270,16 +271,17 @@ impl SampleCounts {
 }
 
 /// Compares Stim and Stab `01` stdout under a two-sample plan, returning a failure reason.
-pub(super) fn compare_two_sample_plan(plan: &str, stim: &[u8], stab: &[u8]) -> Option<String> {
-    let plan = match TwoSamplePlan::parse(plan) {
-        Ok(plan) => plan,
-        Err(reason) => return Some(reason),
-    };
-    let stim = match SampleCounts::tally(&plan, "Stim", stim) {
+pub(super) fn compare_two_sample_plan(
+    plan: &TwoSamplePlan,
+    stim: &[u8],
+    stab: &[u8],
+) -> Option<String> {
+    let per_test_alpha = two_sided_normal_tail_bound(plan.sigma);
+    let stim = match SampleCounts::tally(plan, "Stim", stim) {
         Ok(counts) => counts,
         Err(reason) => return Some(reason),
     };
-    let stab = match SampleCounts::tally(&plan, "Stab", stab) {
+    let stab = match SampleCounts::tally(plan, "Stab", stab) {
         Ok(counts) => counts,
         Err(reason) => return Some(reason),
     };
@@ -299,20 +301,23 @@ pub(super) fn compare_two_sample_plan(plan: &str, stim: &[u8], stab: &[u8]) -> O
                 }
             },
         };
-        let detail = match two_proportion_outcome(stim_hits, stab_hits, shots) {
-            None => {
-                return Some(format!(
-                    "two-sample internal error: {label} counts {stim_hits}/{stab_hits} exceed {shots} shots"
-                ));
-            }
-            Some(TwoProportionOutcome::Identical) => continue,
-            Some(TwoProportionOutcome::DeterministicDisagreement) => {
+        let Some(outcome) = two_proportion_outcome(stim_hits, stab_hits, shots) else {
+            return Some(format!(
+                "two-sample internal error: {label} counts {stim_hits}/{stab_hits} exceed {shots} shots"
+            ));
+        };
+        if !outcome.rejects(plan.sigma, per_test_alpha) {
+            continue;
+        }
+        let detail = match outcome {
+            TwoProportionOutcome::Identical => continue,
+            TwoProportionOutcome::DeterministicDisagreement => {
                 "deterministic disagreement".to_string()
             }
-            Some(TwoProportionOutcome::Scored { z }) if z.abs() > plan.sigma => {
-                format!("z={z:+.2}")
-            }
-            Some(TwoProportionOutcome::Scored { .. }) => continue,
+            TwoProportionOutcome::Scored { z } => format!("z={z:+.2}"),
+            TwoProportionOutcome::Exact { p_value } => format!(
+                "one side constant, exact conditional p={p_value:.3e} < {per_test_alpha:.3e}"
+            ),
         };
         failures.push(format!(
             "{label}: Stim {stim_hits}/{shots} ({:.5}) vs Stab {stab_hits}/{shots} ({:.5}), {detail}",
@@ -324,7 +329,7 @@ pub(super) fn compare_two_sample_plan(plan: &str, stim: &[u8], stab: &[u8]) -> O
         return None;
     }
     let mut reason = format!(
-        "{} of {} two-sample test(s) exceed {} sigma",
+        "{} of {} two-sample test(s) reject equality at {} sigma",
         failures.len(),
         plan.test_count(),
         plan.sigma

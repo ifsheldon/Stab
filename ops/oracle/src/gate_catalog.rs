@@ -3,7 +3,8 @@ use std::fmt::Write as _;
 use stab_model::{Gate, GateArgumentRule, GateCategory, GateTargetRule};
 use thiserror::Error;
 
-use crate::{OracleError, RepoRoot, ensure_stim_helper, process::run_checked_path};
+use crate::process::{ProcessBudget, run_checked_path};
+use crate::{OracleError, RepoRoot, ensure_stim_helper};
 
 const HELPER_TARGET: &str = "stab_stim_gate_catalog";
 const EXPECTED_CANONICAL_GATES: usize = 81;
@@ -38,7 +39,13 @@ pub(crate) enum GateCatalogError {
 
 pub(crate) fn run(root: &RepoRoot, rebuild_stim: bool) -> Result<(), OracleError> {
     let helper = ensure_stim_helper(root, rebuild_stim, HELPER_TARGET)?;
-    let output = run_checked_path(&helper, std::iter::empty::<&str>(), b"", &root.path)?;
+    let output = run_checked_path(
+        &helper,
+        std::iter::empty::<&str>(),
+        b"",
+        &root.path,
+        ProcessBudget::FIXTURE,
+    )?;
     let stim = std::str::from_utf8(&output.stdout.bytes).map_err(GateCatalogError::from)?;
     let stab = model_catalog()?;
     if stim != stab {

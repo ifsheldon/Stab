@@ -9,8 +9,7 @@ use super::data::PinnedInputs;
 use super::model::Policy;
 use crate::error::BenchError;
 use crate::process::{
-    OutputPolicy, ProcessEnvironment, ProcessLaunch, ProcessLimits, ProcessRequest, ProcessResult,
-    UnreadStdin, bench_launcher, run_bounded_process,
+    OutputPolicy, ProcessLimits, ProcessRequest, ProcessResult, bench_launcher, run_bounded_process,
 };
 
 const STDERR_LIMIT_BYTES: usize = 64 << 10;
@@ -103,34 +102,28 @@ pub(super) fn run_command(
     };
     let launcher = bench_launcher()
         .map_err(|source| BenchError::E2e(format!("locate measurement launcher: {source}")))?;
-    run_bounded_process(&ProcessRequest {
-        launch: ProcessLaunch::Measured(launcher),
-        program: binary.to_path_buf(),
-        args: args.to_vec(),
-        stdin: stdin.to_vec(),
-        unread_stdin: UnreadStdin::Reject,
-        working_directory: working_directory.to_path_buf(),
-        environment: ProcessEnvironment::Inherit,
-        affinity_cpu: cpu,
-        limits: ProcessLimits {
-            stdin_bytes: stdin.len(),
-            stdout: output_policy,
-            stderr: OutputPolicy::Capture {
-                maximum_bytes: STDERR_LIMIT_BYTES,
-            },
-            regular_file_bytes: Some(policy.maximum_output_bytes as u64),
-            timeout: Duration::from_secs(policy.command_timeout_seconds),
+    let limits = ProcessLimits {
+        stdout: output_policy,
+        stderr: OutputPolicy::Capture {
+            maximum_bytes: STDERR_LIMIT_BYTES,
         },
-    })
+        ..ProcessLimits::capture(0, Duration::from_secs(policy.command_timeout_seconds))
+    };
+    run_bounded_process(
+        &ProcessRequest::direct(binary, args.to_vec(), working_directory, limits)
+            .with_stdin(stdin)
+            .with_affinity(cpu)
+            .measured(launcher, Some(policy.maximum_output_bytes as u64)),
+    )
     .map_err(BenchError::from)
 }
 
 pub(super) fn checked_success(binary: &Path, result: &ProcessResult) -> Result<(), BenchError> {
-    if result.status == Some(0) && result.stderr_bytes == 0 {
+    if result.status.success() && result.stderr_bytes == 0 {
         return Ok(());
     }
     Err(BenchError::E2e(format!(
-        "{} failed with status {:?} and stderr {}",
+        "{} failed with status {} and stderr {}",
         binary.display(),
         result.status,
         String::from_utf8_lossy(&result.stderr)
@@ -147,28 +140,13 @@ pub(super) fn command_output(
     timeout_seconds: u64,
 ) -> Result<Vec<u8>, BenchError> {
     let args = args.iter().map(OsString::from).collect::<Vec<_>>();
-    let result = run_bounded_process(&ProcessRequest {
-        launch: ProcessLaunch::Direct,
-        program: binary.to_path_buf(),
-        args,
-        stdin: stdin.to_vec(),
-        unread_stdin: UnreadStdin::Reject,
-        working_directory: working_directory.to_path_buf(),
-        environment: ProcessEnvironment::Inherit,
-        affinity_cpu: cpu,
-        limits: ProcessLimits {
-            stdin_bytes: stdin.len(),
-            stdout: OutputPolicy::Capture {
-                maximum_bytes: maximum_output,
-            },
-            stderr: OutputPolicy::Capture {
-                maximum_bytes: maximum_output,
-            },
-            regular_file_bytes: None,
-            timeout: Duration::from_secs(timeout_seconds),
-        },
-    })?;
-    if result.status != Some(0) {
+    let limits = ProcessLimits::capture(maximum_output, Duration::from_secs(timeout_seconds));
+    let result = run_bounded_process(
+        &ProcessRequest::direct(binary, args, working_directory, limits)
+            .with_stdin(stdin)
+            .with_affinity(cpu),
+    )?;
+    if !result.status.success() {
         return Err(BenchError::E2e(format!(
             "{} failed: {}",
             binary.display(),

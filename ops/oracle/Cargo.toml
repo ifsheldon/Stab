@@ -11,6 +11,7 @@ publish = false
 workspace = true
 
 [dependencies]
+cargo_metadata = { workspace = true }
 clap = { workspace = true }
 csv = { workspace = true }
 rustix = { workspace = true }
@@ -22,6 +23,7 @@ stab-analysis = { workspace = true }
 stab-core = { path = "../../crates/stab-core", default-features = false }
 stab-cli = { path = "../../crates/stab-cli" }
 stab-model = { path = "../../crates/stab-model" }
+stab-confined-fs = { path = "../confined-fs" }
 stab-process = { path = "../process" }
 stab-records = { path = "../../crates/stab-records" }
 tempfile = { workspace = true }

@@ -82,6 +82,8 @@ pub enum ReleaseError {
         operation: &'static str,
         variables: String,
     },
+    #[error("release operator process protection failed: {0}")]
+    ProcessProtection(String),
     #[error("release path is invalid: {0}")]
     InvalidPath(PathBuf),
     #[error("release target label is invalid: {0:?}")]

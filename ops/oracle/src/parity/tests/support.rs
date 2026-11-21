@@ -1,8 +1,8 @@
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
-use crate::process::run_process;
-use crate::{ProcessOutput, RepoRoot, ensure_stim_binary};
+use crate::process::{ProcessBudget, run_process, run_process_with_budget};
+use crate::{ProcessOutput, RepoRoot, ensure_stim_library};
 
 pub(super) struct PinnedStimProgram {
     _directory: tempfile::TempDir,
@@ -19,12 +19,7 @@ impl PinnedStimProgram {
                 .expect("workspace root"),
         )
         .expect("repository root");
-        let stim = ensure_stim_binary(&root, false).expect("pinned Stim binary");
-        let library = stim
-            .parent()
-            .expect("Stim output directory")
-            .join("libstim.a");
-        assert!(library.is_file(), "pinned Stim static library is missing");
+        let library = ensure_stim_library(&root, false).expect("pinned Stim static library");
 
         let directory = tempfile::tempdir().expect("pinned Stim probe directory");
         let binary = directory.path().join(name);
@@ -43,8 +38,14 @@ impl PinnedStimProgram {
             OsString::from("-o"),
             binary.clone().into_os_string(),
         ];
-        let compile = run_process(Path::new("c++"), &args, source, &root.path)
-            .expect("compile pinned Stim probe");
+        let compile = run_process_with_budget(
+            Path::new("c++"),
+            &args,
+            source,
+            &root.path,
+            ProcessBudget::BUILD,
+        )
+        .expect("compile pinned Stim probe");
         assert!(
             compile.success(),
             "probe compilation failed: {}",

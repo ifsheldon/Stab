@@ -12,7 +12,7 @@ workspace = true
 
 [dependencies]
 libc = { workspace = true }
-rustix = { workspace = true, features = ["event", "time"] }
+rustix = { workspace = true, features = ["event", "pipe", "time"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 signal-hook = { workspace = true }

@@ -28,9 +28,9 @@ struct ReverseFlowFixtureCase {
 pub(super) fn core_time_reverse_flows_output(
     row: &FixtureRow,
     input: &str,
-    tokens: &[String],
+    case_id: &str,
 ) -> Result<crate::ProcessOutput, FixtureError> {
-    let case = reverse_flow_case(row, input, tokens)?;
+    let case = reverse_flow_case(row, input, case_id)?;
     let circuit = parse_core_circuit(row, "reverse-flow circuit", &case.circuit)?;
     let flows = case
         .flows
@@ -81,21 +81,15 @@ pub(super) fn core_time_reverse_flows_output(
     })
 }
 
-pub(super) fn is_reverse_flow_fixture(row: &FixtureRow) -> bool {
-    row.argv_tokens()
-        .first()
-        .is_some_and(|token| token == "core-time-reverse-flows")
-}
-
 pub(super) fn run_pinned_stim_reverse_flow(
     root: &RepoRoot,
     row: &FixtureRow,
+    case_id: &str,
     input: &[u8],
     helper: &Path,
 ) -> Result<crate::ProcessOutput, OracleError> {
     let input = super::fixture_utf8(row, "stdin", input)?;
-    let tokens = row.argv_tokens();
-    let case = reverse_flow_case(row, input, &tokens)?;
+    let case = reverse_flow_case(row, input, case_id)?;
     let mut protocol = Vec::new();
     protocol.extend_from_slice(if case.dont_turn_measurements_into_resets {
         b"1\n"
@@ -123,14 +117,8 @@ pub(super) fn run_pinned_stim_reverse_flow(
 fn reverse_flow_case(
     row: &FixtureRow,
     input: &str,
-    tokens: &[String],
+    case_id: &str,
 ) -> Result<ReverseFlowFixtureCase, FixtureError> {
-    let [_, case_id] = tokens else {
-        return Err(FixtureError::CoreFixtureFailed {
-            id: row.id.clone(),
-            reason: "core-time-reverse-flows requires exactly one case id".to_string(),
-        });
-    };
     let corpus: ReverseFlowFixtureCorpus =
         serde_json::from_str(input).map_err(|source| FixtureError::CoreFixtureFailed {
             id: row.id.clone(),

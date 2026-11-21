@@ -13,12 +13,16 @@ const MAX_CRATE_EXPANDED_BYTES: u64 = 80 << 20;
 const MAX_CRATE_DECLARED_BYTES: u64 = 64 << 20;
 const MAX_CRATE_ENTRY_COUNT: u64 = 4_096;
 const MAX_VCS_INFO_BYTES: u64 = 64 << 10;
+const MAX_NORMALIZED_MANIFEST_BYTES: u64 = 1 << 20;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ReviewedArchive {
     pub(crate) bytes: Vec<u8>,
     pub(crate) sha256: String,
     pub(crate) vcs_commit: String,
+    /// The `Cargo.toml` Cargo normalized into the archive, which is the
+    /// manifest crates.io receives with the upload.
+    pub(crate) normalized_manifest: String,
 }
 
 pub(crate) fn read_file_and_validate(
@@ -39,7 +43,10 @@ pub(crate) fn validate_bytes(
     version: &str,
     expected_commit: &str,
 ) -> Result<ReviewedArchive, ReleaseError> {
-    let vcs_commit = archive_vcs_commit(path, &bytes, package, version)?;
+    let ArchiveContents {
+        vcs_commit,
+        normalized_manifest,
+    } = archive_contents(path, &bytes, package, version)?;
     if vcs_commit != expected_commit {
         return Err(ReleaseError::ArchiveContract {
             path: path.to_path_buf(),
@@ -52,6 +59,7 @@ pub(crate) fn validate_bytes(
         sha256: sha256_bytes(&bytes),
         bytes,
         vcs_commit,
+        normalized_manifest,
     })
 }
 
@@ -78,14 +86,21 @@ pub(crate) fn sha256_bytes(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
 
-fn archive_vcs_commit(
+struct ArchiveContents {
+    vcs_commit: String,
+    normalized_manifest: String,
+}
+
+fn archive_contents(
     path: &Path,
     bytes: &[u8],
     package: &str,
     version: &str,
-) -> Result<String, ReleaseError> {
+) -> Result<ArchiveContents, ReleaseError> {
     let expected_root = format!("{package}-{version}");
     let expected_vcs = format!("{expected_root}/.cargo_vcs_info.json");
+    let expected_manifest = format!("{expected_root}/Cargo.toml");
+    let mut manifest = None;
     let decoder = MultiGzDecoder::new(Cursor::new(bytes));
     let expanded = ExpandedReader::new(decoder, MAX_CRATE_EXPANDED_BYTES);
     let mut archive = tar::Archive::new(expanded);
@@ -169,12 +184,38 @@ fn archive_vcs_commit(
                 return Err(archive_error(path, "archive records dirty source"));
             }
             vcs = Some(parsed.git.sha1);
+        } else if entry_path == Path::new(&expected_manifest) {
+            if manifest.is_some() {
+                return Err(archive_error(path, "duplicate normalized Cargo.toml"));
+            }
+            if declared_size > MAX_NORMALIZED_MANIFEST_BYTES {
+                return Err(archive_error(path, "normalized Cargo.toml is oversized"));
+            }
+            let mut bytes = Vec::new();
+            entry
+                .by_ref()
+                .take(MAX_NORMALIZED_MANIFEST_BYTES.saturating_add(1))
+                .read_to_end(&mut bytes)
+                .map_err(|source| archive_error(path, source.to_string()))?;
+            if !matches!(u64::try_from(bytes.len()), Ok(length) if length <= MAX_NORMALIZED_MANIFEST_BYTES)
+            {
+                return Err(archive_error(path, "normalized Cargo.toml is oversized"));
+            }
+            manifest = Some(
+                String::from_utf8(bytes)
+                    .map_err(|_| archive_error(path, "normalized Cargo.toml is not UTF-8"))?,
+            );
         }
     }
     let mut expanded = archive.into_inner();
     io::copy(&mut expanded, &mut io::sink())
         .map_err(|source| archive_error(path, source.to_string()))?;
-    vcs.ok_or_else(|| archive_error(path, "archive has no .cargo_vcs_info.json"))
+    Ok(ArchiveContents {
+        vcs_commit: vcs
+            .ok_or_else(|| archive_error(path, "archive has no .cargo_vcs_info.json"))?,
+        normalized_manifest: manifest
+            .ok_or_else(|| archive_error(path, "archive has no normalized Cargo.toml"))?,
+    })
 }
 
 struct ExpandedReader<R> {
@@ -247,6 +288,36 @@ struct CargoGitIdentity {
     dirty: Option<bool>,
 }
 
+/// A `.crate` archive holding only Cargo's VCS record and `manifest` as the
+/// normalized `Cargo.toml`.
+#[cfg(test)]
+pub(crate) fn fixture_crate(package: &str, version: &str, commit: &str, manifest: &str) -> Vec<u8> {
+    use flate2::Compression;
+    use flate2::write::GzEncoder;
+
+    let encoder = GzEncoder::new(Vec::new(), Compression::default());
+    let mut archive = tar::Builder::new(encoder);
+    let vcs = format!("{{\"git\":{{\"sha1\":\"{commit}\"}},\"path_in_vcs\":\"crates/{package}\"}}");
+    for (name, contents) in [
+        (".cargo_vcs_info.json", vcs.as_str()),
+        ("Cargo.toml", manifest),
+    ] {
+        let mut header = tar::Header::new_gnu();
+        header.set_size(u64::try_from(contents.len()).expect("entry length"));
+        header.set_mode(0o644);
+        header.set_cksum();
+        archive
+            .append_data(
+                &mut header,
+                format!("{package}-{version}/{name}"),
+                contents.as_bytes(),
+            )
+            .expect("append fixture entry");
+    }
+    let encoder = archive.into_inner().expect("finish tar");
+    encoder.finish().expect("finish gzip")
+}
+
 #[cfg(test)]
 mod tests {
     use std::assert_matches;
@@ -258,23 +329,12 @@ mod tests {
     use super::*;
 
     fn crate_bytes(commit: &str) -> Vec<u8> {
-        let encoder = GzEncoder::new(Vec::new(), Compression::default());
-        let mut archive = tar::Builder::new(encoder);
-        let vcs =
-            format!("{{\"git\":{{\"sha1\":\"{commit}\"}},\"path_in_vcs\":\"crates/stab-core\"}}");
-        let mut header = tar::Header::new_gnu();
-        header.set_size(u64::try_from(vcs.len()).expect("VCS length"));
-        header.set_mode(0o644);
-        header.set_cksum();
-        archive
-            .append_data(
-                &mut header,
-                "stab-core-0.2.0/.cargo_vcs_info.json",
-                vcs.as_bytes(),
-            )
-            .expect("append VCS info");
-        let encoder = archive.into_inner().expect("finish tar");
-        encoder.finish().expect("finish gzip")
+        fixture_crate(
+            "stab-core",
+            "0.2.0",
+            commit,
+            "[package]\nname = \"stab-core\"\nversion = \"0.2.0\"\n",
+        )
     }
 
     fn expanded_bomb() -> Vec<u8> {

@@ -4,8 +4,8 @@ use std::ffi::{OsStr, OsString};
 use std::path::Path;
 
 pub(crate) use stab_process::{
-    Launcher, OutputPolicy, ProcessEnvironment, ProcessError, ProcessLaunch, ProcessLimits,
-    ProcessRequest, ProcessResult, UnreadStdin, run_bounded_process, run_launcher,
+    Launcher, OutputPolicy, ProcessError, ProcessLimits, ProcessRequest, ProcessResult,
+    run_bounded_process, run_launcher,
 };
 
 use crate::config::COMMAND_TIMEOUT;
@@ -28,27 +28,13 @@ pub(crate) fn run_process(
     working_dir: &Path,
     capture_stdout: bool,
 ) -> Result<ProcessResult, BenchError> {
-    run_bounded_process(&ProcessRequest {
-        launch: ProcessLaunch::Direct,
-        program: program.to_path_buf(),
-        args: args.to_vec(),
-        stdin: stdin.to_vec(),
-        unread_stdin: UnreadStdin::Reject,
-        working_directory: working_dir.to_path_buf(),
-        environment: ProcessEnvironment::Inherit,
-        affinity_cpu: None,
-        limits: ProcessLimits {
-            stdin_bytes: stdin.len(),
-            stdout: if capture_stdout {
-                BASELINE_CAPTURE_LIMIT_BYTES.into()
-            } else {
-                OutputPolicy::Discard
-            },
-            stderr: BASELINE_CAPTURE_LIMIT_BYTES.into(),
-            regular_file_bytes: None,
-            timeout: COMMAND_TIMEOUT,
-        },
-    })
+    let mut limits = ProcessLimits::capture(BASELINE_CAPTURE_LIMIT_BYTES, COMMAND_TIMEOUT);
+    if !capture_stdout {
+        limits.stdout = OutputPolicy::Discard;
+    }
+    run_bounded_process(
+        &ProcessRequest::direct(program, args.to_vec(), working_dir, limits).with_stdin(stdin),
+    )
     .map_err(BenchError::from)
 }
 
@@ -70,14 +56,12 @@ where
 }
 
 pub(crate) fn check_success(program: &Path, output: &ProcessResult) -> Result<(), BenchError> {
-    if output.status == Some(0) {
+    if output.status.success() {
         return Ok(());
     }
     Err(BenchError::CommandFailed {
         program: program.display().to_string(),
-        status: output
-            .status
-            .map_or_else(|| "signal".to_string(), |status| status.to_string()),
+        status: output.status.to_string(),
         stderr: String::from_utf8_lossy(&output.stderr)
             .into_owned()
             .into_boxed_str(),

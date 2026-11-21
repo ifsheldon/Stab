@@ -24,7 +24,12 @@ add_executable(stab_stim_gate_catalog gate_catalog.cc)
 target_include_directories(stab_stim_gate_catalog PRIVATE "${STIM_SOURCE_DIR}/src")
 target_link_libraries(stab_stim_gate_catalog PRIVATE "${STIM_LIBRARY}")
 
+add_executable(stab_stim_parse_print parse_print.cc)
+target_include_directories(stab_stim_parse_print PRIVATE "${STIM_SOURCE_DIR}/src")
+target_link_libraries(stab_stim_parse_print PRIVATE "${STIM_LIBRARY}")
+
 if(NOT MSVC)
     target_compile_options(stab_stim_reverse_flow PRIVATE -O3 -Wall -Wpedantic -fno-strict-aliasing)
     target_compile_options(stab_stim_gate_catalog PRIVATE -O3 -Wall -Wpedantic -fno-strict-aliasing)
+    target_compile_options(stab_stim_parse_print PRIVATE -O3 -Wall -Wpedantic -fno-strict-aliasing)
 endif()

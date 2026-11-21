@@ -7,10 +7,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 
 use super::host::validate_recorded_host_transition;
-use super::model::{SelfBaseline, Suite, TIMING_BOUNDARY, Tier, suite_contract_digest};
+use super::model::{SelfBaseline, Suite, TIMING_BOUNDARY, Tier};
 use super::report::{
     CORRECTNESS_SCHEMA_VERSION, CorrectnessReport, DerivedReport, GateOutcome, RawSamples,
-    RunMetadata, derive_report, markdown,
+    RunMetadata, markdown,
 };
 use crate::error::BenchError;
 use crate::root::RepoRoot;
@@ -72,34 +72,7 @@ pub(crate) fn baseline_candidate(
 
 pub(crate) fn release_check(root: &RepoRoot) -> Result<(), BenchError> {
     let loaded = super::load_suite(root)?;
-    let pointer_path = root.path.join(CURRENT_EVIDENCE);
-    match fs::symlink_metadata(&pointer_path) {
-        Ok(metadata) if metadata.file_type().is_symlink() => {
-            return Err(BenchError::E2e(format!(
-                "current evidence pointer {CURRENT_EVIDENCE} is a symbolic link"
-            )));
-        }
-        Ok(metadata) if !metadata.is_file() => {
-            return Err(BenchError::E2e(format!(
-                "current evidence pointer {CURRENT_EVIDENCE} is not a regular file"
-            )));
-        }
-        Ok(_) => {}
-        Err(source) => {
-            return Err(BenchError::E2e(format!(
-                "current AArch64 evidence is unavailable at {CURRENT_EVIDENCE}: {source}"
-            )));
-        }
-    }
-    let pointer_bytes = fs::read(&pointer_path).map_err(|source| {
-        BenchError::E2e(format!(
-            "current AArch64 evidence is unavailable at {CURRENT_EVIDENCE}: {source}"
-        ))
-    })?;
-    let pointer = toml::from_slice::<CurrentEvidence>(&pointer_bytes).map_err(|source| {
-        BenchError::E2e(format!("current evidence pointer is invalid: {source}"))
-    })?;
-    pointer.validate()?;
+    let pointer = CurrentEvidence::read(root)?;
 
     let full = verify_bundle(&evidence_bundle_path(root, &pointer.full_bundle)?)?;
     let soak = verify_bundle(&evidence_bundle_path(root, &pointer.soak_bundle)?)?;
@@ -134,14 +107,8 @@ fn validate_release_pair(
         ));
     }
     let expected_cases = current_suite
-        .families
-        .iter()
-        .flat_map(|family| {
-            family
-                .cases
-                .iter()
-                .map(|case| format!("{}.{}", family.id, case.id))
-        })
+        .cases()
+        .map(|(_, _, id)| id)
         .collect::<Vec<_>>();
     if full.metadata.selected_cases != expected_cases
         || soak.metadata.selected_cases != expected_cases
@@ -150,10 +117,10 @@ fn validate_release_pair(
             "release evidence does not cover every release case in source order".to_string(),
         ));
     }
-    let current_contract = suite_contract_digest(current_suite).map_err(BenchError::E2e)?;
-    let measured_contract = suite_contract_digest(&full.suite).map_err(BenchError::E2e)?;
+    let current_contract = current_suite.contract_digest().map_err(BenchError::E2e)?;
+    let measured_contract = full.suite.contract_digest().map_err(BenchError::E2e)?;
     if current_contract != measured_contract
-        || suite_contract_digest(&soak.suite).map_err(BenchError::E2e)? != measured_contract
+        || soak.suite.contract_digest().map_err(BenchError::E2e)? != measured_contract
     {
         return Err(BenchError::E2e(
             "current and measured E2E workload contracts differ".to_string(),
@@ -195,7 +162,7 @@ fn validate_release_pair(
 }
 
 fn validate_release_source(root: &RepoRoot, measured_source: &str) -> Result<(), BenchError> {
-    let source = super::execution::source_identity(root)?;
+    let source = super::execution::SourceIdentity::capture(root)?;
     if !source.clean {
         return Err(BenchError::E2e(
             "release evidence requires a clean current source tree".to_string(),
@@ -207,23 +174,45 @@ fn validate_release_source(root: &RepoRoot, measured_source: &str) -> Result<(),
         &root.path,
     )?;
     let range = format!("{measured_source}..HEAD");
-    let changed = super::commands::command_output(
-        Path::new("git"),
-        &["diff", "--name-only", "--diff-filter=ACDMRTUXB", &range],
-        b"",
-        &root.path,
-        1 << 20,
-        None,
-        60,
-    )?;
-    let changed = std::str::from_utf8(&changed)
-        .map_err(|source| BenchError::E2e(format!("git diff paths are not UTF-8: {source}")))?;
-    if let Some(path) = changed.lines().find(|path| !release_descendant_path(path)) {
+    if let Some(path) = changed_paths(&root.path, &range)?
+        .iter()
+        .find(|path| !release_descendant_path(path))
+    {
         return Err(BenchError::E2e(format!(
             "release descendant changes non-evidence path {path}"
         )));
     }
     Ok(())
+}
+
+/// Every path a commit range touches. Rename detection is off, so a rename reports both its
+/// source and its destination, and `-z` output is split on NUL so no path spelling can forge or
+/// hide an entry.
+fn changed_paths(repository: &Path, range: &str) -> Result<Vec<String>, BenchError> {
+    let changed = super::commands::command_output(
+        Path::new("git"),
+        &[
+            "diff",
+            "--name-only",
+            "--no-renames",
+            "-z",
+            "--diff-filter=ACDMRTUXB",
+            range,
+        ],
+        b"",
+        repository,
+        1 << 20,
+        None,
+        60,
+    )?;
+    changed
+        .split(|byte| *byte == 0)
+        .filter(|path| !path.is_empty())
+        .map(|path| {
+            String::from_utf8(path.to_vec())
+                .map_err(|source| BenchError::E2e(format!("git diff path is not UTF-8: {source}")))
+        })
+        .collect()
 }
 
 fn release_descendant_path(path: &str) -> bool {
@@ -405,7 +394,8 @@ fn verify_bundle(directory: &Path) -> Result<VerifiedBundle, BenchError> {
     }
     validate_metadata(&suite, &metadata)?;
     validate_correctness(&metadata, &correctness)?;
-    let actual = derive_report(&suite, &metadata, &samples).map_err(BenchError::E2e)?;
+    let actual = DerivedReport::derive(&suite, &metadata, &correctness, &samples)
+        .map_err(BenchError::E2e)?;
     if actual != expected {
         return Err(BenchError::E2e(
             "offline report derivation differs from report.json".to_string(),
@@ -652,7 +642,7 @@ fn validate_correctness(
     let expected = metadata
         .selected_cases
         .iter()
-        .map(String::as_str)
+        .map(super::model::CaseId::as_str)
         .collect::<BTreeSet<_>>();
     let actual = correctness
         .cases
@@ -731,6 +721,39 @@ struct CurrentEvidence {
 }
 
 impl CurrentEvidence {
+    /// Reads and validates the regular-file evidence pointer.
+    fn read(root: &RepoRoot) -> Result<Self, BenchError> {
+        let pointer_path = root.path.join(CURRENT_EVIDENCE);
+        match fs::symlink_metadata(&pointer_path) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(BenchError::E2e(format!(
+                    "current evidence pointer {CURRENT_EVIDENCE} is a symbolic link"
+                )));
+            }
+            Ok(metadata) if !metadata.is_file() => {
+                return Err(BenchError::E2e(format!(
+                    "current evidence pointer {CURRENT_EVIDENCE} is not a regular file"
+                )));
+            }
+            Ok(_) => {}
+            Err(source) => {
+                return Err(BenchError::E2e(format!(
+                    "current AArch64 evidence is unavailable at {CURRENT_EVIDENCE}: {source}"
+                )));
+            }
+        }
+        let pointer_bytes = fs::read(&pointer_path).map_err(|source| {
+            BenchError::E2e(format!(
+                "current AArch64 evidence is unavailable at {CURRENT_EVIDENCE}: {source}"
+            ))
+        })?;
+        let pointer = toml::from_slice::<CurrentEvidence>(&pointer_bytes).map_err(|source| {
+            BenchError::E2e(format!("current evidence pointer is invalid: {source}"))
+        })?;
+        pointer.validate()?;
+        Ok(pointer)
+    }
+
     fn validate(&self) -> Result<(), BenchError> {
         if self.schema_version != 1
             || self.measured_source_commit.len() != 40
@@ -749,237 +772,4 @@ impl CurrentEvidence {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::e2e::data::OutputWitness;
-    use crate::e2e::host::{HostProfile, SwapSnapshot};
-    use crate::e2e::model::{
-        BOOTSTRAP_RESAMPLES, BOOTSTRAP_SEED, COMMAND_TIMEOUT_SECONDS, CONFIDENCE_LEVEL, Case,
-        Comparator, Family, MAXIMUM_CASE_RSS_BYTES, MAXIMUM_OUTPUT_BYTES,
-        MAXIMUM_TEMPERATURE_MILLIDEGREES, Policy, RunnerKind, STIM_COMMIT, STIM_VERSION,
-        SemanticWork, SizeClass, StimIdentity, TierPolicy, WorkUnit, Workload, case_digest,
-    };
-    use crate::e2e::report::{
-        CaseCorrectness, CaseSamples, RUN_SCHEMA_VERSION, SAMPLES_SCHEMA_VERSION,
-    };
-    use crate::e2e::statistics::StabTiming;
-
-    #[test]
-    fn replay_verifies_every_source_byte_and_rejects_extra_entries() {
-        let directory = tempfile::tempdir().expect("bundle directory");
-        publish_fixture(directory.path());
-        let verified = verify_bundle(directory.path()).expect("verified bundle");
-        let mut inconsistent = verified.metadata.clone();
-        inconsistent.formal = true;
-        assert!(validate_metadata(&verified.suite, &inconsistent).is_err());
-
-        fs::write(directory.path().join("unexpected"), b"extra").expect("extra entry");
-        assert!(verify_bundle(directory.path()).is_err());
-        fs::remove_file(directory.path().join("unexpected")).expect("remove extra entry");
-
-        let samples = directory.path().join("samples.json");
-        let mut bytes = fs::read(&samples).expect("samples");
-        bytes.push(b' ');
-        fs::write(samples, bytes).expect("tamper samples");
-        assert!(verify_bundle(directory.path()).is_err());
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn replay_rejects_a_symlinked_bundle_member() {
-        let directory = tempfile::tempdir().expect("bundle directory");
-        publish_fixture(directory.path());
-        let samples = directory.path().join("samples.json");
-        fs::remove_file(&samples).expect("remove samples");
-        std::os::unix::fs::symlink("report.json", samples).expect("symlink samples");
-        assert!(verify_bundle(directory.path()).is_err());
-    }
-
-    #[test]
-    fn release_pointer_and_descendant_scope_fail_closed() {
-        let valid = CurrentEvidence {
-            schema_version: 1,
-            measured_source_commit: "a".repeat(40),
-            full_bundle: PathBuf::from("benchmarks/evidence/aarch64/run/full"),
-            soak_bundle: PathBuf::from("benchmarks/evidence/aarch64/run/soak"),
-        };
-        assert!(valid.validate().is_ok());
-        let mut invalid = valid;
-        invalid.soak_bundle = invalid.full_bundle.clone();
-        assert!(invalid.validate().is_err());
-
-        assert!(release_descendant_path(
-            "benchmarks/evidence/aarch64/run/full/report.json"
-        ));
-        assert!(release_descendant_path("benchmarks/suite.toml"));
-        assert!(!release_descendant_path("crates/stab-engine/src/lib.rs"));
-        assert!(!release_descendant_path("Cargo.toml"));
-    }
-
-    #[test]
-    fn baseline_eligibility_accepts_only_unfailed_formal_gate_states() {
-        let directory = tempfile::tempdir().expect("bundle directory");
-        publish_fixture(directory.path());
-        let mut report = verify_bundle(directory.path())
-            .expect("verified bundle")
-            .report;
-        report.parity = GateOutcome::Passed;
-        report.self_regression = GateOutcome::Unseeded;
-        report.memory = GateOutcome::Passed;
-        assert!(eligible_for_baseline(&report));
-
-        report.self_regression = GateOutcome::Failed;
-        assert!(!eligible_for_baseline(&report));
-        report.self_regression = GateOutcome::Unseeded;
-        report.parity = GateOutcome::Diagnostic;
-        assert!(!eligible_for_baseline(&report));
-    }
-
-    fn publish_fixture(directory: &Path) {
-        let case = Case {
-            id: "small".to_string(),
-            size_class: SizeClass::Small,
-            batch: 1,
-            work: SemanticWork {
-                amount: 64,
-                unit: WorkUnit::Shots,
-            },
-            maximum_stab_peak_rss_bytes: MAXIMUM_CASE_RSS_BYTES,
-            workload: Workload::RustPipeline {
-                shots: 64,
-                minimum_logical_failures: 1,
-                maximum_logical_failures: 10,
-                seed: 7,
-            },
-        };
-        let suite = Suite {
-            schema_version: 1,
-            stim: StimIdentity {
-                version: STIM_VERSION.to_string(),
-                commit: STIM_COMMIT.to_string(),
-            },
-            policy: Policy {
-                timing_boundary: TIMING_BOUNDARY.to_string(),
-                parity_max_ratio: 1.25,
-                self_regression_max_ratio: 1.15,
-                bootstrap_seed: BOOTSTRAP_SEED,
-                bootstrap_resamples: BOOTSTRAP_RESAMPLES,
-                confidence_level: CONFIDENCE_LEVEL,
-                maximum_temperature_millidegrees: MAXIMUM_TEMPERATURE_MILLIDEGREES,
-                maximum_output_bytes: MAXIMUM_OUTPUT_BYTES,
-                command_timeout_seconds: COMMAND_TIMEOUT_SECONDS,
-            },
-            tiers: BTreeMap::from([
-                (
-                    Tier::Smoke,
-                    TierPolicy {
-                        warmups: 0,
-                        samples: 1,
-                    },
-                ),
-                (
-                    Tier::Full,
-                    TierPolicy {
-                        warmups: 2,
-                        samples: 9,
-                    },
-                ),
-                (
-                    Tier::Soak,
-                    TierPolicy {
-                        warmups: 3,
-                        samples: 21,
-                    },
-                ),
-            ]),
-            expected_release_families: 1,
-            expected_release_cases: 1,
-            self_baselines: Vec::new(),
-            families: vec![Family {
-                id: "pipeline".to_string(),
-                description: "reusable pipeline".to_string(),
-                runner: RunnerKind::Rust,
-                comparator: Comparator::SelfOnly,
-                prerequisites: vec!["sampling.test".to_string()],
-                cases: vec![case.clone()],
-            }],
-        };
-        suite.validate().expect("fixture suite");
-        let suite_bytes = toml::to_string_pretty(&suite)
-            .expect("suite TOML")
-            .into_bytes();
-        let host = HostProfile {
-            architecture: "aarch64".to_string(),
-            cpu_model: "test".to_string(),
-            logical_cpus: 4,
-            affinity_cpu: Some(2),
-            kernel_release: "test".to_string(),
-            thermal: Vec::new(),
-            swap: SwapSnapshot {
-                configured: Vec::new(),
-                pages_in: 0,
-                pages_out: 0,
-            },
-        };
-        let case_id = "pipeline.small".to_string();
-        let digest = case_digest("pipeline", &case).expect("case digest");
-        let metadata = RunMetadata {
-            schema_version: RUN_SCHEMA_VERSION,
-            suite_sha256: hex::encode(Sha256::digest(&suite_bytes)),
-            source_commit: "b".repeat(40),
-            source_clean: false,
-            stim_commit: STIM_COMMIT.to_string(),
-            stim_binary_sha256: "1".repeat(64),
-            stab_binary_sha256: "2".repeat(64),
-            bench_binary_sha256: "3".repeat(64),
-            rustc: "rustc test".to_string(),
-            target: "aarch64-test".to_string(),
-            tier: Tier::Smoke,
-            formal: false,
-            host_before: host.clone(),
-            host_after: host,
-            selected_cases: vec![case_id.clone()],
-        };
-        let correctness = CorrectnessReport {
-            schema_version: CORRECTNESS_SCHEMA_VERSION,
-            cases: vec![CaseCorrectness {
-                case_id: case_id.clone(),
-                input_sha256: hex::encode(Sha256::digest([])),
-                stim_outputs: BTreeMap::new(),
-                stab_outputs: BTreeMap::from([(
-                    "pipeline".to_string(),
-                    OutputWitness {
-                        bytes: 4,
-                        sha256: hex::encode(Sha256::digest(b"64:1")),
-                        one_bits: None,
-                    },
-                )]),
-            }],
-        };
-        let samples = RawSamples {
-            schema_version: SAMPLES_SCHEMA_VERSION,
-            cases: vec![CaseSamples {
-                case_id,
-                case_digest: digest,
-                paired: Vec::new(),
-                stab_only: vec![StabTiming {
-                    index: 0,
-                    seconds: 0.01,
-                    work: 64,
-                    peak_rss_bytes: 1 << 20,
-                    output_bytes: 4,
-                }],
-            }],
-        };
-        let report = derive_report(&suite, &metadata, &samples).expect("derived report");
-        publish_bundle(
-            directory,
-            &suite_bytes,
-            &metadata,
-            &correctness,
-            &samples,
-            &report,
-        )
-        .expect("publish bundle");
-    }
-}
+mod tests;

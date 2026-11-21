@@ -2,11 +2,17 @@
 //!
 //! Every supervised program runs in its own process group with piped standard
 //! streams, a wall-clock deadline, bounded stdin and output capture, optional
-//! CPU pinning and regular-file size limits, and sticky SIGINT/SIGTERM
-//! cancellation. Any limit violation, cancellation, or supervisor exit kills and
-//! reaps the whole group, including descendants that still hold the pipes.
-//! [`ProcessLaunch::Measured`] runs the program through a fresh launcher so the
-//! reported peak RSS and wall interval belong to the program alone.
+//! CPU pinning, and sticky SIGINT/SIGTERM cancellation. Any limit violation,
+//! cancellation, supervisor exit, or leader exit kills the whole group while
+//! the leader is still unreaped. Pipe I/O is nonblocking and stoppable: once
+//! the group is killed, readers drain what is readable and then give a process
+//! outside the group a short grace to close a pipe it inherited, so such a
+//! process is reported instead of holding the supervisor past its deadline.
+//! [`ProcessLaunch::Measured`] runs the program through a fresh launcher, which
+//! also applies the regular-file size limit before the program starts.
+//!
+//! The lower layer ([`pipe`], [`group`], [`Cancellation`]) is public so other
+//! supervisors with different publication contracts can reuse it.
 //!
 //! The supervisor requires Linux: it waits on a pidfd and reaps with `wait4`.
 
@@ -21,47 +27,31 @@
 )]
 
 use std::ffi::OsString;
-use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{ExitStatus, Stdio};
-use std::sync::Arc;
-use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread::JoinHandle;
+use std::process::Stdio;
 use std::time::{Duration, Instant};
 
-use thiserror::Error;
-
+mod cancellation;
+mod error;
+pub mod group;
 mod launcher;
 mod limits;
+pub mod pipe;
 
-use launcher::MeasuredLaunch;
+pub use cancellation::Cancellation;
+pub use error::{CapturedFailure, ProcessError, ProcessExit};
 pub use launcher::{Launcher, run_launcher};
-use limits::{set_child_affinity, set_child_file_limit};
+pub use pipe::OutputPolicy;
+
+use group::ProcessGroupLeader;
+use launcher::MeasuredLaunch;
+use limits::set_child_affinity;
+use pipe::{CapturedStream, DrainPolicy, InputWriter, OutputReader, StreamEnd, WriteEnd};
 
 const POLL_INTERVAL: Duration = Duration::from_millis(5);
-const DIAGNOSTIC_PREFIX_BYTES: usize = 4 << 10;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum OutputPolicy {
-    Capture { maximum_bytes: usize },
-    Discard,
-}
-
-impl OutputPolicy {
-    const fn maximum_bytes(self) -> Option<usize> {
-        match self {
-            Self::Capture { maximum_bytes } => Some(maximum_bytes),
-            Self::Discard => None,
-        }
-    }
-}
-
-impl From<usize> for OutputPolicy {
-    fn from(maximum_bytes: usize) -> Self {
-        Self::Capture { maximum_bytes }
-    }
-}
+/// How long pipe ends stay open for processes outside the killed group.
+const PIPE_DRAIN_GRACE: Duration = Duration::from_millis(500);
+const DRAIN: DrainPolicy = DrainPolicy::StopAfterGrace(PIPE_DRAIN_GRACE);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ProcessEnvironment {
@@ -92,8 +82,26 @@ pub struct ProcessLimits {
     pub stdin_bytes: usize,
     pub stdout: OutputPolicy,
     pub stderr: OutputPolicy,
+    /// Bound on every regular file the program writes. It requires
+    /// [`ProcessLaunch::Measured`], whose launcher applies it before the
+    /// program starts.
     pub regular_file_bytes: Option<u64>,
     pub timeout: Duration,
+}
+
+impl ProcessLimits {
+    /// No stdin, both output streams captured up to `maximum_bytes`, and no
+    /// regular-file limit.
+    #[must_use]
+    pub const fn capture(maximum_bytes: usize, timeout: Duration) -> Self {
+        Self {
+            stdin_bytes: 0,
+            stdout: OutputPolicy::Capture { maximum_bytes },
+            stderr: OutputPolicy::Capture { maximum_bytes },
+            regular_file_bytes: None,
+            timeout,
+        }
+    }
 }
 
 /// Whether a program may exit before reading all of its stdin.
@@ -130,9 +138,62 @@ pub struct ProcessRequest {
     pub limits: ProcessLimits,
 }
 
+impl ProcessRequest {
+    /// A directly spawned program with no stdin, the inherited environment, no
+    /// CPU pinning, and `limits`.
+    #[must_use]
+    pub fn direct(
+        program: impl Into<PathBuf>,
+        args: Vec<OsString>,
+        working_directory: impl Into<PathBuf>,
+        limits: ProcessLimits,
+    ) -> Self {
+        Self {
+            launch: ProcessLaunch::Direct,
+            program: program.into(),
+            args,
+            stdin: Vec::new(),
+            unread_stdin: UnreadStdin::Reject,
+            working_directory: working_directory.into(),
+            environment: ProcessEnvironment::Inherit,
+            affinity_cpu: None,
+            limits,
+        }
+    }
+
+    /// Sends `stdin` and bounds stdin at exactly its length.
+    #[must_use]
+    pub fn with_stdin(mut self, stdin: &[u8]) -> Self {
+        self.stdin = stdin.to_vec();
+        self.limits.stdin_bytes = stdin.len();
+        self
+    }
+
+    #[must_use]
+    pub const fn with_unread_stdin(mut self, unread_stdin: UnreadStdin) -> Self {
+        self.unread_stdin = unread_stdin;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_affinity(mut self, cpu: Option<usize>) -> Self {
+        self.affinity_cpu = cpu;
+        self
+    }
+
+    /// Runs the program through `launcher`, bounding its regular files at
+    /// `regular_file_bytes` before it starts.
+    #[must_use]
+    pub fn measured(mut self, launcher: Launcher, regular_file_bytes: Option<u64>) -> Self {
+        self.launch = ProcessLaunch::Measured(launcher);
+        self.limits.regular_file_bytes = regular_file_bytes;
+        self
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProcessResult {
-    pub status: Option<i32>,
+    pub status: ProcessExit,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
     pub stdout_bytes: u64,
@@ -141,88 +202,40 @@ pub struct ProcessResult {
     pub wall_elapsed: Duration,
 }
 
+/// Runs `request` under the process-wide SIGINT/SIGTERM [`Cancellation`].
 pub fn run_bounded_process(request: &ProcessRequest) -> Result<ProcessResult, ProcessError> {
-    let cancellation = ProcessCancellation::for_signals()?;
+    let cancellation = Cancellation::for_signals().map_err(ProcessError::InstallSignals)?;
     run_bounded_process_with_cancellation(request, &cancellation)
 }
 
-fn run_bounded_process_with_cancellation(
+/// Runs `request`, stopping it as soon as `cancellation` is set. A request
+/// whose cancellation is already set never starts.
+pub fn run_bounded_process_with_cancellation(
     request: &ProcessRequest,
-    cancellation: &ProcessCancellation,
+    cancellation: &Cancellation,
 ) -> Result<ProcessResult, ProcessError> {
     let wall_started = Instant::now();
     ensure_linux()?;
-    if request.stdin.len() > request.limits.stdin_bytes {
-        return Err(ProcessError::StdinLimit {
-            actual: request.stdin.len(),
-            maximum: request.limits.stdin_bytes,
-        });
-    }
-    if request.limits.timeout.is_zero() {
-        return Err(ProcessError::ZeroTimeout);
-    }
-    if request.limits.regular_file_bytes == Some(0) {
-        return Err(ProcessError::ZeroFileLimit);
-    }
+    validate(request)?;
     let deadline = wall_started
         .checked_add(request.limits.timeout)
         .ok_or(ProcessError::DeadlineOverflow)?;
     if cancellation.is_cancelled() {
-        return Err(ProcessError::Interrupted(Box::new(InterruptedError {
-            program: request.program.clone(),
-            stdout: Vec::new(),
-            stderr: Vec::new(),
-            stdout_diagnostic: Box::default(),
-            stderr_diagnostic: Box::default(),
-        })));
+        return Err(ProcessError::Interrupted(CapturedFailure::empty(
+            request.program.clone(),
+        )));
     }
 
     let measured = match &request.launch {
         ProcessLaunch::Direct => None,
         ProcessLaunch::Measured(_) => Some(MeasuredLaunch::prepare(request)?),
     };
-    let mut command = match &request.launch {
-        ProcessLaunch::Direct => {
-            let mut command = std::process::Command::new(&request.program);
-            command.args(&request.args);
-            command
-        }
-        ProcessLaunch::Measured(launcher) => {
-            let mut command = std::process::Command::new(&launcher.program);
-            command.args(&launcher.args);
-            command
-        }
-    };
-    command
-        .current_dir(&request.working_directory)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    if let ProcessEnvironment::ClearAndSet(environment) = &request.environment {
-        command
-            .env_clear()
-            .envs(environment.iter().map(|(key, value)| (key, value)));
-    }
-    if let Some(measured) = &measured {
-        let (key, value) = measured.environment();
-        command.env(key, value);
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt as _;
-        command.process_group(0);
-    }
-    let child = command.spawn().map_err(|source| ProcessError::Spawn {
-        program: request.program.clone(),
-        source,
-    })?;
-    let mut child = ManagedChild::new(child, request.program.clone());
-    child.open_completion_fd()?;
-    // A measured launcher pins itself before spawning the program and bounds
-    // the program's file writes itself, so these apply only to direct spawns.
+    let mut child = SupervisedChild::spawn(request, measured.as_ref())?;
+    // A measured launcher pins itself before spawning the program, so the
+    // supervisor pins only direct spawns.
     if measured.is_none()
         && let Some(cpu) = request.affinity_cpu
-        && let Err(source) = set_child_affinity(child.id(), cpu)
+        && let Err(source) = set_child_affinity(child.leader.id(), cpu)
     {
         child.close_group()?;
         return Err(ProcessError::SetAffinity {
@@ -231,111 +244,69 @@ fn run_bounded_process_with_cancellation(
             source,
         });
     }
-    if measured.is_none()
-        && let Some(maximum) = request.limits.regular_file_bytes
-        && let Err(source) = set_child_file_limit(child.id(), maximum)
-    {
-        child.close_group()?;
-        return Err(ProcessError::SetFileLimit {
-            program: request.program.clone(),
-            maximum,
-            source,
-        });
-    }
     child.start_io(request)?;
     let mut completed = None;
 
     loop {
         if cancellation.is_cancelled() {
-            child.close_group()?;
-            let captured = child.join_io_after_termination()?;
-            let (stdout_diagnostic, stderr_diagnostic) = diagnostics(&captured);
-            return Err(ProcessError::Interrupted(Box::new(InterruptedError {
-                program: request.program.clone(),
-                stdout: captured.stdout,
-                stderr: captured.stderr,
-                stdout_diagnostic,
-                stderr_diagnostic,
-            })));
+            return Err(ProcessError::Interrupted(child.terminate()?));
         }
-        if child.stdout_exceeded()? || child.stderr_exceeded()? {
-            let stream = if child.stdout_exceeded()? {
-                "stdout"
-            } else {
-                "stderr"
-            };
-            let policy = if stream == "stdout" {
-                request.limits.stdout
-            } else {
-                request.limits.stderr
-            };
+        if let Some((stream, policy)) = child.exceeded_stream(request)? {
             let maximum = policy
                 .maximum_bytes()
                 .ok_or(ProcessError::DiscardExceeded { stream })?;
-            child.close_group()?;
-            let captured = child.join_io_after_termination()?;
-            let (stdout_diagnostic, stderr_diagnostic) = diagnostics(&captured);
-            return Err(ProcessError::OutputLimit(Box::new(OutputLimitError {
-                program: request.program.clone(),
+            return Err(ProcessError::OutputLimit {
                 stream,
                 maximum,
-                stdout: captured.stdout,
-                stderr: captured.stderr,
-                stdout_diagnostic,
-                stderr_diagnostic,
-            })));
+                failure: child.terminate()?,
+            });
         }
         let now = Instant::now();
         if now >= deadline {
-            child.close_group()?;
-            let captured = child.join_io_after_termination()?;
-            let (stdout_diagnostic, stderr_diagnostic) = diagnostics(&captured);
-            return Err(ProcessError::TimedOut(Box::new(TimedOutError {
-                program: request.program.clone(),
+            return Err(ProcessError::TimedOut {
                 timeout: request.limits.timeout,
-                stdout: captured.stdout,
-                stderr: captured.stderr,
-                stdout_diagnostic,
-                stderr_diagnostic,
-            })));
+                failure: child.terminate()?,
+            });
         }
         if completed.is_some() && child.io_finished()? {
             break;
         }
-        if completed.is_none()
-            && child.wait_for_completion(POLL_INTERVAL.min(deadline.duration_since(now)))?
-        {
-            completed = Some(child.wait_with_rusage()?);
-            child.close_group()?;
-        } else if completed.is_some() {
-            std::thread::sleep(POLL_INTERVAL.min(deadline.duration_since(now)));
+        let slice = POLL_INTERVAL.min(deadline.duration_since(now));
+        if completed.is_none() {
+            if child.leader_exited(slice)? {
+                completed = Some(child.reap_completed()?);
+            }
+        } else {
+            std::thread::sleep(slice);
         }
     }
 
-    let captured = child.join_io(request.unread_stdin)?;
+    let joined = child.join_io(request.unread_stdin)?;
     // A reader can cross its limit after the last loop check and still finish
     // before the loop observes it, so the joined totals are checked again.
     for (stream, policy, total) in [
-        ("stdout", request.limits.stdout, captured.stdout_bytes),
-        ("stderr", request.limits.stderr, captured.stderr_bytes),
+        ("stdout", request.limits.stdout, joined.stdout.total_bytes),
+        ("stderr", request.limits.stderr, joined.stderr.total_bytes),
     ] {
         if let Some(maximum) = policy.maximum_bytes()
             && u64::try_from(maximum).is_ok_and(|maximum| total > maximum)
         {
-            let (stdout_diagnostic, stderr_diagnostic) = diagnostics(&captured);
-            return Err(ProcessError::OutputLimit(Box::new(OutputLimitError {
-                program: request.program.clone(),
+            return Err(ProcessError::OutputLimit {
                 stream,
                 maximum,
-                stdout: captured.stdout,
-                stderr: captured.stderr,
-                stdout_diagnostic,
-                stderr_diagnostic,
-            })));
+                failure: joined.into_failure(&request.program),
+            });
         }
     }
-    let completed =
-        completed.ok_or_else(|| ProcessError::MissingStatus(request.program.clone()))?;
+    if !joined.held_streams.is_empty() {
+        return Err(ProcessError::PipesHeld(
+            joined.into_failure(&request.program),
+        ));
+    }
+    let completed = completed.ok_or_else(|| ProcessError::MissingStatus {
+        program: request.program.clone(),
+        source: std::io::Error::other("the supervision loop ended before the leader exited"),
+    })?;
     let (status, peak_rss, wall_elapsed) = match &measured {
         None => (
             completed.status,
@@ -346,49 +317,58 @@ fn run_bounded_process_with_cancellation(
             use std::os::unix::process::ExitStatusExt as _;
             let program = measured.completion(request, completed.status)?;
             (
-                ExitStatus::from_raw(program.wait_status),
+                std::process::ExitStatus::from_raw(program.wait_status),
                 Some(program.peak_rss_bytes),
                 program.elapsed,
             )
         }
     };
+    let status = ProcessExit::from_status(status).ok_or_else(|| ProcessError::MissingStatus {
+        program: request.program.clone(),
+        source: std::io::Error::other(format!("wait status {status} is neither exit nor signal")),
+    })?;
     if wall_elapsed > request.limits.timeout {
-        let (stdout_diagnostic, stderr_diagnostic) = diagnostics(&captured);
-        return Err(ProcessError::TimedOut(Box::new(TimedOutError {
-            program: request.program.clone(),
+        return Err(ProcessError::TimedOut {
             timeout: request.limits.timeout,
-            stdout: captured.stdout,
-            stderr: captured.stderr,
-            stdout_diagnostic,
-            stderr_diagnostic,
-        })));
+            failure: joined.into_failure(&request.program),
+        });
     }
-    #[cfg(unix)]
+    if let Some(maximum) = request.limits.regular_file_bytes
+        && status.signal() == Some(signal_hook::consts::signal::SIGXFSZ)
     {
-        use std::os::unix::process::ExitStatusExt as _;
-        if let Some(maximum) = request.limits.regular_file_bytes
-            && status.signal() == Some(signal_hook::consts::signal::SIGXFSZ)
-        {
-            let (stdout_diagnostic, stderr_diagnostic) = diagnostics(&captured);
-            return Err(ProcessError::FileLimit(Box::new(FileLimitError {
-                program: request.program.clone(),
-                maximum,
-                stdout: captured.stdout,
-                stderr: captured.stderr,
-                stdout_diagnostic,
-                stderr_diagnostic,
-            })));
-        }
+        return Err(ProcessError::FileLimit {
+            maximum,
+            failure: joined.into_failure(&request.program),
+        });
     }
     Ok(ProcessResult {
-        status: status.code(),
-        stdout: captured.stdout,
-        stderr: captured.stderr,
-        stdout_bytes: captured.stdout_bytes,
-        stderr_bytes: captured.stderr_bytes,
+        status,
+        stdout: joined.stdout.bytes,
+        stderr: joined.stderr.bytes,
+        stdout_bytes: joined.stdout.total_bytes,
+        stderr_bytes: joined.stderr.total_bytes,
         parent_observed_peak_rss_bytes: peak_rss,
         wall_elapsed,
     })
+}
+
+fn validate(request: &ProcessRequest) -> Result<(), ProcessError> {
+    if request.stdin.len() > request.limits.stdin_bytes {
+        return Err(ProcessError::StdinLimit {
+            actual: request.stdin.len(),
+            maximum: request.limits.stdin_bytes,
+        });
+    }
+    if request.limits.timeout.is_zero() {
+        return Err(ProcessError::ZeroTimeout);
+    }
+    match (request.limits.regular_file_bytes, &request.launch) {
+        (Some(0), _) => Err(ProcessError::ZeroFileLimit),
+        (Some(_), ProcessLaunch::Direct) => Err(ProcessError::FileLimitRequiresLauncher {
+            program: request.program.clone(),
+        }),
+        _ => Ok(()),
+    }
 }
 
 fn measured_wall_elapsed(
@@ -401,135 +381,156 @@ fn measured_wall_elapsed(
         .ok_or_else(|| ProcessError::CompletionClock(program.to_path_buf()))
 }
 
-struct ManagedChild {
-    child: std::process::Child,
+/// The supervised group and its pipe threads. Dropping it kills the group
+/// before the leader is reaped and then stops and joins every pipe thread.
+struct SupervisedChild {
+    leader: ProcessGroupLeader,
     program: PathBuf,
-    stdin: Option<Writer>,
+    stdin: Option<InputWriter>,
     stdout: Option<OutputReader>,
     stderr: Option<OutputReader>,
-    completion_fd: Option<std::os::fd::OwnedFd>,
-    reaped: bool,
-    group_closed: bool,
 }
 
-impl ManagedChild {
-    fn new(child: std::process::Child, program: PathBuf) -> Self {
-        Self {
-            child,
+impl SupervisedChild {
+    fn spawn(
+        request: &ProcessRequest,
+        measured: Option<&MeasuredLaunch>,
+    ) -> Result<Self, ProcessError> {
+        let mut command = match &request.launch {
+            ProcessLaunch::Direct => {
+                let mut command = std::process::Command::new(&request.program);
+                command.args(&request.args);
+                command
+            }
+            ProcessLaunch::Measured(launcher) => {
+                let mut command = std::process::Command::new(&launcher.program);
+                command.args(&launcher.args);
+                command
+            }
+        };
+        command
+            .current_dir(&request.working_directory)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        if let ProcessEnvironment::ClearAndSet(environment) = &request.environment {
+            command
+                .env_clear()
+                .envs(environment.iter().map(|(key, value)| (key, value)));
+        }
+        if let Some(measured) = measured {
+            let (key, value) = measured.environment();
+            command.env(key, value);
+        }
+        Self::spawn_command(&mut command, request.program.clone())
+    }
+
+    fn spawn_command(
+        command: &mut std::process::Command,
+        program: PathBuf,
+    ) -> Result<Self, ProcessError> {
+        let leader = ProcessGroupLeader::spawn(command).map_err(|source| ProcessError::Spawn {
+            program: program.clone(),
+            source,
+        })?;
+        Ok(Self {
+            leader,
             program,
             stdin: None,
             stdout: None,
             stderr: None,
-            completion_fd: None,
-            reaped: false,
-            group_closed: false,
-        }
-    }
-
-    fn id(&self) -> u32 {
-        self.child.id()
+        })
     }
 
     fn start_io(&mut self, request: &ProcessRequest) -> Result<(), ProcessError> {
-        let stdout = self
-            .child
+        let child = self.leader.child_mut();
+        let stdout = child
             .stdout
             .take()
             .ok_or(ProcessError::MissingPipe("stdout"))?;
-        self.stdout = Some(spawn_reader(stdout, request.limits.stdout));
-        let stderr = self
-            .child
+        let stderr = child
             .stderr
             .take()
             .ok_or(ProcessError::MissingPipe("stderr"))?;
-        self.stderr = Some(spawn_reader(stderr, request.limits.stderr));
-        let stdin = self
-            .child
+        let stdin = child
             .stdin
             .take()
             .ok_or(ProcessError::MissingPipe("stdin"))?;
-        self.stdin = Some(spawn_writer(stdin, request.stdin.clone()));
-        Ok(())
-    }
-
-    fn open_completion_fd(&mut self) -> Result<(), ProcessError> {
-        let pid = rustix::process::Pid::from_child(&self.child);
-        let completion_fd = rustix::process::pidfd_open(pid, rustix::process::PidfdFlags::NONBLOCK)
-            .map_err(|source| ProcessError::OpenCompletionFd {
-                program: self.program.clone(),
-                source: source.into(),
-            })?;
-        self.completion_fd = Some(completion_fd);
-        Ok(())
-    }
-
-    fn wait_for_completion(&self, timeout: Duration) -> Result<bool, ProcessError> {
-        use rustix::event::{PollFd, PollFlags, Timespec, poll};
-
-        let completion_fd = self
-            .completion_fd
-            .as_ref()
-            .ok_or_else(|| ProcessError::MissingCompletionFd(self.program.clone()))?;
-        let timeout =
-            Timespec::try_from(timeout).map_err(|source| ProcessError::PollCompletion {
-                program: self.program.clone(),
-                source: std::io::Error::new(std::io::ErrorKind::InvalidInput, source),
-            })?;
-        let mut descriptors = [PollFd::new(completion_fd, PollFlags::IN)];
-        match poll(&mut descriptors, Some(&timeout)) {
-            Ok(0) => Ok(false),
-            Ok(_) if descriptors[0].revents().contains(PollFlags::NVAL) => {
-                Err(ProcessError::PollCompletion {
-                    program: self.program.clone(),
-                    source: std::io::Error::other("child completion descriptor is invalid"),
-                })
-            }
-            Ok(_) => Ok(true),
-            Err(rustix::io::Errno::INTR) => Ok(false),
-            Err(source) => Err(ProcessError::PollCompletion {
-                program: self.program.clone(),
-                source: source.into(),
-            }),
-        }
-    }
-
-    fn wait_with_rusage(&mut self) -> Result<CompletedChild, ProcessError> {
-        let completed = wait_with_rusage(self.child.id()).map_err(|source| ProcessError::Wait {
+        let start_error = |source| ProcessError::StartIo {
             program: self.program.clone(),
             source,
-        })?;
-        self.reaped = true;
-        Ok(completed)
+        };
+        self.stdout =
+            Some(OutputReader::spawn(stdout, request.limits.stdout, DRAIN).map_err(start_error)?);
+        self.stderr =
+            Some(OutputReader::spawn(stderr, request.limits.stderr, DRAIN).map_err(start_error)?);
+        self.stdin =
+            Some(InputWriter::spawn(stdin, request.stdin.clone(), DRAIN).map_err(start_error)?);
+        Ok(())
     }
 
-    fn close_group(&mut self) -> Result<(), ProcessError> {
-        if self.group_closed {
-            return Ok(());
+    fn exceeded_stream(
+        &self,
+        request: &ProcessRequest,
+    ) -> Result<Option<(&'static str, OutputPolicy)>, ProcessError> {
+        if reader(self.stdout.as_ref(), "stdout")?.exceeded() {
+            return Ok(Some(("stdout", request.limits.stdout)));
         }
-        kill_process_group(&mut self.child, &self.program)?;
-        if !self.reaped {
-            self.child.wait().map_err(|source| ProcessError::Wait {
+        if reader(self.stderr.as_ref(), "stderr")?.exceeded() {
+            return Ok(Some(("stderr", request.limits.stderr)));
+        }
+        Ok(None)
+    }
+
+    fn leader_exited(&self, timeout: Duration) -> Result<bool, ProcessError> {
+        self.leader
+            .wait_for_exit(timeout)
+            .map_err(|source| ProcessError::PollCompletion {
+                program: self.program.clone(),
+                source,
+            })
+    }
+
+    /// Kills the rest of the group while the exited leader still pins its
+    /// group id, reaps the leader, and lets the pipes drain under their grace.
+    fn reap_completed(&mut self) -> Result<group::RusageCompletion, ProcessError> {
+        let completed = self
+            .leader
+            .kill_group_and_reap_with_rusage()
+            .map_err(|source| ProcessError::Wait {
                 program: self.program.clone(),
                 source,
             })?;
-            self.reaped = true;
+        self.stop_io();
+        Ok(completed)
+    }
+
+    /// Kills and reaps the group, then collects what the pipes captured.
+    fn terminate(&mut self) -> Result<Box<CapturedFailure>, ProcessError> {
+        self.close_group()?;
+        let joined = self.take_and_join_io(StdinOutcome::Ignored)?;
+        Ok(joined.into_failure(&self.program))
+    }
+
+    fn close_group(&mut self) -> Result<(), ProcessError> {
+        let closed = self
+            .leader
+            .kill_group_and_reap()
+            .map_err(|source| ProcessError::Kill {
+                program: self.program.clone(),
+                source,
+            });
+        self.stop_io();
+        closed.map(drop)
+    }
+
+    fn stop_io(&self) {
+        if let Some(stdin) = &self.stdin {
+            stdin.stop();
         }
-        self.group_closed = true;
-        Ok(())
-    }
-
-    fn stdout_exceeded(&self) -> Result<bool, ProcessError> {
-        self.stdout
-            .as_ref()
-            .map(OutputReader::exceeded)
-            .ok_or(ProcessError::MissingPipe("stdout"))
-    }
-
-    fn stderr_exceeded(&self) -> Result<bool, ProcessError> {
-        self.stderr
-            .as_ref()
-            .map(OutputReader::exceeded)
-            .ok_or(ProcessError::MissingPipe("stderr"))
+        for reader in [&self.stdout, &self.stderr].into_iter().flatten() {
+            reader.stop();
+        }
     }
 
     fn io_finished(&self) -> Result<bool, ProcessError> {
@@ -538,16 +539,8 @@ impl ManagedChild {
             .as_ref()
             .ok_or(ProcessError::MissingPipe("stdin"))?
             .is_finished()
-            && self
-                .stdout
-                .as_ref()
-                .ok_or(ProcessError::MissingPipe("stdout"))?
-                .is_finished()
-            && self
-                .stderr
-                .as_ref()
-                .ok_or(ProcessError::MissingPipe("stderr"))?
-                .is_finished())
+            && reader(self.stdout.as_ref(), "stdout")?.is_finished()
+            && reader(self.stderr.as_ref(), "stderr")?.is_finished())
     }
 
     fn join_io(&mut self, unread_stdin: UnreadStdin) -> Result<JoinedOutput, ProcessError> {
@@ -555,10 +548,6 @@ impl ManagedChild {
             UnreadStdin::Reject => StdinOutcome::Required,
             UnreadStdin::Allow => StdinOutcome::BrokenPipeAllowed,
         })
-    }
-
-    fn join_io_after_termination(&mut self) -> Result<JoinedOutput, ProcessError> {
-        self.take_and_join_io(StdinOutcome::Ignored)
     }
 
     fn take_and_join_io(
@@ -581,93 +570,44 @@ impl ManagedChild {
     }
 }
 
-struct CompletedChild {
-    status: ExitStatus,
-    peak_rss_bytes: u64,
-    completed_at: Instant,
+fn reader<'a>(
+    reader: Option<&'a OutputReader>,
+    stream: &'static str,
+) -> Result<&'a OutputReader, ProcessError> {
+    reader.ok_or(ProcessError::MissingPipe(stream))
 }
 
-#[allow(
-    unsafe_code,
-    reason = "Linux wait4 is the only per-child peak-RSS source that survives fast process exit"
-)]
-fn wait_with_rusage(pid: u32) -> Result<CompletedChild, std::io::Error> {
-    use std::mem::MaybeUninit;
-    use std::os::unix::process::ExitStatusExt as _;
-
-    let raw_pid = libc::pid_t::try_from(pid).map_err(|_| {
-        std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            format!("child process id {pid} exceeds pid_t"),
-        )
-    })?;
-    let mut status = 0;
-    let mut usage = MaybeUninit::<libc::rusage>::zeroed();
-    // SAFETY: wait4 receives the known child PID and valid writable pointers. A positive
-    // return initializes both outputs; negative returns errno. The pidfd readiness event proves
-    // that this blocking reap will return promptly without adding monitor-poll latency.
-    let waited = unsafe { libc::wait4(raw_pid, &mut status, 0, usage.as_mut_ptr()) };
-    if waited < 0 {
-        return Err(std::io::Error::last_os_error());
-    }
-    let completed_at = Instant::now();
-    // SAFETY: a positive wait4 return initialized the rusage value.
-    let usage = unsafe { usage.assume_init() };
-    let peak_kib = u64::try_from(usage.ru_maxrss)
-        .map_err(|_| std::io::Error::other("wait4 returned negative peak RSS"))?;
-    let peak_rss_bytes = peak_kib
-        .checked_mul(1024)
-        .ok_or_else(|| std::io::Error::other("wait4 peak RSS overflows bytes"))?;
-    Ok(CompletedChild {
-        status: ExitStatus::from_raw(status),
-        peak_rss_bytes,
-        completed_at,
-    })
-}
-
-impl Drop for ManagedChild {
+impl Drop for SupervisedChild {
     fn drop(&mut self) {
-        if !self.group_closed {
-            drop(kill_process_group(&mut self.child, &self.program));
-            if !self.reaped {
-                drop(self.child.wait());
-            }
-        }
+        drop(self.leader.kill_group_and_reap());
+        self.stop_io();
         if let Some(stdin) = self.stdin.take() {
-            drop(join_writer(&self.program, stdin));
+            drop(stdin.join());
         }
-        if let Some(stdout) = self.stdout.take() {
-            drop(join_reader(&self.program, stdout));
-        }
-        if let Some(stderr) = self.stderr.take() {
-            drop(join_reader(&self.program, stderr));
+        for reader in [self.stdout.take(), self.stderr.take()]
+            .into_iter()
+            .flatten()
+        {
+            drop(reader.join());
         }
     }
 }
 
 struct JoinedOutput {
-    stdout: Vec<u8>,
-    stderr: Vec<u8>,
-    stdout_bytes: u64,
-    stderr_bytes: u64,
+    stdout: CapturedStream,
+    stderr: CapturedStream,
+    held_streams: Vec<&'static str>,
 }
 
-fn diagnostics(output: &JoinedOutput) -> (Box<str>, Box<str>) {
-    (
-        diagnostic_prefix(&output.stdout),
-        diagnostic_prefix(&output.stderr),
-    )
-}
-
-fn diagnostic_prefix(bytes: &[u8]) -> Box<str> {
-    let kept = bytes
-        .get(..bytes.len().min(DIAGNOSTIC_PREFIX_BYTES))
-        .unwrap_or(bytes);
-    let mut diagnostic = String::from_utf8_lossy(kept).into_owned();
-    if kept.len() < bytes.len() {
-        diagnostic.push_str("\n[diagnostic truncated]");
+impl JoinedOutput {
+    fn into_failure(self, program: &Path) -> Box<CapturedFailure> {
+        CapturedFailure::new(
+            program.to_path_buf(),
+            self.stdout.bytes,
+            self.stderr.bytes,
+            self.held_streams,
+        )
     }
-    diagnostic.into_boxed_str()
 }
 
 /// Which stdin-writer failures still fail the joined process.
@@ -680,325 +620,46 @@ enum StdinOutcome {
 }
 
 fn join_all(
-    program: &std::path::Path,
-    stdin: Writer,
+    program: &Path,
+    stdin: InputWriter,
     stdout: OutputReader,
     stderr: OutputReader,
     stdin_outcome: StdinOutcome,
 ) -> Result<JoinedOutput, ProcessError> {
-    let writer = join_writer(program, stdin);
-    let stdout = join_reader(program, stdout)?;
-    let stderr = join_reader(program, stderr)?;
+    let writer = stdin.join();
+    let capture_error = |source| ProcessError::Capture {
+        program: program.to_path_buf(),
+        source,
+    };
+    let stdout = stdout.join().map_err(capture_error)?;
+    let stderr = stderr.join().map_err(capture_error)?;
+    let mut held_streams = Vec::new();
     match (stdin_outcome, writer) {
-        (StdinOutcome::Ignored, _) | (_, Ok(())) => {}
-        (StdinOutcome::BrokenPipeAllowed, Err(ProcessError::WriteStdin { source, .. }))
+        (_, Ok(WriteEnd::HeldOpen)) => held_streams.push("stdin"),
+        (StdinOutcome::Ignored, Err(_)) | (_, Ok(WriteEnd::Complete)) => {}
+        (StdinOutcome::BrokenPipeAllowed, Err(source))
             if source.kind() == std::io::ErrorKind::BrokenPipe => {}
-        (_, Err(error)) => return Err(error),
+        (_, Err(source)) => {
+            return Err(ProcessError::WriteStdin {
+                program: program.to_path_buf(),
+                source,
+            });
+        }
+    }
+    for (stream, captured) in [("stdout", &stdout), ("stderr", &stderr)] {
+        if captured.end != StreamEnd::Eof {
+            held_streams.push(stream);
+        }
     }
     Ok(JoinedOutput {
-        stdout: stdout.bytes,
-        stderr: stderr.bytes,
-        stdout_bytes: stdout.total_bytes,
-        stderr_bytes: stderr.total_bytes,
+        stdout,
+        stderr,
+        held_streams,
     })
-}
-
-#[derive(Clone)]
-struct ProcessCancellation {
-    cancelled: Arc<AtomicBool>,
-}
-
-impl ProcessCancellation {
-    fn for_signals() -> Result<Self, ProcessError> {
-        static CANCELLED: OnceLock<Arc<AtomicBool>> = OnceLock::new();
-        static INSTALLED: OnceLock<Result<(), String>> = OnceLock::new();
-        let cancelled = Arc::clone(CANCELLED.get_or_init(|| Arc::new(AtomicBool::new(false))));
-        let installed = INSTALLED.get_or_init(|| {
-            for signal in [
-                signal_hook::consts::signal::SIGINT,
-                signal_hook::consts::signal::SIGTERM,
-            ] {
-                signal_hook::flag::register(signal, Arc::clone(&cancelled))
-                    .map_err(|source| source.to_string())?;
-            }
-            Ok(())
-        });
-        if let Err(reason) = installed {
-            return Err(ProcessError::InstallSignals(reason.clone()));
-        }
-        Ok(Self { cancelled })
-    }
-
-    fn is_cancelled(&self) -> bool {
-        self.cancelled.load(Ordering::Acquire)
-    }
-
-    #[cfg(test)]
-    fn for_test() -> Self {
-        Self {
-            cancelled: Arc::new(AtomicBool::new(false)),
-        }
-    }
-
-    #[cfg(test)]
-    fn cancel(&self) {
-        self.cancelled.store(true, Ordering::Release);
-    }
-}
-
-type Writer = JoinHandle<Result<(), std::io::Error>>;
-
-fn spawn_writer(mut pipe: std::process::ChildStdin, bytes: Vec<u8>) -> Writer {
-    std::thread::spawn(move || pipe.write_all(&bytes))
-}
-
-fn join_writer(program: &std::path::Path, writer: Writer) -> Result<(), ProcessError> {
-    match writer.join() {
-        Ok(Ok(())) => Ok(()),
-        Ok(Err(source)) => Err(ProcessError::WriteStdin {
-            program: program.to_path_buf(),
-            source,
-        }),
-        Err(_) => Err(ProcessError::WriteStdin {
-            program: program.to_path_buf(),
-            source: std::io::Error::other("stdin writer thread panicked"),
-        }),
-    }
-}
-
-struct CapturedOutput {
-    bytes: Vec<u8>,
-    total_bytes: u64,
-}
-
-struct OutputReader {
-    handle: JoinHandle<Result<CapturedOutput, std::io::Error>>,
-    exceeded: Arc<AtomicBool>,
-}
-
-impl OutputReader {
-    fn exceeded(&self) -> bool {
-        self.exceeded.load(Ordering::Acquire)
-    }
-
-    fn is_finished(&self) -> bool {
-        self.handle.is_finished()
-    }
-}
-
-fn spawn_reader(mut pipe: impl Read + Send + 'static, policy: OutputPolicy) -> OutputReader {
-    let exceeded = Arc::new(AtomicBool::new(false));
-    let reader_exceeded = Arc::clone(&exceeded);
-    let handle = std::thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let mut total_bytes = 0_u64;
-        let mut buffer = [0_u8; 8192];
-        loop {
-            let count = pipe.read(&mut buffer)?;
-            if count == 0 {
-                break;
-            }
-            total_bytes =
-                total_bytes
-                    .checked_add(u64::try_from(count).map_err(|_| {
-                        std::io::Error::other("pipe byte count does not fit in u64")
-                    })?)
-                    .ok_or_else(|| std::io::Error::other("pipe byte count overflow"))?;
-            let chunk = buffer
-                .get(..count)
-                .ok_or_else(|| std::io::Error::other("pipe read exceeded buffer bounds"))?;
-            if let OutputPolicy::Capture { maximum_bytes } = policy {
-                let remaining = maximum_bytes.saturating_sub(bytes.len());
-                if count <= remaining {
-                    bytes.extend_from_slice(chunk);
-                } else {
-                    let kept = chunk
-                        .get(..remaining)
-                        .ok_or_else(|| std::io::Error::other("pipe keep exceeded buffer bounds"))?;
-                    bytes.extend_from_slice(kept);
-                    reader_exceeded.store(true, Ordering::Release);
-                }
-            }
-        }
-        Ok(CapturedOutput { bytes, total_bytes })
-    });
-    OutputReader { handle, exceeded }
-}
-
-fn join_reader(
-    program: &std::path::Path,
-    reader: OutputReader,
-) -> Result<CapturedOutput, ProcessError> {
-    match reader.handle.join() {
-        Ok(Ok(output)) => Ok(output),
-        Ok(Err(source)) => Err(ProcessError::Capture {
-            program: program.to_path_buf(),
-            source,
-        }),
-        Err(_) => Err(ProcessError::Capture {
-            program: program.to_path_buf(),
-            source: std::io::Error::other("output reader thread panicked"),
-        }),
-    }
-}
-
-fn kill_process_group(
-    child: &mut std::process::Child,
-    program: &std::path::Path,
-) -> Result<(), ProcessError> {
-    let raw_pid = i32::try_from(child.id()).map_err(|_| ProcessError::InvalidPid(child.id()))?;
-    let pid =
-        rustix::process::Pid::from_raw(raw_pid).ok_or(ProcessError::InvalidPid(child.id()))?;
-    if let Err(source) = rustix::process::kill_process_group(pid, rustix::process::Signal::KILL)
-        && source != rustix::io::Errno::SRCH
-    {
-        return Err(ProcessError::Kill {
-            program: program.to_path_buf(),
-            source: source.into(),
-        });
-    }
-    Ok(())
 }
 
 fn ensure_linux() -> Result<(), ProcessError> {
     cfg!(target_os = "linux").ok_or(ProcessError::UnsupportedHost)
-}
-
-#[derive(Debug, Error)]
-#[error(
-    "{program} {stream} exceeded {maximum} bytes\nstdout (bounded prefix):\n{stdout_diagnostic}\nstderr (bounded prefix):\n{stderr_diagnostic}"
-)]
-pub struct OutputLimitError {
-    pub program: PathBuf,
-    pub stream: &'static str,
-    pub maximum: usize,
-    pub stdout: Vec<u8>,
-    pub stderr: Vec<u8>,
-    pub stdout_diagnostic: Box<str>,
-    pub stderr_diagnostic: Box<str>,
-}
-
-#[derive(Debug, Error)]
-#[error(
-    "{program} timed out after {timeout:?}\nstdout (bounded prefix):\n{stdout_diagnostic}\nstderr (bounded prefix):\n{stderr_diagnostic}"
-)]
-pub struct TimedOutError {
-    pub program: PathBuf,
-    pub timeout: Duration,
-    pub stdout: Vec<u8>,
-    pub stderr: Vec<u8>,
-    pub stdout_diagnostic: Box<str>,
-    pub stderr_diagnostic: Box<str>,
-}
-
-#[derive(Debug, Error)]
-#[error(
-    "{program} exceeded the regular-file limit of {maximum} bytes\nstdout (bounded prefix):\n{stdout_diagnostic}\nstderr (bounded prefix):\n{stderr_diagnostic}"
-)]
-pub struct FileLimitError {
-    pub program: PathBuf,
-    pub maximum: u64,
-    pub stdout: Vec<u8>,
-    pub stderr: Vec<u8>,
-    pub stdout_diagnostic: Box<str>,
-    pub stderr_diagnostic: Box<str>,
-}
-
-#[derive(Debug, Error)]
-#[error(
-    "{program} was interrupted\nstdout (bounded prefix):\n{stdout_diagnostic}\nstderr (bounded prefix):\n{stderr_diagnostic}"
-)]
-pub struct InterruptedError {
-    pub program: PathBuf,
-    pub stdout: Vec<u8>,
-    pub stderr: Vec<u8>,
-    pub stdout_diagnostic: Box<str>,
-    pub stderr_diagnostic: Box<str>,
-}
-
-#[derive(Debug, Error)]
-pub enum ProcessError {
-    #[error("bounded process supervision requires Linux")]
-    UnsupportedHost,
-    #[error("failed to measure {program} through the launcher: {reason}")]
-    Launch { program: PathBuf, reason: Box<str> },
-    #[error("process stdin is {actual} bytes, exceeding {maximum}")]
-    StdinLimit { actual: usize, maximum: usize },
-    #[error("process timeout must be positive")]
-    ZeroTimeout,
-    #[error("process regular-file limit must be positive when configured")]
-    ZeroFileLimit,
-    #[error("process timeout exceeds the monotonic clock range")]
-    DeadlineOverflow,
-    #[error("failed to install process-cancellation signal handlers: {0}")]
-    InstallSignals(String),
-    #[error("failed to spawn {program}: {source}")]
-    Spawn {
-        program: PathBuf,
-        source: std::io::Error,
-    },
-    #[error("failed to open a completion descriptor for {program}: {source}")]
-    OpenCompletionFd {
-        program: PathBuf,
-        source: std::io::Error,
-    },
-    #[error("failed to poll completion of {program}: {source}")]
-    PollCompletion {
-        program: PathBuf,
-        source: std::io::Error,
-    },
-    #[error("spawned process {0} is missing its completion descriptor")]
-    MissingCompletionFd(PathBuf),
-    #[error("failed to pin {program} to CPU {cpu}: {source}")]
-    SetAffinity {
-        program: PathBuf,
-        cpu: usize,
-        source: std::io::Error,
-    },
-    #[error("failed to limit regular files written by {program} to {maximum} bytes: {source}")]
-    SetFileLimit {
-        program: PathBuf,
-        maximum: u64,
-        source: std::io::Error,
-    },
-    #[error("spawned process is missing its piped {0}")]
-    MissingPipe(&'static str),
-    #[error("discarded process stream {stream} unexpectedly exceeded an output limit")]
-    DiscardExceeded { stream: &'static str },
-    #[error("failed to wait for {program}: {source}")]
-    Wait {
-        program: PathBuf,
-        source: std::io::Error,
-    },
-    #[error("failed to write stdin for {program}: {source}")]
-    WriteStdin {
-        program: PathBuf,
-        source: std::io::Error,
-    },
-    #[error("failed to capture output from {program}: {source}")]
-    Capture {
-        program: PathBuf,
-        source: std::io::Error,
-    },
-    #[error(transparent)]
-    OutputLimit(Box<OutputLimitError>),
-    #[error(transparent)]
-    TimedOut(Box<TimedOutError>),
-    #[error(transparent)]
-    FileLimit(Box<FileLimitError>),
-    #[error(transparent)]
-    Interrupted(Box<InterruptedError>),
-    #[error("child process id {0} exceeds the supported Linux pid range")]
-    InvalidPid(u32),
-    #[error("{0} completed without an observable exit status")]
-    MissingStatus(PathBuf),
-    #[error("completion time for {0} preceded its start time")]
-    CompletionClock(PathBuf),
-    #[error("failed to terminate the process group for {program}: {source}")]
-    Kill {
-        program: PathBuf,
-        source: std::io::Error,
-    },
 }
 
 #[cfg(test)]

@@ -120,6 +120,9 @@ jobs:
       - name: Run live pinned Stim fixtures
         run: just oracle::run --all-rows
 
+      - name: Check stored goldens against pinned Stim
+        run: just oracle::record --check-clean
+
       - name: Check E2E performance contract
         run: just bench::e2e-check
 

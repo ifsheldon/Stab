@@ -1,6 +1,9 @@
 use std::assert_matches;
 
+use std::collections::BTreeSet;
+
 use super::*;
+use crate::{STIM_COMMIT, STIM_TAG};
 
 mod catalog_semantics;
 mod pinned_stim;

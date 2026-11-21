@@ -1,6 +1,7 @@
 use std::assert_matches;
 
-use super::{compare_two_sample_plan, validate_two_sample_plan};
+use super::{TwoSamplePlan, compare_two_sample_plan};
+use crate::fixtures::row::CliArgv;
 use crate::fixtures::{FixtureError, FixtureManifest, RunFilter, compare_fixture};
 
 /// The shot count and per-row false-positive budget used by the surface-code manifest rows.
@@ -55,7 +56,7 @@ fn accepts_independent_draws_from_one_distribution() {
     let stim = independent_records(0x5eed_0001, &probabilities);
     let stab = independent_records(0x5eed_0002, &probabilities);
 
-    assert_eq!(compare_two_sample_plan(PLAN, &stim, &stab), None);
+    assert_eq!(compare(PLAN, &stim, &stab), None);
 }
 
 #[test]
@@ -66,7 +67,7 @@ fn rejects_ten_percent_relative_shift_in_one_column_at_fixture_shot_count() {
     let stim = records_with_column_hits(&base, 0, 10_000);
     let stab = records_with_column_hits(&base, 0, 11_000);
 
-    let reason = compare_two_sample_plan(PLAN, &stim, &stab).expect("shift must be rejected");
+    let reason = compare(PLAN, &stim, &stab).expect("shift must be rejected");
 
     assert!(reason.contains("column 0: Stim 10000/20000"), "{reason}");
     assert!(!reason.contains("column 1:"), "{reason}");
@@ -84,7 +85,7 @@ fn joint_parity_rejects_correlation_change_with_identical_marginals() {
     }
     let stab = independent_records(0x5eed_0005, &[0.5, 0.5, 0.0, 1.0]);
 
-    let reason = compare_two_sample_plan(PLAN, &stim, &stab).expect("correlation change");
+    let reason = compare(PLAN, &stim, &stab).expect("correlation change");
 
     assert!(reason.contains("joint parity=0,1"), "{reason}");
     assert!(!reason.contains("column "), "{reason}");
@@ -96,7 +97,7 @@ fn rejects_deterministic_column_disagreement() {
     let stim = independent_records(0x5eed_0006, &probabilities);
     let stab = records_with_column_hits(&stim, 2, SHOTS);
 
-    let reason = compare_two_sample_plan(PLAN, &stim, &stab).expect("deterministic mismatch");
+    let reason = compare(PLAN, &stim, &stab).expect("deterministic mismatch");
 
     assert!(
         reason.contains("column 2: Stim 0/20000 (0.00000) vs Stab 20000/20000 (1.00000), deterministic disagreement"),
@@ -111,12 +112,11 @@ fn rejects_record_width_and_shot_count_mismatches() {
     let mut short = stim.clone();
     short.truncate(short.len() - 5);
 
-    let width = compare_two_sample_plan(PLAN, &stim, &wide).expect("width mismatch");
-    let count = compare_two_sample_plan(PLAN, &short, &stim).expect("shot count mismatch");
+    let width = compare(PLAN, &stim, &wide).expect("width mismatch");
+    let count = compare(PLAN, &short, &stim).expect("shot count mismatch");
     let mut unterminated = stim.clone();
     unterminated.pop();
-    let unterminated =
-        compare_two_sample_plan(PLAN, &stim, &unterminated).expect("missing newline");
+    let unterminated = compare(PLAN, &stim, &unterminated).expect("missing newline");
 
     assert!(
         width.contains("Stab shot 0 has 5 column(s), plan declares columns=4"),
@@ -157,23 +157,23 @@ fn validation_rejects_budget_overclaims_and_bad_joint_sets() {
     let out_of_range = PLAN.replace("joint parity=0,1", "joint any=0..4");
 
     assert!(
-        validate_two_sample_plan(overclaim, &argv)
+        validate(overclaim, &argv)
             .expect("overclaim")
             .contains("over 1000 test(s)")
     );
     let without_joints = joint_overclaim.replace(&format!("{joints}; "), "");
-    assert_eq!(validate_two_sample_plan(&without_joints, &argv), None);
+    assert_eq!(validate(&without_joints, &argv), None);
     assert!(
-        validate_two_sample_plan(&joint_overclaim, &argv)
+        validate(&joint_overclaim, &argv)
             .expect("joint overclaim")
             .contains("over 600 test(s)")
     );
     assert!(
-        validate_two_sample_plan(&out_of_range, &argv)
+        validate(&out_of_range, &argv)
             .expect("joint range")
             .contains("outside the declared 4 column(s)")
     );
-    assert_eq!(validate_two_sample_plan(PLAN, &argv), None);
+    assert_eq!(validate(PLAN, &argv), None);
 }
 
 #[test]
@@ -201,7 +201,7 @@ fn validation_rejects_argv_that_disagrees_with_plan() {
         ),
     ];
     for (argv, expected) in cases {
-        let reason = validate_two_sample_plan(PLAN, &argv).expect("argv mismatch must reject");
+        let reason = validate(PLAN, &argv).expect("argv mismatch must reject");
         assert!(reason.contains(expected), "{reason}");
     }
 }
@@ -231,6 +231,54 @@ fn manifest_two_sample_rows_run_under_statistical_filter_and_report_mismatches()
     );
     compare_fixture(row, &process_output(&stim), &process_output(&stim))
         .expect("identical samples must pass");
+}
+
+fn compare(plan: &str, stim: &[u8], stab: &[u8]) -> Option<String> {
+    match TwoSamplePlan::parse(plan) {
+        Ok(plan) => compare_two_sample_plan(&plan, stim, stab),
+        Err(reason) => Some(reason),
+    }
+}
+
+fn validate(plan: &str, argv: &[String]) -> Option<String> {
+    match TwoSamplePlan::parse(plan) {
+        Ok(plan) => plan.validate_argv(&CliArgv::literals(argv)),
+        Err(reason) => Some(reason),
+    }
+}
+
+#[test]
+fn one_constant_side_rejects_a_rare_rate_the_pooled_z_test_accepted() {
+    // Column 2 never fires for Stim. With 32 Stab events the pooled z is about 5.7, inside
+    // 6 sigma, but the exact conditional p-value 2^-31 is below the 6-sigma per-test rate.
+    let stim = independent_records(0x5eed_000a, &[0.5, 0.1, 0.0, 1.0]);
+    let stab = records_with_column_hits(&stim, 2, 32);
+    let reason = compare(PLAN, &stim, &stab).expect("32 events against none must reject");
+    assert!(
+        reason.contains("column 2: Stim 0/20000") && reason.contains("exact conditional p="),
+        "{reason}"
+    );
+
+    let few = records_with_column_hits(&stim, 2, 3);
+    assert_eq!(compare(PLAN, &stim, &few), None);
+}
+
+#[test]
+fn repeated_plan_tokens_are_rejected() {
+    for (token, expected) in [
+        ("sample_count=20000", "sample_count more than once"),
+        ("fixed_seed=5", "fixed_seed more than once"),
+        (
+            "false_positive_rate<=0.000001",
+            "false_positive_rate more than once",
+        ),
+        ("columns=4", "columns more than once"),
+        ("two-sample columns within 6 sigma", "sigma more than once"),
+    ] {
+        let plan = format!("{PLAN}; {token}");
+        let reason = TwoSamplePlan::parse(&plan).expect_err("duplicate token must reject");
+        assert!(reason.contains(expected), "{token}: {reason}");
+    }
 }
 
 fn argv(tokens: &[&str]) -> Vec<String> {

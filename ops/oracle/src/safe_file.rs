@@ -1,18 +1,14 @@
-//! Descriptor-walked file access that rejects symlinks in every path component.
+//! Descriptor-walked file access that rejects symlinks in every path component, built on the
+//! shared `stab-confined-fs` primitives. It does not revalidate device and inode identity.
 
 use std::ffi::OsStr;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::os::fd::OwnedFd;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use rustix::fs::{Mode, OFlags};
 use thiserror::Error;
-
-const DIRECTORY_FLAGS: OFlags = OFlags::RDONLY
-    .union(OFlags::CLOEXEC)
-    .union(OFlags::DIRECTORY)
-    .union(OFlags::NOFOLLOW);
 
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -48,53 +44,41 @@ impl SafeFileLocation {
 }
 
 pub(crate) fn open_regular_file(path: &Path) -> Result<std::fs::File, SafeFileError> {
-    let (components, file_name) = split_absolute_file_path(path)?;
-    let directory = open_directory_components(components)?;
-    let descriptor = rustix::fs::openat(
-        &directory,
-        file_name,
-        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK,
-        Mode::empty(),
-    )
-    .map_err(std::io::Error::from)?;
-    let file = std::fs::File::from(descriptor);
-    if !file.metadata()?.is_file() {
-        return Err(SafeFileError::NotRegular);
-    }
-    Ok(file)
+    stab_confined_fs::open_regular_file(path).map_err(SafeFileError::from)
 }
 
 pub(crate) fn read_regular_file_bounded(
     path: &Path,
     limit: usize,
 ) -> Result<Vec<u8>, SafeFileError> {
-    let mut file = open_regular_file(path)?;
-    let limit_u64 = u64::try_from(limit).unwrap_or(u64::MAX);
-    if file.metadata()?.len() > limit_u64 {
-        return Err(SafeFileError::TooLarge { limit });
-    }
-    let mut bytes = Vec::new();
-    Read::by_ref(&mut file)
-        .take(limit_u64)
-        .read_to_end(&mut bytes)?;
-    let mut extra = [0_u8; 1];
-    if bytes.len() == limit && file.read(&mut extra)? != 0 {
-        return Err(SafeFileError::TooLarge { limit });
-    }
-    Ok(bytes)
+    let limit = u64::try_from(limit).unwrap_or(u64::MAX);
+    stab_confined_fs::read_regular_file_bounded(path, limit).map_err(SafeFileError::from)
 }
 
 pub(crate) fn open_directory(path: &Path) -> Result<std::fs::File, SafeFileError> {
-    let directory = open_directory_components(absolute_normal_components(path)?)?;
-    Ok(std::fs::File::from(directory))
+    stab_confined_fs::open_directory(path).map_err(SafeFileError::from)
+}
+
+/// Opens the directory `name` directly below `parent` without following a symlink.
+pub(crate) fn open_child_directory(
+    parent: &impl std::os::fd::AsFd,
+    name: &OsStr,
+) -> Result<OwnedFd, SafeFileError> {
+    stab_confined_fs::open_directory_at(parent, name, Path::new(name))
+        .map(OwnedFd::from)
+        .map_err(SafeFileError::from)
 }
 
 pub(crate) fn atomic_write_regular_file(path: &Path, bytes: &[u8]) -> Result<(), SafeFileError> {
     use rustix::fs::AtFlags;
     use std::mem::DropGuard;
 
-    let (components, file_name) = split_absolute_file_path(path)?;
-    let directory = open_or_create_directory_components(components)?;
+    let (components, file_name) =
+        stab_confined_fs::split_absolute_path(path).map_err(SafeFileError::from)?;
+    let directory = OwnedFd::from(
+        stab_confined_fs::open_directory_components(&components, true, path)
+            .map_err(SafeFileError::from)?,
+    );
     let (temporary_name, descriptor) = create_temporary_file(&directory)?;
     let mut file = std::fs::File::from(descriptor);
     if !file.metadata()?.is_file() {
@@ -111,43 +95,6 @@ pub(crate) fn atomic_write_regular_file(path: &Path, bytes: &[u8]) -> Result<(),
     rustix::fs::fsync(&directory).map_err(std::io::Error::from)?;
     DropGuard::dismiss(cleanup);
     Ok(())
-}
-
-fn open_directory_components(components: Vec<&OsStr>) -> Result<OwnedFd, SafeFileError> {
-    let mut directory = open_root_directory()?;
-    for component in components {
-        directory = rustix::fs::openat(&directory, component, DIRECTORY_FLAGS, Mode::empty())
-            .map_err(std::io::Error::from)?;
-    }
-    Ok(directory)
-}
-
-fn open_or_create_directory_components(components: Vec<&OsStr>) -> Result<OwnedFd, SafeFileError> {
-    let mut directory = open_root_directory()?;
-    for component in components {
-        let next = rustix::fs::openat(&directory, component, DIRECTORY_FLAGS, Mode::empty());
-        directory = match next {
-            Ok(next) => next,
-            Err(rustix::io::Errno::NOENT) => {
-                rustix::fs::mkdirat(
-                    &directory,
-                    component,
-                    Mode::RUSR
-                        | Mode::WUSR
-                        | Mode::XUSR
-                        | Mode::RGRP
-                        | Mode::XGRP
-                        | Mode::ROTH
-                        | Mode::XOTH,
-                )
-                .map_err(std::io::Error::from)?;
-                rustix::fs::openat(&directory, component, DIRECTORY_FLAGS, Mode::empty())
-                    .map_err(std::io::Error::from)?
-            }
-            Err(source) => return Err(SafeFileError::Io(source.into())),
-        };
-    }
-    Ok(directory)
 }
 
 fn create_temporary_file(
@@ -181,30 +128,21 @@ fn create_temporary_file(
     )))
 }
 
-fn open_root_directory() -> Result<OwnedFd, SafeFileError> {
-    rustix::fs::open("/", DIRECTORY_FLAGS, Mode::empty())
-        .map_err(|source| SafeFileError::Io(source.into()))
-}
-
-fn split_absolute_file_path(path: &Path) -> Result<(Vec<&OsStr>, &OsStr), SafeFileError> {
-    let mut normal = absolute_normal_components(path)?;
-    let file_name = normal.pop().ok_or(SafeFileError::UnsafePath)?;
-    Ok((normal, file_name))
-}
-
-fn absolute_normal_components(path: &Path) -> Result<Vec<&OsStr>, SafeFileError> {
-    let mut components = path.components();
-    if !matches!(components.next(), Some(Component::RootDir)) {
-        return Err(SafeFileError::UnsafePath);
+/// Keeps each caller's error variants: the shared walk reports a symlink as its own error, which
+/// the oracle has always surfaced as the underlying `ELOOP`.
+impl From<stab_confined_fs::ConfinedFsError> for SafeFileError {
+    fn from(error: stab_confined_fs::ConfinedFsError) -> Self {
+        use stab_confined_fs::ConfinedFsError;
+        match error {
+            ConfinedFsError::InvalidPath(_) => Self::UnsafePath,
+            ConfinedFsError::Symlink(_) => Self::Io(rustix::io::Errno::LOOP.into()),
+            ConfinedFsError::NotRegularFile(_) => Self::NotRegular,
+            ConfinedFsError::TooLarge { limit, .. } => Self::TooLarge {
+                limit: usize::try_from(limit).unwrap_or(usize::MAX),
+            },
+            ConfinedFsError::Io { source, .. } => Self::Io(source),
+        }
     }
-    let mut normal = Vec::new();
-    for component in components {
-        let Component::Normal(component) = component else {
-            return Err(SafeFileError::UnsafePath);
-        };
-        normal.push(component);
-    }
-    Ok(normal)
 }
 
 #[cfg(test)]

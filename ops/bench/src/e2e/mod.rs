@@ -212,9 +212,10 @@ fn validate_prerequisites(root: &RepoRoot, suite: &model::Suite) -> Result<(), B
     let mut errors = Vec::new();
     for prerequisite in required {
         match statuses.get(prerequisite) {
-            Some(status) if status == "done" || status == "divergence" => {}
+            Some(ParityStatus::Done | ParityStatus::Divergence) => {}
             Some(status) => errors.push(format!(
-                "correctness prerequisite {prerequisite} has status {status}"
+                "correctness prerequisite {prerequisite} has status {}",
+                status.as_str()
             )),
             None => errors.push(format!(
                 "correctness prerequisite {prerequisite} is not in the parity ledger"
@@ -239,5 +240,26 @@ struct ParityFragment {
 #[derive(Deserialize)]
 struct ParityFamily {
     id: String,
-    status: String,
+    status: ParityStatus,
+}
+
+/// A parity-ledger family status; only `done` and `divergence` satisfy an E2E prerequisite.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+enum ParityStatus {
+    Done,
+    Divergence,
+    Missing,
+    Deferred,
+}
+
+impl ParityStatus {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Done => "done",
+            Self::Divergence => "divergence",
+            Self::Missing => "missing",
+            Self::Deferred => "deferred",
+        }
+    }
 }

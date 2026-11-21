@@ -9,6 +9,7 @@
     )
 )]
 
+mod build;
 mod fixtures;
 mod gate_catalog;
 mod parity;
@@ -17,7 +18,7 @@ mod result_format_corpus;
 mod safe_file;
 mod statistical_contract;
 
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsStr;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -25,7 +26,13 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand, ValueEnum};
 use thiserror::Error;
 
-use process::{render_bytes_for_diagnostics, run_checked, run_process};
+#[cfg(test)]
+use build::ensure_stim_library;
+use build::{
+    ensure_stab_cli_binary, ensure_stim_binary, ensure_stim_helper, ensure_stim_parse_print_helper,
+    ensure_stim_reverse_flow_helper,
+};
+use process::{ProcessBudget, render_bytes_for_diagnostics, run_checked, run_process};
 
 const PREFIX: &str = "stab-oracle";
 const STIM_TAG: &str = "v1.16.0";
@@ -52,6 +59,10 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Internal file-limit launcher; reads its launch spec from the environment.
+    #[command(name = "process-launch", hide = true)]
+    ProcessLaunch,
+
     /// Initialize, update, and validate the pinned Stim submodule.
     Fetch,
 
@@ -154,6 +165,15 @@ enum OracleError {
     #[error("{0}")]
     InvalidRunSelection(String),
 
+    #[error("failed to install the SIGINT/SIGTERM handlers: {0}")]
+    Signals(Box<str>),
+
+    #[error("interrupted by SIGINT or SIGTERM")]
+    Interrupted,
+
+    #[error("internal error: the process-launch subcommand reached the oracle controller")]
+    LauncherDispatch,
+
     #[error("failed to resolve repository root {path}: {source}")]
     ResolveRoot {
         path: PathBuf,
@@ -189,6 +209,12 @@ enum OracleError {
 
     #[error("pinned Stim helper build requires missing artifact {0}")]
     MissingStimArtifact(PathBuf),
+
+    #[error("cargo build reported no executable for the stab-cli `stab` binary")]
+    MissingStabExecutable,
+
+    #[error("cargo build wrote an unreadable JSON message: {0}")]
+    CargoMessage(std::io::Error),
 
     #[error(transparent)]
     Process(#[from] stab_process::ProcessError),
@@ -275,13 +301,6 @@ impl RepoRoot {
             .join("fixtures")
             .join("manifest.csv")
     }
-
-    fn stab_cli_binary(&self) -> PathBuf {
-        self.path
-            .join("target")
-            .join("debug")
-            .join(format!("stab{}", std::env::consts::EXE_SUFFIX))
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -358,6 +377,9 @@ enum Comparator {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    if matches!(cli.command, Command::ProcessLaunch) {
+        return stab_process::run_launcher();
+    }
     match run(cli) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
@@ -368,8 +390,12 @@ fn main() -> ExitCode {
 }
 
 fn run(cli: Cli) -> Result<(), OracleError> {
+    // Install the sticky SIGINT/SIGTERM flag before any work so an interrupt
+    // during in-process rows is observed at the next row boundary.
+    check_cancelled()?;
     let root = RepoRoot::resolve(&cli.root)?;
     match cli.command {
+        Command::ProcessLaunch => return Err(OracleError::LauncherDispatch),
         Command::Fetch => {
             fetch_stim(&root)?;
             print_version(&root)?;
@@ -425,6 +451,17 @@ fn run(cli: Cli) -> Result<(), OracleError> {
     Ok(())
 }
 
+/// Fails once SIGINT or SIGTERM has been received; long loops call it between
+/// rows, tests, and cases.
+fn check_cancelled() -> Result<(), OracleError> {
+    let cancellation = stab_process::Cancellation::for_signals()
+        .map_err(|reason| OracleError::Signals(reason.into_boxed_str()))?;
+    if cancellation.is_cancelled() {
+        return Err(OracleError::Interrupted);
+    }
+    Ok(())
+}
+
 #[derive(Clone, Debug)]
 struct RunSelection {
     case: Option<OracleCase>,
@@ -463,6 +500,7 @@ fn fetch_stim(root: &RepoRoot) -> Result<(), OracleError> {
         ["submodule", "update", "--init", "--", VENDOR_STIM_PATH],
         b"",
         &root.path,
+        ProcessBudget::BUILD,
     )?;
     validate_stim_source(root)?;
     Ok(())
@@ -522,161 +560,10 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_checked("git", args, b"", working_dir)?;
+    let output = run_checked("git", args, b"", working_dir, ProcessBudget::FIXTURE)?;
     Ok(String::from_utf8_lossy(&output.stdout.bytes)
         .trim()
         .to_string())
-}
-
-fn ensure_stim_binary(root: &RepoRoot, rebuild: bool) -> Result<PathBuf, OracleError> {
-    let version = validate_stim_source(root)?;
-    let binary = root.stim_binary();
-    if binary.is_file() && !rebuild && build_stamp_matches(root, &version) {
-        return Ok(binary);
-    }
-
-    let build_dir = root.build_dir();
-    std::fs::create_dir_all(&build_dir).map_err(|source| OracleError::CreateBuildDir {
-        path: build_dir.clone(),
-        source,
-    })?;
-
-    run_checked(
-        "cmake",
-        [
-            OsString::from("-S"),
-            root.stim_source().into_os_string(),
-            OsString::from("-B"),
-            build_dir.clone().into_os_string(),
-            OsString::from("-DCMAKE_BUILD_TYPE=Release"),
-        ],
-        b"",
-        &root.path,
-    )?;
-    run_checked(
-        "cmake",
-        [
-            OsString::from("--build"),
-            build_dir.into_os_string(),
-            OsString::from("--target"),
-            OsString::from("stim"),
-            OsString::from("--parallel"),
-        ],
-        b"",
-        &root.path,
-    )?;
-    if !binary.is_file() {
-        return Err(OracleError::MissingStimBinary(binary));
-    }
-    std::fs::write(root.build_stamp(), build_stamp_content(&version)).map_err(|source| {
-        OracleError::WriteBuildStamp {
-            path: root.build_stamp(),
-            source,
-        }
-    })?;
-    Ok(binary)
-}
-
-fn ensure_stim_reverse_flow_helper(
-    root: &RepoRoot,
-    rebuild_stim: bool,
-) -> Result<PathBuf, OracleError> {
-    ensure_stim_helper(root, rebuild_stim, "stab_stim_reverse_flow")
-}
-
-fn ensure_stim_helper(
-    root: &RepoRoot,
-    rebuild_stim: bool,
-    target: &'static str,
-) -> Result<PathBuf, OracleError> {
-    ensure_stim_binary(root, rebuild_stim)?;
-    let library = root.stim_library();
-    if rebuild_stim || !library.is_file() {
-        run_checked(
-            "cmake",
-            [
-                OsString::from("--build"),
-                root.build_dir().into_os_string(),
-                OsString::from("--target"),
-                OsString::from("libstim"),
-                OsString::from("--parallel"),
-            ],
-            b"",
-            &root.path,
-        )?;
-    }
-    if !library.is_file() {
-        return Err(OracleError::MissingStimArtifact(library));
-    }
-
-    let source_dir = root.stim_helper_source_dir();
-    if !source_dir.is_dir() {
-        return Err(OracleError::MissingStimArtifact(source_dir));
-    }
-    let helper_build_dir = root.stim_helper_build_dir();
-    std::fs::create_dir_all(&helper_build_dir).map_err(|source| OracleError::CreateBuildDir {
-        path: helper_build_dir.clone(),
-        source,
-    })?;
-    run_checked(
-        "cmake",
-        [
-            OsString::from("-S"),
-            source_dir.into_os_string(),
-            OsString::from("-B"),
-            helper_build_dir.clone().into_os_string(),
-            OsString::from("-DCMAKE_BUILD_TYPE=Release"),
-            cmake_path_definition("STIM_SOURCE_DIR", &root.stim_source()),
-            cmake_path_definition("STIM_LIBRARY", &library),
-        ],
-        b"",
-        &root.path,
-    )?;
-    run_checked(
-        "cmake",
-        [
-            OsString::from("--build"),
-            helper_build_dir.into_os_string(),
-            OsString::from("--target"),
-            OsString::from(target),
-            OsString::from("--parallel"),
-        ],
-        b"",
-        &root.path,
-    )?;
-    let binary = root.stim_helper_binary(target);
-    if !binary.is_file() {
-        return Err(OracleError::MissingStimBinary(binary));
-    }
-    Ok(binary)
-}
-
-fn cmake_path_definition(name: &str, path: &Path) -> OsString {
-    let mut value = OsString::from(format!("-D{name}="));
-    value.push(path.as_os_str());
-    value
-}
-
-fn build_stamp_matches(root: &RepoRoot, version: &StimSourceVersion) -> bool {
-    std::fs::read_to_string(root.build_stamp())
-        .is_ok_and(|actual| actual == build_stamp_content(version))
-}
-
-fn build_stamp_content(version: &StimSourceVersion) -> String {
-    format!(
-        "stim_tag={}\nstim_commit={}\nbuild_type=Release\n",
-        version.tag, version.commit
-    )
-}
-
-fn ensure_stab_cli_binary(root: &RepoRoot) -> Result<PathBuf, OracleError> {
-    run_checked(
-        "cargo",
-        ["build", "-q", "-p", "stab-cli", "--bin", "stab"],
-        b"",
-        &root.path,
-    )?;
-    Ok(root.stab_cli_binary())
 }
 
 fn run_smoke_case(

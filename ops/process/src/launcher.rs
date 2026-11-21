@@ -7,10 +7,10 @@
 //! least the runner's own peak, which hid every benchmark's real memory use.
 //!
 //! The supervisor instead executes a fresh, small launcher: a binary whose
-//! entry point calls [`run_launcher`], such as `stab-bench e2e-launch`. The launcher pins itself to the requested CPU so the
-//! program inherits the mask before it starts, spawns the program with inherited
-//! standard streams, bounds the program's regular-file writes, reaps it with
-//! `wait4`, and writes
+//! entry point calls [`run_launcher`], such as `stab-bench e2e-launch`. The
+//! launcher pins itself to the requested CPU and lowers its own `RLIMIT_FSIZE`
+//! so the program inherits both before its first instruction, spawns the
+//! program with inherited standard streams, reaps it with `wait4`, and writes
 //! the program's wait status, peak RSS, and monotonic spawn and exit instants to
 //! a report file owned by the supervisor. The launcher never writes to its
 //! standard streams, which belong to the measured program.
@@ -22,11 +22,14 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use super::{ProcessError, ProcessRequest, limits, wait_with_rusage};
+use super::group::{process_id, wait_with_rusage};
+use super::{ProcessError, ProcessRequest, limits};
 
 /// Environment variable carrying the JSON [`LaunchSpec`] to the launcher.
 const SPEC_ENV: &str = "STAB_BENCH_LAUNCH_SPEC";
-const MAX_REPORT_BYTES: u64 = 4 << 10;
+/// Bound on the launcher's report file. The launcher writes that report under
+/// the program's regular-file limit, so a limit must be at least this large.
+pub(super) const MAX_REPORT_BYTES: u64 = 4 << 10;
 /// Exit status of a launcher that could not measure its program.
 const LAUNCH_FAILURE_EXIT: u8 = 125;
 
@@ -76,6 +79,15 @@ pub(super) struct MeasuredCompletion {
 
 impl MeasuredLaunch {
     pub(super) fn prepare(request: &ProcessRequest) -> Result<Self, ProcessError> {
+        if let Some(maximum) = request.limits.regular_file_bytes
+            && maximum < MAX_REPORT_BYTES
+        {
+            return Err(ProcessError::FileLimitBelowLauncherReport {
+                program: request.program.clone(),
+                maximum,
+                minimum: MAX_REPORT_BYTES,
+            });
+        }
         let report = tempfile::Builder::new()
             .prefix("stab-bench-launch-")
             .tempfile()
@@ -200,22 +212,26 @@ fn launch(spec: &LaunchSpec) -> Result<LaunchReport, String> {
     if let Some(cpu) = spec.affinity_cpu {
         limits::pin_current_thread(cpu).map_err(|source| format!("set affinity: {source}"))?;
     }
+    // The program inherits the launcher's own limit at spawn, so no write can
+    // precede it. The launcher's report stays below MAX_REPORT_BYTES, which
+    // the supervisor requires the limit to cover.
+    if let Some(maximum) = spec.file_limit_bytes {
+        if maximum < MAX_REPORT_BYTES {
+            return Err(format!(
+                "file-size limit {maximum} is below the {MAX_REPORT_BYTES}-byte report bound"
+            ));
+        }
+        limits::limit_own_file_size(maximum)
+            .map_err(|source| format!("set file-size limit: {source}"))?;
+    }
     let mut command = Command::new(&spec.program);
     command.args(&spec.args).env_remove(SPEC_ENV);
     let spawn_monotonic_ns = monotonic_ns()?;
-    let mut child = command
+    let child = command
         .spawn()
         .map_err(|source| format!("spawn {}: {source}", spec.program))?;
-    // The file limit binds only the program: the launcher must still be able to
-    // write its report after the program exceeds a small limit.
-    if let Some(maximum) = spec.file_limit_bytes
-        && let Err(source) = limits::set_child_file_limit(child.id(), maximum)
-    {
-        drop(child.kill());
-        drop(child.wait());
-        return Err(format!("set file-size limit: {source}"));
-    }
-    let completed = wait_with_rusage(child.id())
+    let completed = process_id(child.id())
+        .and_then(wait_with_rusage)
         .map_err(|source| format!("wait for {}: {source}", spec.program))?;
     let exit_monotonic_ns = monotonic_ns()?;
     Ok(LaunchReport::Completed {

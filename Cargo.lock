@@ -2549,6 +2549,7 @@ dependencies = [
 name = "stab-bench"
 version = "0.2.0"
 dependencies = [
+ "cargo_metadata",
  "clap",
  "hex",
  "rand 0.10.1",
@@ -2606,6 +2607,15 @@ dependencies = [
  "hex",
  "serde",
  "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "stab-confined-fs"
+version = "0.2.0"
+dependencies = [
+ "rustix",
+ "tempfile",
  "thiserror",
 ]
 
@@ -2678,6 +2688,7 @@ dependencies = [
 name = "stab-oracle"
 version = "0.2.0"
 dependencies = [
+ "cargo_metadata",
  "clap",
  "csv",
  "rustix",
@@ -2687,6 +2698,7 @@ dependencies = [
  "stab-analysis",
  "stab-cli",
  "stab-compat-corpus",
+ "stab-confined-fs",
  "stab-core",
  "stab-model",
  "stab-process",
@@ -2770,10 +2782,12 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "signal-hook",
+ "stab-confined-fs",
+ "stab-process",
  "tar",
  "tempfile",
  "thiserror",
+ "toml",
  "ureq",
 ]
 

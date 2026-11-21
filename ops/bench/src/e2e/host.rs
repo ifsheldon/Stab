@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -51,16 +51,93 @@ impl HostProfile {
     pub(super) fn validate_formal(
         &self,
         maximum_temperature_millidegrees: u64,
+        competitors: &CompetitorScan,
     ) -> Result<(), String> {
         validate_recorded_host_transition(self, self, maximum_temperature_millidegrees, true)?;
-        let competitors = competing_benchmark_processes()?;
-        if !competitors.is_empty() {
-            return Err(format!(
+        competitors.check()
+    }
+}
+
+/// Program names whose processes compete with formal timing: builds and toolchain work.
+const COMPETING_PROGRAMS: [&str; 3] = ["cargo", "rustc", "cmake"];
+
+/// Finds processes outside the controller's ancestor chain that would compete with formal
+/// timing: another benchmark controller, worker, or launcher; a process executing a measured
+/// binary; or a Cargo, rustc, or CMake process.
+pub(super) struct CompetitorScan {
+    measured_binaries: Vec<PathBuf>,
+}
+
+impl CompetitorScan {
+    pub(super) fn new(measured_binaries: Vec<PathBuf>) -> Self {
+        let measured_binaries = measured_binaries
+            .into_iter()
+            .map(|path| fs::canonicalize(&path).unwrap_or(path))
+            .collect();
+        Self { measured_binaries }
+    }
+
+    /// Fails closed when any competitor is running.
+    pub(super) fn check(&self) -> Result<(), String> {
+        let competitors = self.competing_processes()?;
+        if competitors.is_empty() {
+            Ok(())
+        } else {
+            Err(format!(
                 "competing benchmark processes are active: {}",
                 competitors.join(", ")
-            ));
+            ))
         }
-        Ok(())
+    }
+
+    fn competing_processes(&self) -> Result<Vec<String>, String> {
+        let own_pid = std::process::id();
+        let ancestors = ancestor_pids(own_pid)?;
+        let mut matches = Vec::new();
+        for entry in fs::read_dir("/proc")
+            .map_err(|source| format!("cannot scan /proc: {source}"))?
+            .filter_map(Result::ok)
+        {
+            let name = entry.file_name();
+            let Some(pid) = name.to_str().and_then(|value| value.parse::<u32>().ok()) else {
+                continue;
+            };
+            if pid == own_pid || ancestors.contains(&pid) {
+                continue;
+            }
+            // A process that exits during the scan has nothing left to compete with.
+            let Ok(bytes) = fs::read(entry.path().join("cmdline")) else {
+                continue;
+            };
+            let executable = fs::read_link(entry.path().join("exe")).ok();
+            if self.competes(&bytes, executable.as_deref()) {
+                let command = String::from_utf8_lossy(&bytes).replace('\0', " ");
+                matches.push(format!("{pid}:{command}"));
+            }
+        }
+        matches.sort();
+        Ok(matches)
+    }
+
+    fn competes(&self, cmdline: &[u8], executable: Option<&Path>) -> bool {
+        let command = String::from_utf8_lossy(cmdline).replace('\0', " ");
+        if command.contains("stab-bench")
+            && (command.contains("e2e-run")
+                || command.contains("e2e-worker")
+                || command.contains("e2e-launch"))
+        {
+            return true;
+        }
+        if executable.is_some_and(|path| self.measured_binaries.iter().any(|binary| binary == path))
+        {
+            return true;
+        }
+        let program = cmdline.split(|byte| *byte == 0).next().unwrap_or_default();
+        let program = Path::new(std::str::from_utf8(program).unwrap_or_default());
+        program
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| COMPETING_PROGRAMS.contains(&name))
     }
 }
 
@@ -69,16 +146,11 @@ pub(super) fn validate_host_after(
     after: &HostProfile,
     maximum_temperature_millidegrees: u64,
     formal: bool,
+    competitors: &CompetitorScan,
 ) -> Result<(), String> {
     validate_recorded_host_transition(before, after, maximum_temperature_millidegrees, formal)?;
     if formal {
-        let competitors = competing_benchmark_processes()?;
-        if !competitors.is_empty() {
-            return Err(format!(
-                "competing benchmark processes are active: {}",
-                competitors.join(", ")
-            ));
-        }
+        competitors.check()?;
     }
     Ok(())
 }
@@ -223,37 +295,6 @@ fn swap_snapshot() -> Result<SwapSnapshot, String> {
     })
 }
 
-fn competing_benchmark_processes() -> Result<Vec<String>, String> {
-    let own_pid = std::process::id();
-    let ancestors = ancestor_pids(own_pid)?;
-    let mut matches = Vec::new();
-    for entry in fs::read_dir("/proc")
-        .map_err(|source| format!("cannot scan /proc: {source}"))?
-        .filter_map(Result::ok)
-    {
-        let name = entry.file_name();
-        let Some(pid) = name.to_str().and_then(|value| value.parse::<u32>().ok()) else {
-            continue;
-        };
-        if pid == own_pid || ancestors.contains(&pid) {
-            continue;
-        }
-        let Ok(bytes) = fs::read(entry.path().join("cmdline")) else {
-            continue;
-        };
-        let command = String::from_utf8_lossy(&bytes).replace('\0', " ");
-        if command.contains("stab-bench")
-            && (command.contains("e2e-run")
-                || command.contains("e2e-worker")
-                || command.contains("e2e-launch"))
-        {
-            matches.push(format!("{pid}:{command}"));
-        }
-    }
-    matches.sort();
-    Ok(matches)
-}
-
 fn ancestor_pids(pid: u32) -> Result<BTreeSet<u32>, String> {
     let mut ancestors = BTreeSet::new();
     let mut current = pid;
@@ -306,10 +347,9 @@ mod tests {
         use std::ffi::OsString;
         use std::time::Duration;
 
-        crate::process::ProcessRequest {
-            launch: crate::process::ProcessLaunch::Direct,
-            program: std::env::current_exe().expect("test executable"),
-            args: [
+        let mut request = crate::process::ProcessRequest::direct(
+            std::env::current_exe().expect("test executable"),
+            [
                 "e2e::host::tests::restricted_affinity_helper",
                 "--exact",
                 "--ignored",
@@ -317,26 +357,20 @@ mod tests {
             ]
             .map(OsString::from)
             .into(),
-            stdin: vec![b'\n'],
-            unread_stdin: crate::process::UnreadStdin::Reject,
-            working_directory: std::env::current_dir().expect("working directory"),
-            environment: vec![
-                (OsString::from("STAB_HOST_TEST_CPU"), cpu.to_string().into()),
-                (
-                    OsString::from("STAB_HOST_TEST_CHILD"),
-                    child.to_string().into(),
-                ),
-            ]
-            .into(),
-            affinity_cpu: child.then_some(cpu),
-            limits: crate::process::ProcessLimits {
-                stdin_bytes: 1,
-                stdout: 4096.into(),
-                stderr: 4096.into(),
-                regular_file_bytes: None,
-                timeout: Duration::from_secs(10),
-            },
-        }
+            std::env::current_dir().expect("working directory"),
+            crate::process::ProcessLimits::capture(4096, Duration::from_secs(10)),
+        )
+        .with_stdin(b"\n")
+        .with_affinity(child.then_some(cpu));
+        request.environment = vec![
+            (OsString::from("STAB_HOST_TEST_CPU"), cpu.to_string().into()),
+            (
+                OsString::from("STAB_HOST_TEST_CHILD"),
+                child.to_string().into(),
+            ),
+        ]
+        .into();
+        request
     }
 
     #[cfg(target_os = "linux")]
@@ -352,7 +386,7 @@ mod tests {
             .expect("restricted controller completes");
         assert_eq!(
             output.status,
-            Some(0),
+            stab_process::ProcessExit::Exited(0),
             "restricted controller stderr: {}",
             String::from_utf8_lossy(&output.stderr)
         );
@@ -387,7 +421,7 @@ mod tests {
         .expect("supervised child completes");
         assert_eq!(
             output.status,
-            Some(0),
+            stab_process::ProcessExit::Exited(0),
             "affinity child stderr: {}",
             String::from_utf8_lossy(&output.stderr)
         );
@@ -412,14 +446,15 @@ mod tests {
                 pages_out: 20,
             },
         };
+        let scan = CompetitorScan::new(Vec::new());
         assert_eq!(
-            validate_host_after(&profile, &profile, 100_000, false),
+            validate_host_after(&profile, &profile, 100_000, false, &scan),
             Ok(())
         );
 
         let mut changed = profile.clone();
         changed.swap.pages_out += 1;
-        assert!(validate_host_after(&profile, &changed, 100_000, true).is_err());
+        assert!(validate_host_after(&profile, &changed, 100_000, true, &scan).is_err());
     }
 
     #[test]
@@ -437,7 +472,25 @@ mod tests {
                 pages_out: 0,
             },
         };
-        assert!(profile.validate_formal(100_000).is_err());
+        assert!(
+            profile
+                .validate_formal(100_000, &CompetitorScan::new(Vec::new()))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn competitor_scan_matches_controllers_measured_binaries_and_builds() {
+        let scan = CompetitorScan::new(vec![PathBuf::from("/bench/bin/stab")]);
+
+        assert!(scan.competes(b"/t/stab-bench\0e2e-worker\0--shots\0", None));
+        assert!(scan.competes(b"stab\0sample\0", Some(Path::new("/bench/bin/stab"))));
+        assert!(scan.competes(b"/home/u/.cargo/bin/cargo\0build\0", None));
+        assert!(scan.competes(b"rustc\0--crate-name\0x\0", None));
+        assert!(scan.competes(b"/usr/bin/cmake\0--build\0", None));
+        assert!(!scan.competes(b"/usr/bin/vim\0cargo\0", Some(Path::new("/usr/bin/vim"))));
+        assert!(!scan.competes(b"stab-bench\0e2e-check\0", None));
+        assert!(!scan.competes(b"", None));
     }
 
     #[test]

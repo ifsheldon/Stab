@@ -1,7 +1,7 @@
 use std::assert_matches;
 
 use super::*;
-use std::io::BufRead as _;
+use std::io::{BufRead as _, Read as _, Write as _};
 
 const HELPER_TEST: &str = "tests::process_helper";
 const HELPER_ENV: &str = "STAB_BENCH_PROCESS_HELPER";
@@ -36,20 +36,23 @@ fn request(mode: &str) -> ProcessRequest {
 #[test]
 fn captures_success_nonzero_and_signal_status() {
     let success = run_bounded_process(&request("success")).expect("successful helper");
-    assert_eq!(success.status, Some(0));
+    assert_eq!(success.status, ProcessExit::Exited(0));
     assert!(String::from_utf8_lossy(&success.stdout).contains("helper-success"));
 
     let nonzero = run_bounded_process(&request("nonzero")).expect("nonzero is captured");
-    assert_eq!(nonzero.status, Some(7));
+    assert_eq!(nonzero.status, ProcessExit::Exited(7));
 
     let signalled = run_bounded_process(&request("signal")).expect("signal is captured");
-    assert_eq!(signalled.status, None);
+    assert_eq!(
+        signalled.status,
+        ProcessExit::Signaled(signal_hook::consts::signal::SIGTERM)
+    );
 }
 
 #[test]
 fn captures_peak_rss_from_a_short_lived_child() {
     let output = run_bounded_process(&request("peak-rss")).expect("short allocation succeeds");
-    assert_eq!(output.status, Some(0));
+    assert_eq!(output.status, ProcessExit::Exited(0));
     assert!(
         output
             .parent_observed_peak_rss_bytes
@@ -92,14 +95,20 @@ fn rejects_missing_binary_and_all_stream_limits() {
     stdout.limits.stdout = 32.into();
     assert_matches!(
         run_bounded_process(&stdout),
-        Err(ProcessError::OutputLimit(error)) if error.stream == "stdout"
+        Err(ProcessError::OutputLimit {
+            stream: "stdout",
+            ..
+        })
     );
 
     let mut stderr = request("stderr-overflow");
     stderr.limits.stderr = 32.into();
     assert_matches!(
         run_bounded_process(&stderr),
-        Err(ProcessError::OutputLimit(error)) if error.stream == "stderr"
+        Err(ProcessError::OutputLimit {
+            stream: "stderr",
+            ..
+        })
     );
 }
 
@@ -114,7 +123,7 @@ fn unread_stdin_policy_decides_whether_a_broken_pipe_fails() {
 
     request.unread_stdin = UnreadStdin::Allow;
     let output = run_bounded_process(&request).expect("an early exit stays observable");
-    assert_eq!(output.status, Some(3));
+    assert_eq!(output.status, ProcessExit::Exited(3));
     assert_eq!(output.stderr, b"rejected");
 }
 
@@ -127,7 +136,7 @@ fn timeout_includes_blocked_stdin_writes() {
 
     assert_matches!(
         run_bounded_process(&request),
-        Err(ProcessError::TimedOut(_))
+        Err(ProcessError::TimedOut { .. })
     );
     assert!(started.elapsed() < Duration::from_secs(2));
 }
@@ -144,7 +153,7 @@ fn sticky_cancellation_prevents_a_later_process_from_starting() {
         OsString::from("sticky-cancellation"),
         marker.as_os_str().to_owned(),
     ];
-    let cancellation = ProcessCancellation::for_test();
+    let cancellation = Cancellation::manual();
     cancellation.cancel();
 
     assert_matches!(
@@ -162,7 +171,7 @@ fn drains_child_output_while_writing_stdin() {
 
     let output = run_bounded_process(&request).expect("concurrent pipe transfer succeeds");
 
-    assert_eq!(output.status, Some(0));
+    assert_eq!(output.status, ProcessExit::Exited(0));
     assert!(
         output
             .stdout
@@ -175,7 +184,7 @@ fn drains_child_output_while_writing_stdin() {
 fn cancellation_terminates_blocked_io() {
     let mut request = request("sleep");
     request.stdin = vec![0_u8; 8 << 20];
-    let cancellation = ProcessCancellation::for_test();
+    let cancellation = Cancellation::manual();
     let trigger = cancellation.clone();
     let canceller = std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(50));
@@ -195,7 +204,7 @@ fn discard_policy_drains_without_capturing_or_limiting_output() {
 
     let output = run_bounded_process(&request).expect("discarded output succeeds");
 
-    assert_eq!(output.status, Some(0));
+    assert_eq!(output.status, ProcessExit::Exited(0));
     assert!(output.stdout.is_empty());
 }
 
@@ -220,7 +229,7 @@ fn failures_render_bounded_lossy_diagnostic_prefixes() {
     request.limits.stdout = (16 << 10).into();
     let error = run_bounded_process(&request).expect_err("output must exceed its limit");
     let rendered = error.to_string();
-    let ProcessError::OutputLimit(error) = error else {
+    let ProcessError::OutputLimit { failure: error, .. } = error else {
         unreachable!("expected output-limit error, got {rendered}");
     };
 
@@ -250,7 +259,7 @@ fn pins_the_child_to_the_requested_singleton_cpu() {
 
     assert_eq!(
         result.status,
-        Some(0),
+        ProcessExit::Exited(0),
         "affinity helper stderr: {}",
         String::from_utf8_lossy(&result.stderr)
     );
@@ -320,7 +329,7 @@ fn pins_threads_that_the_child_created_before_the_affinity_request() {
 }
 
 #[test]
-fn rejects_invalid_affinity_and_bounds_regular_files() {
+fn rejects_invalid_affinity_and_direct_regular_file_limits() {
     let mut invalid_affinity = request("success");
     invalid_affinity.affinity_cpu = Some(rustix::thread::CpuSet::MAX_CPU);
     assert_matches!(
@@ -328,32 +337,102 @@ fn rejects_invalid_affinity_and_bounds_regular_files() {
         Err(ProcessError::SetAffinity { .. })
     );
 
+    // A direct spawn could bound the program only after it already started,
+    // so a file limit requires the launcher and the request never starts.
     let directory = tempfile::tempdir().expect("temporary output directory");
-    let output = directory.path().join("bounded-output");
-    let mut bounded_file = request("file-overflow");
-    bounded_file.stdin = vec![b'\n'];
-    bounded_file.limits.stdin_bytes = 1;
-    bounded_file.limits.regular_file_bytes = Some(64);
-    bounded_file.environment.push((
+    let output = directory.path().join("unbounded-output");
+    let mut direct_file = request("file-overflow-immediate");
+    direct_file.limits.regular_file_bytes = Some(8 << 10);
+    direct_file.environment.push((
         OsString::from(OUTPUT_PATH_ENV),
         output.as_os_str().to_os_string(),
     ));
     assert_matches!(
-        run_bounded_process(&bounded_file),
-        Err(ProcessError::FileLimit(error)) if error.maximum == 64
+        run_bounded_process(&direct_file),
+        Err(ProcessError::FileLimitRequiresLauncher { .. })
     );
+    assert!(!output.exists(), "a rejected request must not start");
+}
+
+/// Regression: the file limit was applied with `prlimit` after `spawn`
+/// returned, so a program that writes at startup escaped it.
+#[test]
+fn file_limit_binds_a_program_that_writes_immediately() {
+    let directory = tempfile::tempdir().expect("temporary output directory");
+    let output = directory.path().join("bounded-output");
+    let mut immediate = measured("file-overflow-immediate");
+    immediate.limits.regular_file_bytes = Some(8 << 10);
+    immediate.environment.push((
+        OsString::from(OUTPUT_PATH_ENV),
+        output.as_os_str().to_os_string(),
+    ));
+    for _ in 0..8 {
+        assert_matches!(
+            run_bounded_process(&immediate),
+            Err(ProcessError::FileLimit { maximum, .. }) if maximum == 8 << 10
+        );
+        assert!(
+            std::fs::metadata(&output)
+                .expect("bounded output exists")
+                .len()
+                <= 8 << 10
+        );
+        std::fs::remove_file(&output).expect("reset bounded output");
+    }
+}
+
+/// Regression: a descendant that left the process group kept the inherited
+/// stdout open, so joining the reader blocked forever after the leader exited.
+#[test]
+fn escaped_pipe_holder_is_reported_after_leader_exit() {
+    let started = Instant::now();
+    let error = run_bounded_process(&request("escaped-holder-exit"))
+        .expect_err("an escaped pipe holder must be reported");
+    assert!(started.elapsed() < Duration::from_secs(5));
+    let ProcessError::PipesHeld(failure) = error else {
+        unreachable!("expected a held-pipe error, got {error}");
+    };
+    assert_eq!(failure.held_streams, ["stdout"]);
+    reap_escaped_holder(&failure.stdout);
+}
+
+/// Regression: after a timeout killed the group, an escaped pipe holder kept
+/// the supervisor blocked past its own deadline.
+#[test]
+fn escaped_pipe_holder_cannot_extend_a_timeout() {
+    let mut request = request("escaped-holder-sleep");
+    request.limits.timeout = Duration::from_millis(500);
+    let started = Instant::now();
+    let error = run_bounded_process(&request).expect_err("helper must time out");
     assert!(
-        std::fs::metadata(output)
-            .expect("bounded output exists")
-            .len()
-            <= 64
+        started.elapsed() < Duration::from_secs(5),
+        "timeout waited {:?} for an escaped pipe holder",
+        started.elapsed()
     );
+    let ProcessError::TimedOut { failure, .. } = error else {
+        unreachable!("expected a timeout, got {error}");
+    };
+    assert!(failure.held_streams.contains(&"stdout"));
+    assert!(failure.to_string().contains("still held its"));
+    reap_escaped_holder(&failure.stdout);
+}
+
+fn reap_escaped_holder(stdout: &[u8]) {
+    let pid = String::from_utf8_lossy(stdout)
+        .lines()
+        .find_map(|line| line.strip_prefix("grandchild-pid="))
+        .expect("grandchild pid")
+        .parse::<u32>()
+        .expect("numeric grandchild pid");
+    let pid = group::process_id(pid).expect("grandchild pid");
+    let killed = rustix::process::kill_process(pid, rustix::process::Signal::KILL);
+    assert!(matches!(killed, Ok(()) | Err(rustix::io::Errno::SRCH)));
 }
 
 #[test]
 fn captures_worker_panic_as_a_failed_process() {
     let output = run_bounded_process(&request("panic")).expect("panic is captured");
-    assert_eq!(output.status, Some(101));
+    assert_eq!(output.status, ProcessExit::Exited(101));
     assert!(String::from_utf8_lossy(&output.stderr).contains("process helper panic"));
 }
 
@@ -362,8 +441,8 @@ fn timeout_kills_the_entire_process_group() {
     let mut request = request("child-tree");
     request.limits.timeout = Duration::from_millis(100);
     let error = run_bounded_process(&request).expect_err("helper must time out");
-    assert_matches!(error, ProcessError::TimedOut(_));
-    let ProcessError::TimedOut(error) = error else {
+    assert_matches!(error, ProcessError::TimedOut { .. });
+    let ProcessError::TimedOut { failure: error, .. } = error else {
         unreachable!("timeout shape checked above");
     };
     let output = String::from_utf8_lossy(&error.stdout);
@@ -389,7 +468,7 @@ fn timeout_kills_the_entire_process_group() {
 fn leader_exit_closes_descendants_that_retain_pipe_handles() {
     let output = run_bounded_process(&request("leader-exit-with-descendant"))
         .expect("leader exit with inherited descendant pipes completes");
-    assert_eq!(output.status, Some(0));
+    assert_eq!(output.status, ProcessExit::Exited(0));
     let pid = String::from_utf8_lossy(&output.stdout)
         .lines()
         .find_map(|line| line.strip_prefix("grandchild-pid="))
@@ -423,13 +502,13 @@ fn managed_child_drop_kills_and_reaps_after_io_start() {
             .env_clear()
             .envs(environment.iter().map(|(key, value)| (key, value)));
     }
-    use std::os::unix::process::CommandExt as _;
-    command.process_group(0);
-    let child = command.spawn().expect("spawn managed helper");
-    let pid = child.id();
-    let mut managed = ManagedChild::new(child, request.program.clone());
+    let mut managed =
+        SupervisedChild::spawn_command(&mut command, request.program.clone()).expect("spawn");
+    let pid = managed.leader.id();
     managed.start_io(&request).expect("start managed IO");
+    let dropped = Instant::now();
     drop(managed);
+    assert!(dropped.elapsed() < Duration::from_secs(2));
 
     for _ in 0..100 {
         if !PathBuf::from(format!("/proc/{pid}")).exists() {
@@ -475,7 +554,7 @@ fn measured_peak_rss_excludes_the_supervisor_footprint() {
     std::hint::black_box(&supervisor);
 
     let idle = run_bounded_process(&measured("success")).expect("measured helper");
-    assert_eq!(idle.status, Some(0));
+    assert_eq!(idle.status, ProcessExit::Exited(0));
     assert!(String::from_utf8_lossy(&idle.stdout).contains("helper-success"));
     let idle_peak = idle.parent_observed_peak_rss_bytes.expect("measured peak");
     assert!(
@@ -500,13 +579,13 @@ fn measured_runs_report_the_program_status_affinity_and_file_limit() {
         run_bounded_process(&measured("nonzero"))
             .expect("nonzero")
             .status,
-        Some(7)
+        ProcessExit::Exited(7)
     );
     assert_eq!(
         run_bounded_process(&measured("signal"))
             .expect("signal")
             .status,
-        None
+        ProcessExit::Signaled(signal_hook::consts::signal::SIGTERM)
     );
 
     let allowed = rustix::thread::sched_getaffinity(None).expect("read parent affinity");
@@ -528,14 +607,22 @@ fn measured_runs_report_the_program_status_affinity_and_file_limit() {
     let mut bounded_file = measured("file-overflow");
     bounded_file.stdin = vec![b'\n'];
     bounded_file.limits.stdin_bytes = 1;
-    bounded_file.limits.regular_file_bytes = Some(64);
+    bounded_file.limits.regular_file_bytes = Some(8 << 10);
     bounded_file.environment.push((
         OsString::from(OUTPUT_PATH_ENV),
         output.as_os_str().to_os_string(),
     ));
     assert_matches!(
         run_bounded_process(&bounded_file),
-        Err(ProcessError::FileLimit(error)) if error.maximum == 64
+        Err(ProcessError::FileLimit { maximum, .. }) if maximum == 8 << 10
+    );
+
+    // The launcher writes its own report under the program's limit.
+    let mut below_report = measured("success");
+    below_report.limits.regular_file_bytes = Some(64);
+    assert_matches!(
+        run_bounded_process(&below_report),
+        Err(ProcessError::FileLimitBelowLauncherReport { minimum: 4096, .. })
     );
 
     let mut invalid_affinity = measured("success");
@@ -598,7 +685,39 @@ fn process_helper() {
                 .expect("read file limit barrier");
             assert_eq!(barrier, *b"\n");
             let path = std::env::var_os(OUTPUT_PATH_ENV).expect("output path");
-            std::fs::write(path, vec![0_u8; 1024]).expect("file limit terminates write");
+            std::fs::write(path, vec![0_u8; 64 << 10]).expect("file limit terminates write");
+        }
+        "file-overflow-immediate" => {
+            let path = std::env::var_os(OUTPUT_PATH_ENV).expect("output path");
+            std::fs::write(path, vec![0_u8; 64 << 10]).expect("file limit terminates write");
+        }
+        "escaped-holder-exit" | "escaped-holder-sleep" => {
+            let mut holder =
+                std::process::Command::new(std::env::current_exe().expect("helper executable"))
+                    .args([HELPER_TEST, "--exact", "--ignored", "--nocapture"])
+                    .env_clear()
+                    .env(HELPER_ENV, "setsid-grandchild")
+                    .stderr(Stdio::piped())
+                    .spawn()
+                    .expect("spawn escaping grandchild");
+            let mut escaped = String::new();
+            std::io::BufReader::new(holder.stderr.take().expect("grandchild stderr"))
+                .read_line(&mut escaped)
+                .expect("read escape marker");
+            assert!(escaped.ends_with("escaped\n"), "{escaped:?}");
+            println!("grandchild-pid={}", holder.id());
+            std::io::stdout().flush().expect("flush grandchild pid");
+            drop(holder);
+            if mode == "escaped-holder-sleep" {
+                std::thread::sleep(Duration::from_secs(30));
+            }
+        }
+        "setsid-grandchild" => {
+            // Leave the supervised session and process group, keeping the
+            // inherited stdout, then tell the leader through stderr.
+            rustix::process::setsid().expect("leave the supervised group");
+            eprintln!("escaped");
+            std::thread::sleep(Duration::from_secs(30));
         }
         "panic" => {
             std::env::var_os("STAB_BENCH_INTENTIONALLY_MISSING").expect("process helper panic");

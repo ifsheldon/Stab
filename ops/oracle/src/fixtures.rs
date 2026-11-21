@@ -14,12 +14,14 @@ mod id;
 mod outputs;
 mod paths;
 mod reverse_flow;
+mod row;
 mod statistical;
 mod two_sample;
 
 pub(crate) use id::FixtureId;
 use paths::{fixture_file, validate_fixture_path};
 use reverse_flow::core_time_reverse_flows_output;
+use row::{CoreFixture, FixtureRow, RawFixtureRow, RowPlan};
 
 const FIXTURE_ROOT: &str = "oracle/fixtures";
 
@@ -56,21 +58,6 @@ impl RunFilter {
             Self::Structural => row.comparator == FixtureComparator::Structural,
         }
     }
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-struct FixtureRow {
-    id: FixtureId,
-    upstream_source: String,
-    comparator: FixtureComparator,
-    command_shape: String,
-    argv: String,
-    stdin_path: String,
-    expected_stdout_path: String,
-    expected_status: i32,
-    expected_stderr_class: ExpectedStderrClass,
-    statistical_plan: String,
-    source_license_note: String,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
@@ -139,7 +126,7 @@ enum ExpectedStdoutPolicy {
     AllowMissing,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 struct FixtureManifest {
     rows: Vec<FixtureRow>,
 }
@@ -182,16 +169,18 @@ pub(crate) enum FixtureError {
         source: std::io::Error,
     },
 
-    #[error("{id} expected status {expected}, got {actual:?}")]
+    #[error("{id} expected {side} status {expected}, got {actual:?}")]
     StatusMismatch {
         id: FixtureId,
+        side: ProcessSide,
         expected: i32,
         actual: Option<i32>,
     },
 
-    #[error("{id} expected stderr class {expected}, got {actual:?}")]
+    #[error("{id} expected {side} stderr class {expected}, got {actual:?}")]
     StderrClassMismatch {
         id: FixtureId,
+        side: ProcessSide,
         expected: &'static str,
         actual: StderrClass,
     },
@@ -220,6 +209,24 @@ pub(crate) enum FixtureError {
     },
 }
 
+/// Which implementation produced an observed process shape.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ProcessSide {
+    /// Pinned Stim, through its CLI or a libstim helper.
+    Stim,
+    /// The Stab CLI or an in-process Stab core fixture.
+    Stab,
+}
+
+impl std::fmt::Display for ProcessSide {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Stim => "Stim",
+            Self::Stab => "Stab",
+        })
+    }
+}
+
 impl FixtureManifest {
     fn read(root: &RepoRoot) -> Result<Self, FixtureError> {
         let path = root.fixture_manifest();
@@ -231,11 +238,28 @@ impl FixtureManifest {
         Self::from_csv(&content)
     }
 
+    /// Parses every row's `argv` and `statistical_plan` into typed values, reporting every
+    /// malformed row at once.
     fn from_csv(content: &str) -> Result<Self, FixtureError> {
         let mut reader = csv::ReaderBuilder::new()
             .trim(csv::Trim::All)
             .from_reader(content.as_bytes());
-        let rows = reader.deserialize().collect::<Result<Vec<_>, _>>()?;
+        let raw_rows = reader
+            .deserialize::<RawFixtureRow>()
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut rows = Vec::with_capacity(raw_rows.len());
+        let mut violations = Vec::new();
+        for raw in raw_rows {
+            match FixtureRow::try_from(raw) {
+                Ok(row) => rows.push(row),
+                Err(row_violations) => violations.extend(row_violations),
+            }
+        }
+        if !violations.is_empty() {
+            return Err(FixtureError::Validation(
+                violations.join("\n").into_boxed_str(),
+            ));
+        }
         Ok(Self { rows })
     }
 
@@ -254,22 +278,6 @@ impl FixtureManifest {
             return Err(FixtureError::Validation(violation.into_boxed_str()));
         }
         for row in &self.rows {
-            for (field, value) in [
-                ("upstream_source", &row.upstream_source),
-                ("command_shape", &row.command_shape),
-                ("argv", &row.argv),
-                ("source_license_note", &row.source_license_note),
-            ] {
-                if value.is_empty() {
-                    violations.push(format!("{} has empty {field}", row.id));
-                }
-            }
-            if row.argv_tokens().is_empty() {
-                violations.push(format!("{} has no argv tokens", row.id));
-            }
-            if row.argv.split('|').any(str::is_empty) {
-                violations.push(format!("{} has an empty argv token", row.id));
-            }
             outputs::validate_row_tokens(
                 row,
                 &fixture_root,
@@ -281,40 +289,6 @@ impl FixtureManifest {
                 && row.expected_stdout_path.is_empty()
             {
                 violations.push(format!("{} exact fixture has no expected stdout", row.id));
-            }
-            if matches!(
-                row.comparator,
-                FixtureComparator::Statistical
-                    | FixtureComparator::Structural
-                    | FixtureComparator::TwoSample
-            ) && row.statistical_plan.is_empty()
-            {
-                violations.push(format!(
-                    "{} comparator needs structural or statistical plan text",
-                    row.id
-                ));
-            }
-            if row.comparator == FixtureComparator::Statistical {
-                let argv_tokens = row.argv_tokens();
-                if let Some(reason) =
-                    statistical::validate_statistical_plan(&row.statistical_plan, &argv_tokens)
-                {
-                    violations.push(format!("{} invalid statistical plan: {reason}", row.id));
-                }
-            }
-            if row.comparator == FixtureComparator::TwoSample {
-                if is_core_fixture(row) {
-                    violations.push(format!(
-                        "{} two-sample rows must run the Stim and Stab binaries",
-                        row.id
-                    ));
-                }
-                let argv_tokens = row.argv_tokens();
-                if let Some(reason) =
-                    two_sample::validate_two_sample_plan(&row.statistical_plan, &argv_tokens)
-                {
-                    violations.push(format!("{} invalid two-sample plan: {reason}", row.id));
-                }
             }
             validate_vendor_source(root, row, &mut violations);
             for (field, relative, must_exist) in [
@@ -392,14 +366,6 @@ impl FixtureManifest {
 }
 
 impl FixtureRow {
-    fn argv_tokens(&self) -> Vec<String> {
-        self.argv
-            .split('|')
-            .filter(|token| !token.is_empty())
-            .map(ToOwned::to_owned)
-            .collect()
-    }
-
     fn stdin(&self, root: &RepoRoot) -> Result<Vec<u8>, FixtureError> {
         if self.stdin_path.is_empty() {
             return Ok(Vec::new());
@@ -430,22 +396,20 @@ pub(crate) fn record_fixtures(
             ExpectedStdoutPolicy::AllowMissing
         },
     )?;
-    let stim_binary = crate::ensure_stim_binary(root, rebuild_stim)?;
-    let mut reverse_flow_helper = None;
+    let mut stim = PinnedStim::new(root, rebuild_stim);
     for row in manifest.rows.iter().filter(|row| is_recordable(row)) {
+        crate::check_cancelled()?;
         let stdin = row.stdin(root)?;
-        let command = outputs::prepare_command(root, row, "stim-record")?;
-        let output = if reverse_flow::is_reverse_flow_fixture(row) {
-            let helper = match &reverse_flow_helper {
-                Some(path) => path,
-                None => reverse_flow_helper
-                    .insert(crate::ensure_stim_reverse_flow_helper(root, rebuild_stim)?),
-            };
-            reverse_flow::run_pinned_stim_reverse_flow(root, row, &stdin, helper)?
-        } else {
-            run_prepared_fixture_process(root, &stim_binary, &command, &stdin)?
+        let (output, command) = match row.core() {
+            Some(core) => (stim.run_core(row, core, &stdin)?, None),
+            None => {
+                let command = outputs::prepare_command(root, row, "stim-record")?;
+                let output = run_prepared_fixture_process(root, stim.binary()?, &command, &stdin)?;
+                (output, Some(command))
+            }
         };
-        check_expected_process_shape(row, &output)?;
+        check_expected_process_shape(row, ProcessSide::Stim, &output)?;
+        let fixture_outputs = command.as_ref().map_or(&[][..], |command| &command.outputs);
         let expected_path = row.expected_stdout_file(root)?;
         if check_clean {
             let expected = hex_payload::read(root, &row.expected_stdout_path)?;
@@ -456,21 +420,93 @@ pub(crate) fn record_fixtures(
                 }
                 .into());
             }
-            outputs::compare_expected_outputs(row, root, &command.outputs)?;
+            outputs::compare_expected_outputs(row, root, fixture_outputs)?;
             println!("[stab-oracle] CLEAN {}", row.id);
         } else {
             hex_payload::write(root, &row.expected_stdout_path, &output.stdout.bytes)?;
-            outputs::record_outputs(row, root, &command.outputs)?;
+            outputs::record_outputs(row, root, fixture_outputs)?;
             println!("[stab-oracle] RECORDED {}", row.id);
         }
     }
     Ok(())
 }
 
+/// Every exact-output row with a stored golden is recorded from, and checked against, pinned
+/// Stim: CLI rows through the `stim` binary and core rows through a libstim helper.
 fn is_recordable(row: &FixtureRow) -> bool {
-    row.comparator == FixtureComparator::ExactOutput
-        && (!is_core_fixture(row) || reverse_flow::is_reverse_flow_fixture(row))
-        && !row.expected_stdout_path.is_empty()
+    row.comparator == FixtureComparator::ExactOutput && !row.expected_stdout_path.is_empty()
+}
+
+/// Lazily built pinned Stim programs for one record or run pass.
+struct PinnedStim<'a> {
+    root: &'a RepoRoot,
+    rebuild: bool,
+    binary: Option<PathBuf>,
+    reverse_flow: Option<PathBuf>,
+    parse_print: Option<PathBuf>,
+}
+
+impl<'a> PinnedStim<'a> {
+    const fn new(root: &'a RepoRoot, rebuild: bool) -> Self {
+        Self {
+            root,
+            rebuild,
+            binary: None,
+            reverse_flow: None,
+            parse_print: None,
+        }
+    }
+
+    fn binary(&mut self) -> Result<&Path, OracleError> {
+        if self.binary.is_none() {
+            self.binary = Some(crate::ensure_stim_binary(self.root, self.rebuild)?);
+        }
+        self.binary
+            .as_deref()
+            .ok_or_else(|| missing_program("pinned Stim"))
+    }
+
+    /// Runs the pinned libstim equivalent of a core fixture.
+    fn run_core(
+        &mut self,
+        row: &FixtureRow,
+        core: &CoreFixture,
+        stdin: &[u8],
+    ) -> Result<crate::ProcessOutput, OracleError> {
+        let (root, rebuild) = (self.root, self.rebuild);
+        match core {
+            CoreFixture::TimeReverseFlows { case_id } => {
+                if self.reverse_flow.is_none() {
+                    self.reverse_flow =
+                        Some(crate::ensure_stim_reverse_flow_helper(root, rebuild)?);
+                }
+                let helper = self
+                    .reverse_flow
+                    .as_deref()
+                    .ok_or_else(|| missing_program("reverse-flow helper"))?;
+                reverse_flow::run_pinned_stim_reverse_flow(root, row, case_id, stdin, helper)
+            }
+            CoreFixture::CircuitParsePrint | CoreFixture::DemParsePrint => {
+                if self.parse_print.is_none() {
+                    self.parse_print = Some(crate::ensure_stim_parse_print_helper(root, rebuild)?);
+                }
+                let helper = self
+                    .parse_print
+                    .as_deref()
+                    .ok_or_else(|| missing_program("parse-print helper"))?;
+                let mode = if *core == CoreFixture::DemParsePrint {
+                    "dem"
+                } else {
+                    "circuit"
+                };
+                crate::run_process(helper, [mode], stdin, &root.path)
+            }
+        }
+    }
+}
+
+fn missing_program(label: &str) -> OracleError {
+    OracleError::InvalidRunSelection(format!("internal error: {label} was not prepared"))
 }
 
 /// Runs every manifest fixture, optionally restricted to one comparator.
@@ -480,17 +516,18 @@ pub(crate) fn run_fixtures(
     rebuild_stim: bool,
 ) -> Result<(), OracleError> {
     let manifest = load_manifest(root)?;
-    let mut stim_binary = None;
+    let mut stim = PinnedStim::new(root, rebuild_stim);
     let mut stab_binary = None;
     for row in &manifest.rows {
         if filter.is_some_and(|filter| !filter.matches(row)) {
             continue;
         }
-        let stab = if is_core_fixture(row) {
-            run_core_fixture(root, row)?
+        crate::check_cancelled()?;
+        let stab = if let Some(core) = row.core() {
+            run_core_fixture(root, row, core)?
         } else {
             let stdin = row.stdin(root)?;
-            let stim_binary_path = cached_stim_binary(root, rebuild_stim, &mut stim_binary)?;
+            let stim_binary_path = stim.binary()?.to_path_buf();
             let stab_binary_path = cached_stab_binary(root, &mut stab_binary)?;
             let stim_command = outputs::prepare_command(root, row, "stim")?;
             let stab_command = outputs::prepare_command(root, row, "stab")?;
@@ -527,19 +564,6 @@ fn run_prepared_fixture_process(
     )
 }
 
-fn cached_stim_binary(
-    root: &RepoRoot,
-    rebuild_stim: bool,
-    cache: &mut Option<PathBuf>,
-) -> Result<PathBuf, OracleError> {
-    if let Some(path) = cache {
-        return Ok(path.clone());
-    }
-    let path = crate::ensure_stim_binary(root, rebuild_stim)?;
-    *cache = Some(path.clone());
-    Ok(path)
-}
-
 fn cached_stab_binary(
     root: &RepoRoot,
     cache: &mut Option<PathBuf>,
@@ -552,29 +576,18 @@ fn cached_stab_binary(
     Ok(path)
 }
 
-fn is_core_fixture(row: &FixtureRow) -> bool {
-    row.argv_tokens().first().is_some_and(|token| {
-        matches!(
-            token.as_str(),
-            "core-parse-print"
-                | "core-circuit-parse-print"
-                | "core-dem-parse-print"
-                | "core-time-reverse-flows"
-        )
-    })
-}
-
 fn run_core_fixture(
     root: &RepoRoot,
     row: &FixtureRow,
+    core: &CoreFixture,
 ) -> Result<crate::ProcessOutput, FixtureError> {
     let stdin = row.stdin(root)?;
-    let output = core_parse_print_output(row, &stdin)?;
-    check_expected_process_shape(row, &output)?;
+    let output = core_parse_print_output(row, core, &stdin)?;
+    check_expected_process_shape(row, ProcessSide::Stab, &output)?;
     match row.comparator {
         FixtureComparator::ExactOutput => compare_expected_stdout(row, root, &output)?,
         FixtureComparator::Structural => {
-            compare_core_parse_print_structure(row, &stdin, &output.stdout.bytes)?;
+            compare_core_parse_print_structure(row, core, &stdin, &output.stdout.bytes)?;
         }
         FixtureComparator::HelpHealth
         | FixtureComparator::Statistical
@@ -592,40 +605,21 @@ fn run_core_fixture(
 
 fn core_parse_print_output(
     row: &FixtureRow,
+    core: &CoreFixture,
     stdin: &[u8],
 ) -> Result<crate::ProcessOutput, FixtureError> {
-    if !is_core_fixture(row) {
-        return Err(FixtureError::CoreFixtureFailed {
-            id: row.id.clone(),
-            reason: format!("unsupported core fixture argv {}", row.argv),
-        });
-    }
-    let tokens = row.argv_tokens();
-    let Some(kind) = tokens.first().map(String::as_str) else {
-        return Err(FixtureError::CoreFixtureFailed {
-            id: row.id.clone(),
-            reason: "core fixture has no command token".to_string(),
-        });
-    };
     let input = fixture_utf8(row, "stdin", stdin)?;
-    if kind == "core-time-reverse-flows" {
-        return core_time_reverse_flows_output(row, input, &tokens);
-    }
-    if kind == "core-dem-parse-print" {
-        let dem = parse_core_dem(row, "stdin", input)?;
-        return Ok(crate::ProcessOutput {
-            status: Some(0),
-            stdout: crate::CapturedOutput {
-                bytes: dem.to_dem_string().into_bytes(),
-            },
-            stderr: crate::CapturedOutput { bytes: Vec::new() },
-        });
-    }
-    let circuit = parse_core_circuit(row, "stdin", input)?;
+    let stdout = match core {
+        CoreFixture::TimeReverseFlows { case_id } => {
+            return core_time_reverse_flows_output(row, input, case_id);
+        }
+        CoreFixture::DemParsePrint => parse_core_dem(row, "stdin", input)?.to_dem_string(),
+        CoreFixture::CircuitParsePrint => parse_core_circuit(row, "stdin", input)?.to_stim_string(),
+    };
     Ok(crate::ProcessOutput {
         status: Some(0),
         stdout: crate::CapturedOutput {
-            bytes: circuit.to_stim_string().into_bytes(),
+            bytes: stdout.into_bytes(),
         },
         stderr: crate::CapturedOutput { bytes: Vec::new() },
     })
@@ -649,31 +643,31 @@ fn compare_expected_stdout(
 
 fn compare_core_parse_print_structure(
     row: &FixtureRow,
+    core: &CoreFixture,
     stdin: &[u8],
     stdout: &[u8],
 ) -> Result<(), FixtureError> {
-    if row.argv == "core-dem-parse-print" {
-        let original = parse_core_dem(row, "stdin", fixture_utf8(row, "stdin", stdin)?)?;
-        let reparsed = parse_core_dem(row, "printed stdout", fixture_utf8(row, "stdout", stdout)?)?;
-        if original != reparsed {
-            return Err(FixtureError::ComparatorMismatch {
-                id: row.id.clone(),
-                comparator: row.comparator.as_str(),
-                reason: "parse-print-parse changed DEM semantics".to_string(),
-            });
+    let input = fixture_utf8(row, "stdin", stdin)?;
+    let printed = fixture_utf8(row, "stdout", stdout)?;
+    let changed = match core {
+        CoreFixture::DemParsePrint => (parse_core_dem(row, "stdin", input)?
+            != parse_core_dem(row, "printed stdout", printed)?)
+        .then_some("parse-print-parse changed DEM semantics"),
+        CoreFixture::CircuitParsePrint => (parse_core_circuit(row, "stdin", input)?
+            != parse_core_circuit(row, "printed stdout", printed)?)
+        .then_some("parse-print-parse changed circuit semantics"),
+        CoreFixture::TimeReverseFlows { .. } => {
+            Some("reverse-flow fixtures have no structural comparison")
         }
-        return Ok(());
-    }
-    let original = parse_core_circuit(row, "stdin", fixture_utf8(row, "stdin", stdin)?)?;
-    let reparsed = parse_core_circuit(row, "printed stdout", fixture_utf8(row, "stdout", stdout)?)?;
-    if original != reparsed {
-        return Err(FixtureError::ComparatorMismatch {
+    };
+    match changed {
+        Some(reason) => Err(FixtureError::ComparatorMismatch {
             id: row.id.clone(),
             comparator: row.comparator.as_str(),
-            reason: "parse-print-parse changed circuit semantics".to_string(),
-        });
+            reason: reason.to_string(),
+        }),
+        None => Ok(()),
     }
-    Ok(())
 }
 
 fn parse_core_circuit(row: &FixtureRow, label: &str, input: &str) -> Result<Circuit, FixtureError> {
@@ -722,11 +716,13 @@ fn load_manifest_with_expected_stdout_policy(
 
 fn check_expected_process_shape(
     row: &FixtureRow,
+    side: ProcessSide,
     output: &crate::ProcessOutput,
 ) -> Result<(), FixtureError> {
     if output.status != Some(row.expected_status) {
         return Err(FixtureError::StatusMismatch {
             id: row.id.clone(),
+            side,
             expected: row.expected_status,
             actual: output.status,
         });
@@ -735,6 +731,7 @@ fn check_expected_process_shape(
     if !row.expected_stderr_class.matches(actual_stderr_class) {
         return Err(FixtureError::StderrClassMismatch {
             id: row.id.clone(),
+            side,
             expected: row.expected_stderr_class.as_str(),
             actual: actual_stderr_class,
         });
@@ -742,46 +739,38 @@ fn check_expected_process_shape(
     Ok(())
 }
 
+/// Checks both processes against the row's declared status and stderr class, then applies the
+/// row's comparator.
 fn compare_fixture(
     row: &FixtureRow,
     stim: &crate::ProcessOutput,
     stab: &crate::ProcessOutput,
 ) -> Result<(), FixtureError> {
-    check_expected_process_shape(row, stab)?;
-    if stim.status != Some(row.expected_status) {
-        return Err(FixtureError::StatusMismatch {
-            id: row.id.clone(),
-            expected: row.expected_status,
-            actual: stim.status,
-        });
-    }
+    check_expected_process_shape(row, ProcessSide::Stab, stab)?;
+    check_expected_process_shape(row, ProcessSide::Stim, stim)?;
 
-    let reason = match row.comparator {
-        FixtureComparator::ExactOutput => compare_exact(stim, stab),
-        FixtureComparator::HelpHealth => compare_help_health(stim, stab),
-        FixtureComparator::Statistical => match statistical::source_for_plan(&row.statistical_plan)
-        {
-            Ok(statistical::StatisticalSource::Stdout) => {
-                statistical::compare_statistical_plan(&row.statistical_plan, &stim.stdout.bytes)
-                    .map(|reason| format!("Stim stdout: {reason}"))
-                    .or_else(|| {
-                        statistical::compare_statistical_plan(
-                            &row.statistical_plan,
-                            &stab.stdout.bytes,
-                        )
+    let reason = match (row.comparator, &row.plan) {
+        (FixtureComparator::ExactOutput, _) => compare_exact(stim, stab),
+        (FixtureComparator::HelpHealth, _) => compare_help_health(stim, stab),
+        (FixtureComparator::Statistical, RowPlan::Statistical(plan)) => match plan.source() {
+            statistical::StatisticalSource::Stdout => plan
+                .compare(&stim.stdout.bytes)
+                .map(|reason| format!("Stim stdout: {reason}"))
+                .or_else(|| {
+                    plan.compare(&stab.stdout.bytes)
                         .map(|reason| format!("Stab stdout: {reason}"))
-                    })
-            }
-            Ok(statistical::StatisticalSource::FixtureOutput) => compare_exact(stim, stab),
-            Err(reason) => Some(reason),
+                }),
+            statistical::StatisticalSource::FixtureOutput => compare_exact(stim, stab),
         },
-        FixtureComparator::TwoSample => two_sample::compare_two_sample_plan(
-            &row.statistical_plan,
-            &stim.stdout.bytes,
-            &stab.stdout.bytes,
-        ),
-        FixtureComparator::Structural => Some(format!(
+        (FixtureComparator::TwoSample, RowPlan::TwoSample(plan)) => {
+            two_sample::compare_two_sample_plan(plan, &stim.stdout.bytes, &stab.stdout.bytes)
+        }
+        (FixtureComparator::Structural, _) => Some(format!(
             "{} comparator runs only for in-process core fixtures",
+            row.comparator.as_str()
+        )),
+        (FixtureComparator::Statistical | FixtureComparator::TwoSample, _) => Some(format!(
+            "internal error: {} row has no parsed plan",
             row.comparator.as_str()
         )),
     };

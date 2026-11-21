@@ -110,16 +110,23 @@ impl CargoSandbox {
         S: AsRef<OsStr>,
     {
         self.revalidate()?;
+        let cargo_args = arguments_with_manifest(args, &self.manifest);
+        let label = cargo_args.first().map_or_else(
+            || "cargo".to_string(),
+            |subcommand| format!("cargo {}", subcommand.to_string_lossy()),
+        );
         let mut helper_args = self.helper_arguments();
         helper_args.push(OsString::from("--"));
-        helper_args.extend(arguments_with_manifest(args, &self.manifest));
+        helper_args.extend(cargo_args);
         let result = process::run(
             root,
-            self.launcher.path().as_os_str(),
-            &helper_args,
-            &[],
-            timeout,
-            output_limit,
+            &process::Invocation::new(
+                process::Program::Retained(&self.launcher),
+                &helper_args,
+                timeout,
+                output_limit,
+            )
+            .label(label),
         );
         self.revalidate()?;
         result

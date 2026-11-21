@@ -1,0 +1,18 @@
+[package]
+name = "stab-confined-fs"
+version.workspace = true
+edition.workspace = true
+description = "No-follow descriptor-walked file primitives shared by Stab's operational tools."
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rustix = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

@@ -1,5 +1,3 @@
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -7,30 +5,17 @@ use crate::ReleaseError;
 
 const SLEEP_SLICE: Duration = Duration::from_millis(50);
 
+/// The release tool's view of the shared sticky SIGINT/SIGTERM flag.
 #[derive(Clone, Debug)]
 pub(crate) struct ReleaseCancellation {
-    cancelled: Arc<AtomicBool>,
+    inner: stab_process::Cancellation,
 }
 
 impl ReleaseCancellation {
     pub(crate) fn for_signals() -> Result<Self, ReleaseError> {
-        static CANCELLED: OnceLock<Arc<AtomicBool>> = OnceLock::new();
-        static INSTALLED: OnceLock<Result<(), String>> = OnceLock::new();
-        let cancelled = Arc::clone(CANCELLED.get_or_init(|| Arc::new(AtomicBool::new(false))));
-        let installed = INSTALLED.get_or_init(|| {
-            for signal in [
-                signal_hook::consts::signal::SIGINT,
-                signal_hook::consts::signal::SIGTERM,
-            ] {
-                signal_hook::flag::register(signal, Arc::clone(&cancelled))
-                    .map_err(|source| source.to_string())?;
-            }
-            Ok(())
-        });
-        if let Err(reason) = installed {
-            return Err(ReleaseError::CommandSignalHandlers(reason.clone()));
-        }
-        Ok(Self { cancelled })
+        stab_process::Cancellation::for_signals()
+            .map(|inner| Self { inner })
+            .map_err(ReleaseError::CommandSignalHandlers)
     }
 
     pub(crate) fn check(&self, operation: &str) -> Result<(), ReleaseError> {
@@ -44,7 +29,7 @@ impl ReleaseCancellation {
     }
 
     pub(crate) fn is_cancelled(&self) -> bool {
-        self.cancelled.load(Ordering::Acquire)
+        self.inner.is_cancelled()
     }
 
     pub(crate) fn sleep(&self, duration: Duration, operation: &str) -> Result<(), ReleaseError> {
@@ -59,13 +44,13 @@ impl ReleaseCancellation {
     #[cfg(test)]
     pub(crate) fn for_test() -> Self {
         Self {
-            cancelled: Arc::new(AtomicBool::new(false)),
+            inner: stab_process::Cancellation::manual(),
         }
     }
 
     #[cfg(test)]
     pub(crate) fn cancel(&self) {
-        self.cancelled.store(true, Ordering::Release);
+        self.inner.cancel();
     }
 }
 

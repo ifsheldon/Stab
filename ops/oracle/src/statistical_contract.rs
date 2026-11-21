@@ -1,98 +1,59 @@
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct AcceptedCountRange {
-    minimum: u64,
-    maximum: u64,
+//! Count tests shared by the one-sample and two-sample fixture comparators.
+
+/// A one-sample tolerance: `count / shots` must lie within `allowed_delta` of
+/// `expected_probability`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct CountTolerance {
+    shots: u64,
+    expected_probability: f64,
+    allowed_delta: f64,
 }
 
-impl AcceptedCountRange {
+impl CountTolerance {
+    /// Returns `None` for zero shots or a non-finite or negative tolerance.
     pub(crate) fn try_new(
         shots: u64,
         expected_probability: f64,
         allowed_delta: f64,
     ) -> Option<Self> {
-        let (lower_rejected, upper_rejected) =
-            rejection_boundaries(shots, expected_probability, allowed_delta);
-        let minimum = match lower_rejected {
-            Some(value) => value.checked_add(1)?,
-            None => 0,
-        };
-        let maximum = match upper_rejected {
-            Some(value) => value.checked_sub(1)?,
-            None => shots,
-        };
-        (minimum <= maximum && maximum <= shots).then_some(Self { minimum, maximum })
+        (shots > 0
+            && expected_probability.is_finite()
+            && allowed_delta.is_finite()
+            && allowed_delta >= 0.0)
+            .then_some(Self {
+                shots,
+                expected_probability,
+                allowed_delta,
+            })
     }
 
-    pub(crate) const fn minimum(self) -> u64 {
-        self.minimum
+    pub(crate) fn accepts(self, count: u64) -> bool {
+        count <= self.shots
+            && (count as f64 / self.shots as f64 - self.expected_probability).abs()
+                <= self.allowed_delta
     }
 
-    pub(crate) const fn maximum(self) -> u64 {
-        self.maximum
-    }
-
-    pub(crate) const fn contains(self, count: u64) -> bool {
-        self.minimum <= count && count <= self.maximum
+    /// The accepted counts for diagnostics, as `expected ± delta` in counts.
+    pub(crate) fn describe(self) -> String {
+        let shots = self.shots as f64;
+        format!(
+            "accepted count {:.1} +/- {:.1} of {} (p={:.6})",
+            self.expected_probability * shots,
+            self.allowed_delta * shots,
+            self.shots,
+            self.expected_probability
+        )
     }
 }
 
-pub(crate) fn count_is_accepted(
-    count: u64,
-    shots: u64,
-    expected_probability: f64,
-    allowed_delta: f64,
-) -> bool {
-    if shots == 0 || count > shots {
-        return false;
-    }
-    let observed = count as f64 / shots as f64;
-    (observed - expected_probability).abs() <= allowed_delta
+/// Mills-ratio upper bound on the two-sided standard normal tail beyond `sigma`, used as the
+/// per-test false-positive rate when a plan's Bonferroni budget is validated.
+pub(crate) fn two_sided_normal_tail_bound(sigma: f64) -> f64 {
+    (std::f64::consts::FRAC_2_SQRT_PI / std::f64::consts::SQRT_2) * (-0.5 * sigma * sigma).exp()
+        / sigma
 }
 
-pub(crate) fn rejection_boundaries(
-    shots: u64,
-    expected_probability: f64,
-    allowed_delta: f64,
-) -> (Option<u64>, Option<u64>) {
-    if shots == 0
-        || !expected_probability.is_finite()
-        || !allowed_delta.is_finite()
-        || allowed_delta < 0.0
-    {
-        return (None, None);
-    }
-    let rejected = |count| !count_is_accepted(count, shots, expected_probability, allowed_delta);
-
-    let lower_max = rejected(0).then(|| {
-        let mut low = 0;
-        let mut high = shots;
-        while low < high {
-            let middle = low + (high - low).div_ceil(2);
-            if rejected(middle) && middle as f64 / shots as f64 <= expected_probability {
-                low = middle;
-            } else {
-                high = middle - 1;
-            }
-        }
-        low
-    });
-    let upper_min = rejected(shots).then(|| {
-        let mut low = 0;
-        let mut high = shots;
-        while low < high {
-            let middle = low + (high - low) / 2;
-            if rejected(middle) && middle as f64 / shots as f64 >= expected_probability {
-                high = middle;
-            } else {
-                low = middle + 1;
-            }
-        }
-        low
-    });
-    (lower_max, upper_min)
-}
-
-/// Outcome of a pooled two-proportion z-test between two equal-size samples.
+/// Outcome of comparing two equal-size samples' hit counts.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum TwoProportionOutcome {
     /// Both samples observed the same count, including the zero-variance case where both are
@@ -100,11 +61,27 @@ pub(crate) enum TwoProportionOutcome {
     Identical,
     /// One sample is constantly 0 and the other constantly 1, which no sigma tolerance excuses.
     DeterministicDisagreement,
-    /// The counts differ and the pooled standard error is positive.
+    /// The counts differ and neither is constant: the pooled two-proportion z score.
     Scored { z: f64 },
+    /// Exactly one sample is constant (count 0 or `shots`), where the pooled z score has little
+    /// power: the two-sided p-value of Fisher's exact conditional test.
+    Exact { p_value: f64 },
 }
 
-/// Scores `first` and `second` hits, each out of `shots`, with the pooled two-proportion z-test.
+impl TwoProportionOutcome {
+    /// Whether the outcome rejects equality at `sigma`, whose per-test false-positive rate is
+    /// `per_test_alpha` (the bound the plan's budget was validated against).
+    pub(crate) fn rejects(self, sigma: f64, per_test_alpha: f64) -> bool {
+        match self {
+            Self::Identical => false,
+            Self::DeterministicDisagreement => true,
+            Self::Scored { z } => z.abs() > sigma,
+            Self::Exact { p_value } => p_value < per_test_alpha,
+        }
+    }
+}
+
+/// Compares `first` and `second` hits, each out of `shots`.
 ///
 /// Returns `None` when `shots` is zero or either count exceeds `shots`.
 pub(crate) fn two_proportion_outcome(
@@ -121,6 +98,17 @@ pub(crate) fn two_proportion_outcome(
     if first.min(second) == 0 && first.max(second) == shots {
         return Some(TwoProportionOutcome::DeterministicDisagreement);
     }
+    if first.min(second) == 0 {
+        return Some(TwoProportionOutcome::Exact {
+            p_value: one_side_constant_p_value(first.max(second), shots),
+        });
+    }
+    if first.max(second) == shots {
+        // Count misses instead: the side at `shots` never misses.
+        return Some(TwoProportionOutcome::Exact {
+            p_value: one_side_constant_p_value(shots - first.min(second), shots),
+        });
+    }
     let shots = shots as f64;
     let pooled = (first as f64 + second as f64) / (2.0 * shots);
     let standard_error = (pooled * (1.0 - pooled) * 2.0 / shots).sqrt();
@@ -128,23 +116,42 @@ pub(crate) fn two_proportion_outcome(
     Some(TwoProportionOutcome::Scored { z })
 }
 
+/// Two-sided Fisher exact p-value when one of two `shots`-size samples has 0 events and the other
+/// has `events` (`0 < events < shots`).
+///
+/// Conditioned on the `events` total, the first sample's count is hypergeometric, and with equal
+/// sample sizes that distribution is symmetric, so the two-sided p-value is twice
+/// `P(X = 0) = C(shots, events) / C(2 shots, events) = prod_{i < events} (shots - i) / (2 shots - i)`,
+/// accumulated in log space.
+fn one_side_constant_p_value(events: u64, shots: u64) -> f64 {
+    let shots = shots as f64;
+    let mut log_probability = 0.0f64;
+    let mut index = 0.0f64;
+    let mut remaining = events;
+    while remaining > 0 {
+        log_probability += ((shots - index) / (2.0 * shots - index)).ln();
+        index += 1.0;
+        remaining -= 1;
+    }
+    (2.0 * log_probability.exp()).min(1.0)
+}
+
 #[cfg(test)]
 mod tests {
     use std::assert_matches;
 
-    use super::{
-        AcceptedCountRange, TwoProportionOutcome, rejection_boundaries, two_proportion_outcome,
-    };
+    use super::{CountTolerance, TwoProportionOutcome, two_proportion_outcome};
 
     #[test]
-    fn accepted_count_range_uses_exact_integer_boundaries() {
-        let range = AcceptedCountRange::try_new(100, 0.25, 0.05).expect("accepted range");
+    fn count_tolerance_accepts_exactly_the_counts_within_the_delta() {
+        let tolerance = CountTolerance::try_new(100, 0.25, 0.05).expect("tolerance");
 
-        assert_eq!(rejection_boundaries(100, 0.25, 0.05), (Some(19), Some(31)));
-        assert_eq!(range.minimum(), 20);
-        assert_eq!(range.maximum(), 30);
-        assert!(range.contains(range.minimum()));
-        assert!(range.contains(range.maximum()));
+        assert!(!tolerance.accepts(19));
+        assert!(tolerance.accepts(20));
+        assert!(tolerance.accepts(30));
+        assert!(!tolerance.accepts(31));
+        assert!(!tolerance.accepts(101));
+        assert_eq!(CountTolerance::try_new(0, 0.25, 0.05), None);
     }
 
     #[test]
@@ -169,5 +176,36 @@ mod tests {
         );
         assert_eq!(two_proportion_outcome(21, 0, 20), None);
         assert_eq!(two_proportion_outcome(0, 0, 0), None);
+    }
+
+    #[test]
+    fn one_constant_side_uses_the_exact_conditional_test() {
+        // 6 sigma two-sided normal tail bound, the per-test alpha of a 6-sigma plan.
+        let alpha = super::two_sided_normal_tail_bound(6.0);
+        let p_value = |first, second| {
+            let outcome = two_proportion_outcome(first, second, 20_000);
+            let Some(TwoProportionOutcome::Exact { p_value }) = outcome else {
+                unreachable!("expected an exact outcome, got {outcome:?}");
+            };
+            p_value
+        };
+
+        // The pooled z score is about sqrt(k), so it accepted up to ~36 events against none.
+        // Conditionally, P = 2 * prod (n - i) / (2n - i) ~= 2^(1 - k).
+        assert!((p_value(0, 3) - 0.25).abs() < 1e-3);
+        assert!(p_value(0, 35) < alpha);
+        assert!(p_value(31, 0) < alpha);
+        assert!(p_value(0, 28) > alpha);
+        // The constant-at-shots side is tested through its misses.
+        assert!(p_value(20_000, 19_965) < alpha);
+        assert!(p_value(19_997, 20_000) > alpha);
+        assert!(
+            two_proportion_outcome(0, 3, 20_000)
+                .is_some_and(|outcome| !outcome.rejects(6.0, alpha))
+        );
+        assert!(
+            two_proportion_outcome(0, 35, 20_000)
+                .is_some_and(|outcome| outcome.rejects(6.0, alpha))
+        );
     }
 }
