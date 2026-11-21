@@ -216,10 +216,7 @@ mod tests {
             panic!("one test workflow document");
         };
         let root = document.as_hash().expect("test workflow mapping");
-        let mut report = WorkflowActionReport {
-            action_use_count: 0,
-            violations: Vec::new(),
-        };
+        let mut report = WorkflowActionReport::default();
         super::inspect(Path::new(RELEASE_WORKFLOW_PATH), root, &mut report);
         report
     }
@@ -240,10 +237,7 @@ mod tests {
 
     #[test]
     fn production_release_workflow_path_is_required() {
-        let mut report = WorkflowActionReport {
-            action_use_count: 0,
-            violations: Vec::new(),
-        };
+        let mut report = WorkflowActionReport::default();
         inspect_required_workflow_paths(&[PathBuf::from(RELEASE_WORKFLOW_PATH)], &mut report);
         assert!(report.violations.is_empty());
 
@@ -251,10 +245,7 @@ mod tests {
             Vec::new(),
             vec![PathBuf::from(".github/workflows/renamed-release.yml")],
         ] {
-            let mut report = WorkflowActionReport {
-                action_use_count: 0,
-                violations: Vec::new(),
-            };
+            let mut report = WorkflowActionReport::default();
             inspect_required_workflow_paths(&paths, &mut report);
             assert!(
                 report

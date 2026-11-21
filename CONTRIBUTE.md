@@ -12,13 +12,15 @@ just maintenance::setup-hooks
 just oracle::version
 ```
 
+`setup-hooks` installs into the repository's resolved hooks directory and refuses to replace a hook that is not a `stab-pre-commit` copy; pass `--force` once to replace a foreign hook or one installed by the earlier copy-based recipe.
+
 ## Development Checks
 
 Prefer targeted crate tests during iteration. Before a requested commit, run the checks appropriate to the touched surface and finish with:
 
 ```text
 cargo fmt --all --check
-cargo clippy --workspace --all-targets --config "build.warnings='deny'"
+cargo clippy --workspace --all-targets --locked --config "build.warnings='deny'"
 cargo test --workspace
 just maintenance::pre-commit
 ```
@@ -35,6 +37,9 @@ just architecture::docs-check
 ```
 
 The pre-commit hook is a Rust binary. It checks staged Rust-affecting paths, oversized source blobs, submodule pointers, and the repository instruction-document policy without adding shell launchers.
+It reads the index that Git is committing, including the temporary index of `git commit -a` and pathspec commits, and evaluates the oversized-file and instruction-document checks on staged content, never the working tree.
+`cargo fmt` and Clippy read the working tree, so the hook fails without running them when a Rust-affecting path has unstaged changes, is missing, or is untracked and not ignored; stage or stash those paths first.
+`STAB_PRE_COMMIT_DRY_RUN_TOOLS=1` is a test and diagnostic switch that prints the Rust tool commands instead of running them.
 
 ## Stim Compatibility
 

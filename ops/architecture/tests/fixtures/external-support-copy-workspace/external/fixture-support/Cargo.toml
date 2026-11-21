@@ -1,0 +1,8 @@
+[package]
+name = "fixture-support"
+version = "9.9.9"
+edition = "2024"
+publish = false
+
+[lib]
+path = "src/lib.rs"

@@ -5,6 +5,8 @@ use std::process::Command;
 use cargo_metadata::{Metadata, MetadataCommand, PackageId};
 use thiserror::Error;
 
+use crate::policy::product_contract;
+
 const PREFIX: &str = "stab-architecture";
 const KERNEL_PACKAGE: &str = "stab-kernels-simd";
 const FACADE_PACKAGE: &str = "stab-core";
@@ -99,6 +101,15 @@ pub enum ConsumerCheckError {
     },
 
     #[error(
+        "external consumer {fixture} resolved product package {package} from {location}; every product package must be a path package at crates/{package} in this repository"
+    )]
+    ForeignProductPackage {
+        fixture: &'static str,
+        package: String,
+        location: String,
+    },
+
+    #[error(
         "external consumer {fixture} has publishable workspace packages {packages:?}; every test-support package must set publish = false"
     )]
     PublishableFixturePackages {
@@ -165,7 +176,7 @@ fn validate_fixture_metadata(
             source,
         })?;
     require_unpublished_fixture_packages(&metadata, fixture.id)?;
-    let packages = resolved_packages(&metadata, fixture.id)?;
+    let packages = resolved_packages(root, &metadata, fixture.id)?;
     validate_resolved_packages(fixture, &packages)
 }
 
@@ -173,6 +184,13 @@ fn validate_resolved_packages(
     fixture: ConsumerFixture,
     packages: &ResolvedPackages,
 ) -> Result<(), ConsumerCheckError> {
+    if let Some(foreign) = packages.foreign_products.first() {
+        return Err(ConsumerCheckError::ForeignProductPackage {
+            fixture: fixture.id,
+            package: foreign.name.clone(),
+            location: foreign.location.clone(),
+        });
+    }
     let kernel_count = packages.count(KERNEL_PACKAGE);
     if kernel_count != 1 {
         return Err(ConsumerCheckError::KernelCount {
@@ -219,6 +237,15 @@ fn require_unpublished_fixture_packages(
 #[derive(Debug)]
 struct ResolvedPackages {
     counts: BTreeMap<String, usize>,
+    foreign_products: Vec<ForeignProduct>,
+}
+
+/// A resolved package that carries a product name but is not this repository's
+/// path package, so name counts alone would accept a shadowing copy.
+#[derive(Debug)]
+struct ForeignProduct {
+    name: String,
+    location: String,
 }
 
 impl ResolvedPackages {
@@ -232,6 +259,7 @@ impl ResolvedPackages {
 }
 
 fn resolved_packages(
+    root: &Path,
     metadata: &Metadata,
     fixture: &'static str,
 ) -> Result<ResolvedPackages, ConsumerCheckError> {
@@ -239,19 +267,47 @@ fn resolved_packages(
         .resolve
         .as_ref()
         .ok_or(ConsumerCheckError::MissingResolve { fixture })?;
-    let package_names = metadata
+    let packages = metadata
         .packages
         .iter()
-        .map(|package| (package.id.clone(), package.name.to_string()))
-        .collect::<BTreeMap<PackageId, String>>();
+        .map(|package| (package.id.clone(), package))
+        .collect::<BTreeMap<PackageId, &cargo_metadata::Package>>();
     let mut counts = BTreeMap::new();
+    let mut foreign_products = Vec::new();
     for node in &resolve.nodes {
-        let Some(name) = package_names.get(&node.id) else {
+        let Some(package) = packages.get(&node.id) else {
             continue;
         };
-        *counts.entry(name.clone()).or_default() += 1;
+        let name = package.name.to_string();
+        if product_contract(&name).is_some() && !is_repository_product(root, package) {
+            foreign_products.push(ForeignProduct {
+                location: package
+                    .source
+                    .as_ref()
+                    .map_or_else(|| package.manifest_path.to_string(), ToString::to_string),
+                name: name.clone(),
+            });
+        }
+        *counts.entry(name).or_default() += 1;
     }
-    Ok(ResolvedPackages { counts })
+    foreign_products
+        .sort_by(|left, right| (&left.name, &left.location).cmp(&(&right.name, &right.location)));
+    Ok(ResolvedPackages {
+        counts,
+        foreign_products,
+    })
+}
+
+fn is_repository_product(root: &Path, package: &cargo_metadata::Package) -> bool {
+    if package.source.is_some() {
+        return false;
+    }
+    let expected = root.join("crates").join(package.name.as_str());
+    package
+        .manifest_path
+        .parent()
+        .and_then(|directory| std::fs::canonicalize(directory.as_std_path()).ok())
+        .is_some_and(|directory| directory == expected)
 }
 
 #[cfg(test)]
@@ -266,6 +322,7 @@ mod tests {
                 .iter()
                 .map(|(name, count)| ((*name).to_owned(), *count))
                 .collect(),
+            foreign_products: Vec::new(),
         }
     }
 
@@ -319,6 +376,52 @@ mod tests {
                 "{}: {error}",
                 fixture.id,
             );
+        }
+    }
+
+    #[test]
+    fn consumers_reject_product_packages_that_are_not_repository_path_packages() {
+        let root = std::fs::canonicalize(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures/external-product-copy-workspace"),
+        )
+        .expect("resolve external-product-copy fixture");
+        let metadata = MetadataCommand::new()
+            .current_dir(&root)
+            .manifest_path(root.join("Cargo.toml"))
+            .other_options(vec!["--locked".to_owned()])
+            .exec()
+            .expect("load external-product-copy fixture");
+
+        let packages = resolved_packages(&root, &metadata, "shadowed").expect("resolve packages");
+        assert_eq!(
+            packages.count("stab-core"),
+            2,
+            "name counts alone cannot tell the copies apart"
+        );
+        let [foreign] = packages.foreign_products.as_slice() else {
+            panic!(
+                "only the external copy should be foreign: {:?}",
+                packages.foreign_products
+            );
+        };
+        assert_eq!(foreign.name, "stab-core");
+        assert!(
+            foreign.location.contains("external/stab-core"),
+            "{}",
+            foreign.location
+        );
+
+        let fixture = ConsumerFixture {
+            id: "shadowed",
+            relative_manifest: "Cargo.toml",
+            requires_core: true,
+        };
+        match validate_resolved_packages(fixture, &packages) {
+            Err(ConsumerCheckError::ForeignProductPackage { package, .. }) => {
+                assert_eq!(package, "stab-core");
+            }
+            other => panic!("foreign product copy should fail first: {other:?}"),
         }
     }
 

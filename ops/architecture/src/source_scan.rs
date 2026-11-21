@@ -3,10 +3,12 @@ use std::path::{Path, PathBuf};
 
 use syn::{Item, UseTree, Visibility};
 
-use crate::policy::requires_minimum_rust;
+use crate::policy::{product_contract, requires_minimum_rust};
 use crate::{CheckError, PackageSpec, Violation};
 
 const FACADE_ROOT_REEXPORTS: &str = "ops/architecture/facade-root-reexports.txt";
+const FACADE_PACKAGE: &str = "stab-core";
+const FACADE_PACKAGE_DIRECTORY: &str = "crates/stab-core";
 const FACADE_COMPONENT_CRATES: &[&str] = &[
     "stab_algebra",
     "stab_analysis",
@@ -40,21 +42,52 @@ pub(super) fn scan_workspace_sources(
     rust_sources.sort();
     rust_sources.dedup();
 
-    validate_facade_surface(root, &mut violations)?;
+    // Cargo target roots may be declared outside the package directory with
+    // `[lib] path` or `[[bin]] path`; attribute and scan them explicitly.
+    let mut target_sources = BTreeMap::<PathBuf, &PackageSpec>::new();
+    for package in packages {
+        let package_root = root.join(&package.relative_path);
+        for target in &package.targets {
+            if !target.src_path.starts_with(&package_root) {
+                violations.push(Violation::new(
+                    "target-source-outside-package",
+                    format!(
+                        "{} target {} has crate root {} outside its package directory {}; target roots must live inside the package so the whole module tree is scanned",
+                        package.name,
+                        target.name,
+                        target.src_path.display(),
+                        package.relative_path.display()
+                    ),
+                ));
+            }
+            let display = target
+                .src_path
+                .strip_prefix(root)
+                .map_or_else(|_| target.src_path.clone(), Path::to_path_buf);
+            if rust_sources.binary_search(&display).is_err() {
+                target_sources.insert(display, package);
+            }
+        }
+    }
 
-    for source_path in &rust_sources {
+    validate_facade_surface(root, packages, &mut violations)?;
+
+    for source_path in rust_sources.iter().chain(target_sources.keys()) {
         let source = std::fs::read_to_string(root.join(source_path)).map_err(|source| {
             CheckError::ReadSource {
                 path: source_path.clone(),
                 source,
             }
         })?;
-        let package = package_for_source(source_path, packages);
+        let package = target_sources
+            .get(source_path)
+            .copied()
+            .or_else(|| package_for_source(source_path, packages));
         violations.extend(source_violations(source_path, package, &source));
     }
 
     Ok(SourceReport {
-        rust_source_count: rust_sources.len(),
+        rust_source_count: rust_sources.len() + target_sources.len(),
         violations,
     })
 }
@@ -91,6 +124,13 @@ fn source_violations(
             ),
         ));
     }
+    if let Some(package) = package.filter(|package| product_contract(&package.name).is_some()) {
+        violations.extend(module_path_override_violations(
+            source_path,
+            package,
+            &facts.module_path_overrides,
+        ));
+    }
     if package.is_some_and(|package| package.name == "stab-core") && facts.has_macro_export {
         violations.push(Violation::new(
             "facade-exported-macro",
@@ -103,16 +143,123 @@ fn source_violations(
     violations
 }
 
-fn validate_facade_surface(root: &Path, violations: &mut Vec<Violation>) -> Result<(), CheckError> {
-    let facade_root = Path::new("crates/stab-core/src/lib.rs");
+/// Product library and binary module trees must follow the filesystem layout
+/// the scan walks. Integration tests and benches may share support files with
+/// `#[path]`, but only with literal relative paths that stay in the package.
+fn module_path_override_violations(
+    source_path: &Path,
+    package: &PackageSpec,
+    overrides: &[String],
+) -> Vec<Violation> {
+    let in_shared_test_tree = ["tests", "benches"]
+        .iter()
+        .any(|directory| source_path.starts_with(package.relative_path.join(directory)));
+    let mut violations = Vec::new();
+    for value in overrides {
+        let escapes = value == rust_source::NON_LITERAL_PATH
+            || !lexically_stays_within(
+                source_path.parent().unwrap_or_else(|| Path::new("")),
+                Path::new(value),
+                &package.relative_path,
+            );
+        if !in_shared_test_tree || escapes {
+            violations.push(Violation::new(
+                "product-module-path-override",
+                format!(
+                    "{} source {} overrides a module path with #[path = {value:?}]; product library and binary modules must follow the scanned file layout, and test or bench overrides must stay inside {}",
+                    package.name,
+                    source_path.display(),
+                    package.relative_path.display()
+                ),
+            ));
+        }
+    }
+    violations
+}
+
+fn lexically_stays_within(base: &Path, relative: &Path, boundary: &Path) -> bool {
+    let mut components = base
+        .components()
+        .map(|component| component.as_os_str().to_os_string())
+        .collect::<Vec<_>>();
+    for component in relative.components() {
+        match component {
+            std::path::Component::Normal(name) => components.push(name.to_os_string()),
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                if components.pop().is_none() {
+                    return false;
+                }
+            }
+            std::path::Component::RootDir | std::path::Component::Prefix(_) => return false,
+        }
+    }
+    components.iter().collect::<PathBuf>().starts_with(boundary)
+}
+
+fn validate_facade_surface(
+    root: &Path,
+    packages: &[PackageSpec],
+    violations: &mut Vec<Violation>,
+) -> Result<(), CheckError> {
+    let Some(facade_root) = facade_crate_root(root, packages, violations) else {
+        return Ok(());
+    };
     let root_reexports = Path::new(FACADE_ROOT_REEXPORTS);
-    let root_source = read_source(root, facade_root)?;
+    let root_source = read_source(root, &facade_root)?;
     let root_reexport_inventory = read_source(root, root_reexports)?;
     violations.extend(facade_surface_violations(
-        FacadeSource::new(facade_root, &root_source),
+        FacadeSource::new(&facade_root, &root_source),
         FacadeSource::new(root_reexports, &root_reexport_inventory),
     ));
     Ok(())
+}
+
+/// Resolves the facade crate root from Cargo metadata rather than assuming it,
+/// so a `[lib] path` override cannot move the audited surface elsewhere.
+fn facade_crate_root(
+    root: &Path,
+    packages: &[PackageSpec],
+    violations: &mut Vec<Violation>,
+) -> Option<PathBuf> {
+    let expected = Path::new(FACADE_PACKAGE_DIRECTORY).join("src/lib.rs");
+    let Some(facade) = packages
+        .iter()
+        .find(|package| package.name == FACADE_PACKAGE)
+    else {
+        violations.push(Violation::new(
+            "facade-root-missing",
+            format!("workspace has no {FACADE_PACKAGE} facade package"),
+        ));
+        return None;
+    };
+    let libraries = facade
+        .targets
+        .iter()
+        .filter(|target| target.library)
+        .collect::<Vec<_>>();
+    let [library] = libraries.as_slice() else {
+        violations.push(Violation::new(
+            "facade-root-missing",
+            format!(
+                "{FACADE_PACKAGE} must have exactly one library target, found {}",
+                libraries.len()
+            ),
+        ));
+        return None;
+    };
+    if library.src_path != root.join(&expected) {
+        violations.push(Violation::new(
+            "facade-root-path",
+            format!(
+                "{FACADE_PACKAGE} library crate root is {}, expected {}; the audited facade surface must be the conventional crate root",
+                library.src_path.display(),
+                expected.display()
+            ),
+        ));
+        return None;
+    }
+    Some(expected)
 }
 
 #[derive(Clone, Copy)]
@@ -514,240 +661,4 @@ fn package_for_source<'a>(
 }
 
 #[cfg(test)]
-mod tests {
-    use std::collections::BTreeSet;
-
-    use super::*;
-
-    fn namespaces() -> &'static str {
-        "pub use stab_analysis as analysis;\npub use stab_decoder as decoder;\npub use stab_engine as execution;\n"
-    }
-
-    fn inventory(prefix: &str) -> String {
-        format!(
-            "{prefix}stab_analysis as analysis\nstab_decoder as decoder\nstab_engine as execution\n"
-        )
-    }
-
-    #[test]
-    fn facade_contract_rejects_modules_regardless_of_visibility() {
-        let source = format!(
-            "{}mod private_bits;\npub mod public_bits {{}}\n",
-            namespaces()
-        );
-        let inventory = inventory("");
-        let violations = facade_surface_violations(
-            FacadeSource::new(Path::new("lib.rs"), &source),
-            FacadeSource::new(Path::new("root-reexports.txt"), &inventory),
-        );
-
-        assert_eq!(violations.len(), 2, "{violations:?}");
-        assert!(
-            violations
-                .iter()
-                .all(|violation| violation.code == "facade-root-direct-item")
-        );
-    }
-
-    #[test]
-    fn facade_contract_rejects_private_uses_direct_items_and_macros() {
-        let source = format!(
-            "{}use stab_model as local_model;\nstruct Escape;\ninclude!(\"exports.rs\");\n",
-            namespaces()
-        );
-        let inventory = inventory("");
-        let violations = facade_surface_violations(
-            FacadeSource::new(Path::new("lib.rs"), &source),
-            FacadeSource::new(Path::new("root-reexports.txt"), &inventory),
-        );
-        let codes = violations
-            .iter()
-            .map(|violation| violation.code)
-            .collect::<Vec<_>>();
-
-        assert_eq!(codes, vec!["facade-root-direct-item"; 3]);
-    }
-
-    #[test]
-    fn facade_contract_accepts_grouped_and_aliased_component_reexports() {
-        let source = format!(
-            "{}pub use stab_model::{{Circuit, DetectorErrorModel as Dem}};\n",
-            namespaces()
-        );
-        let inventory = inventory("stab_model::Circuit\nstab_model::DetectorErrorModel as Dem\n");
-        let violations = facade_surface_violations(
-            FacadeSource::new(Path::new("lib.rs"), &source),
-            FacadeSource::new(Path::new("root-reexports.txt"), &inventory),
-        );
-
-        assert!(violations.is_empty(), "{violations:?}");
-    }
-
-    #[test]
-    fn facade_contract_rejects_private_alias_indirection() {
-        let source = format!(
-            "{}use stab_model as local_model;\npub use local_model::Circuit;\n",
-            namespaces()
-        );
-        let inventory = inventory("stab_model::Circuit\n");
-        let violations = facade_surface_violations(
-            FacadeSource::new(Path::new("lib.rs"), &source),
-            FacadeSource::new(Path::new("root-reexports.txt"), &inventory),
-        );
-        let codes = violations
-            .iter()
-            .map(|violation| violation.code)
-            .collect::<BTreeSet<_>>();
-
-        assert!(codes.contains("facade-root-direct-item"));
-        assert!(codes.contains("facade-root-reexport-local-source"));
-        assert!(codes.contains("facade-root-reexport-wrong-owner"));
-    }
-
-    #[test]
-    fn facade_contract_rejects_conditional_reexports() {
-        let source = format!(
-            "{}#[cfg(feature = \"conditional\")] pub use stab_model::Circuit;\n",
-            namespaces()
-        );
-        let inventory = inventory("stab_model::Circuit\n");
-        let violations = facade_surface_violations(
-            FacadeSource::new(Path::new("lib.rs"), &source),
-            FacadeSource::new(Path::new("root-reexports.txt"), &inventory),
-        );
-
-        let [violation] = violations.as_slice() else {
-            panic!("expected one conditional reexport violation: {violations:?}");
-        };
-        assert_eq!(violation.code, "facade-root-conditional-reexport");
-    }
-
-    #[test]
-    fn facade_contract_accepts_crate_docs_and_rejects_crate_conditions() {
-        let source = format!(
-            "#![cfg(feature = \"conditional\")]\n#![cfg_attr(doc, allow(dead_code))]\n//! Facade documentation.\n{}",
-            namespaces()
-        );
-        let inventory = inventory("");
-        let violations = facade_surface_violations(
-            FacadeSource::new(Path::new("lib.rs"), &source),
-            FacadeSource::new(Path::new("root-reexports.txt"), &inventory),
-        );
-
-        assert_eq!(violations.len(), 2, "{violations:?}");
-        assert!(
-            violations
-                .iter()
-                .all(|violation| violation.code == "facade-root-crate-attribute")
-        );
-    }
-
-    #[test]
-    fn facade_contract_rejects_globs_missing_items_and_bad_inventory() {
-        let source = format!("{}pub use stab_model::*;\n", namespaces());
-        let inventory = inventory("stab_model::Circuit\nstab_analysis::Circuit\nnot-valid\n");
-        let violations = facade_surface_violations(
-            FacadeSource::new(Path::new("lib.rs"), &source),
-            FacadeSource::new(Path::new("root-reexports.txt"), &inventory),
-        );
-        let codes = violations
-            .iter()
-            .map(|violation| violation.code)
-            .collect::<BTreeSet<_>>();
-
-        assert_eq!(
-            codes,
-            BTreeSet::from([
-                "facade-root-inventory-duplicate",
-                "facade-root-inventory-invalid",
-                "facade-root-inventory-order",
-                "facade-root-glob-reexport",
-                "facade-root-reexport-missing",
-            ])
-        );
-    }
-
-    #[test]
-    fn facade_contract_rejects_wrong_item_and_namespace_owners() {
-        let source = "pub use stab_model as analysis;\npub use stab_decoder as decoder;\npub use stab_engine as execution;\npub use stab_analysis::Circuit;\n";
-        let inventory = inventory("stab_model::Circuit\n");
-        let violations = facade_surface_violations(
-            FacadeSource::new(Path::new("lib.rs"), source),
-            FacadeSource::new(Path::new("root-reexports.txt"), &inventory),
-        );
-        let wrong_owners = violations
-            .iter()
-            .filter(|violation| violation.code == "facade-root-reexport-wrong-owner")
-            .map(|violation| violation.message.as_str())
-            .collect::<Vec<_>>();
-
-        assert_eq!(wrong_owners.len(), 2, "{violations:?}");
-        assert!(
-            wrong_owners
-                .iter()
-                .any(|message| message.contains("`analysis`"))
-        );
-        assert!(
-            wrong_owners
-                .iter()
-                .any(|message| message.contains("`Circuit`"))
-        );
-    }
-
-    fn source_package(name: &str, relative_path: &str) -> PackageSpec {
-        PackageSpec {
-            name: name.to_owned(),
-            relative_path: PathBuf::from(relative_path),
-            rust_version: None,
-            version: cargo_metadata::semver::Version::new(0, 2, 0),
-            publish: None,
-            binary_targets: Vec::new(),
-        }
-    }
-
-    #[test]
-    fn every_product_crate_rejects_unstable_feature_gates() {
-        let source =
-            "#![feature(portable_simd)]\nmod inner { #![feature(core_intrinsics, never_type)] }\n";
-        for (name, relative_path) in [
-            ("stab-cli", "crates/stab-cli"),
-            ("stab-core", "crates/stab-core"),
-            ("stab-kernels-simd", "crates/stab-kernels-simd"),
-            ("stab-reference-decoder", "test-support/reference-decoder"),
-        ] {
-            let package = source_package(name, relative_path);
-            let source_path = Path::new(relative_path).join("src/lib.rs");
-            let violations = source_violations(&source_path, Some(&package), source);
-            let [violation] = violations.as_slice() else {
-                panic!("{name} should report one feature-gate violation: {violations:?}");
-            };
-            assert_eq!(violation.code, "unstable-feature-gate");
-            assert!(violation.message.contains(name));
-            assert!(violation.message.contains("portable_simd"));
-            assert!(violation.message.contains("never_type"));
-
-            let stable_source =
-                "//! #![feature(portable_simd)] in documentation only.\npub fn run() {}\n";
-            assert!(
-                source_violations(&source_path, Some(&package), stable_source).is_empty(),
-                "{name} should accept sources without feature gates"
-            );
-        }
-    }
-
-    #[test]
-    fn facade_contract_accepts_current_surface() {
-        let violations = facade_surface_violations(
-            FacadeSource::new(
-                Path::new("lib.rs"),
-                include_str!("../../../crates/stab-core/src/lib.rs"),
-            ),
-            FacadeSource::new(
-                Path::new("root-reexports.txt"),
-                include_str!("../facade-root-reexports.txt"),
-            ),
-        );
-
-        assert!(violations.is_empty(), "{violations:?}");
-    }
-}
+mod tests;

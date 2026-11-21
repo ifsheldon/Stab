@@ -6,14 +6,19 @@ use yaml_rust2::{Yaml, YamlLoader};
 
 use crate::{CheckError, Violation};
 
+mod expressions;
+mod local_action;
 mod release;
 
 const WORKFLOW_DIRECTORY: &str = ".github/workflows";
 const MAX_WORKFLOW_BYTES: usize = 1 << 20;
 
+#[derive(Default)]
 pub(super) struct WorkflowActionReport {
     pub action_use_count: usize,
     pub violations: Vec<Violation>,
+    /// Repository-local `./` step actions awaiting inspection of their metadata.
+    local_actions: Vec<local_action::LocalActionUse>,
 }
 
 pub(super) fn scan_workflow_actions(root: &Path) -> Result<WorkflowActionReport, CheckError> {
@@ -36,10 +41,7 @@ pub(super) fn scan_workflow_actions(root: &Path) -> Result<WorkflowActionReport,
     }
     paths.sort();
 
-    let mut report = WorkflowActionReport {
-        action_use_count: 0,
-        violations: Vec::new(),
-    };
+    let mut report = WorkflowActionReport::default();
     let relative_paths = paths
         .iter()
         .filter_map(|path| path.strip_prefix(root).ok())
@@ -49,6 +51,7 @@ pub(super) fn scan_workflow_actions(root: &Path) -> Result<WorkflowActionReport,
     for path in paths {
         inspect_workflow(root, &path, &mut report)?;
     }
+    local_action::inspect_local_actions(root, &mut report)?;
     Ok(report)
 }
 
@@ -73,14 +76,33 @@ fn inspect_workflow_with_post_open_hook(
     post_open_hook: impl FnOnce(),
 ) -> Result<(), CheckError> {
     let relative = path.trim_prefix(root);
+    let Some(source) = read_bounded_regular_file(root, path, "workflow", report, post_open_hook)?
+    else {
+        return Ok(());
+    };
+    inspect_workflow_source(relative, &source, report);
+    Ok(())
+}
+
+/// Reads a workflow or action metadata file through a no-follow descriptor,
+/// recording a violation and returning `None` when it is not a bounded,
+/// regular, UTF-8 file.
+fn read_bounded_regular_file(
+    root: &Path,
+    path: &Path,
+    label: &str,
+    report: &mut WorkflowActionReport,
+    post_open_hook: impl FnOnce(),
+) -> Result<Option<String>, CheckError> {
+    let relative = path.trim_prefix(root);
     let file = match open_workflow_descriptor(path) {
         Ok(file) => file,
         Err(WorkflowOpenError::Symlink) => {
             report.violations.push(Violation::new(
                 "workflow-not-regular-file",
-                format!("workflow {} must be a regular file", relative.display()),
+                format!("{label} {} must be a regular file", relative.display()),
             ));
-            return Ok(());
+            return Ok(None);
         }
         Err(WorkflowOpenError::Io(source)) => {
             return Err(CheckError::ReadWorkflow {
@@ -96,9 +118,9 @@ fn inspect_workflow_with_post_open_hook(
     if !metadata.file_type().is_file() {
         report.violations.push(Violation::new(
             "workflow-not-regular-file",
-            format!("workflow {} must be a regular file", relative.display()),
+            format!("{label} {} must be a regular file", relative.display()),
         ));
-        return Ok(());
+        return Ok(None);
     }
 
     post_open_hook();
@@ -113,22 +135,21 @@ fn inspect_workflow_with_post_open_hook(
         report.violations.push(Violation::new(
             "workflow-too-large",
             format!(
-                "workflow {} exceeds the {}-byte architecture-check limit",
+                "{label} {} exceeds the {}-byte architecture-check limit",
                 relative.display(),
                 MAX_WORKFLOW_BYTES
             ),
         ));
-        return Ok(());
+        return Ok(None);
     }
-    let Ok(source) = std::str::from_utf8(&bytes) else {
+    let Ok(source) = String::from_utf8(bytes) else {
         report.violations.push(Violation::new(
             "workflow-invalid-utf8",
-            format!("workflow {} is not valid UTF-8", relative.display()),
+            format!("{label} {} is not valid UTF-8", relative.display()),
         ));
-        return Ok(());
+        return Ok(None);
     };
-    inspect_workflow_source(relative, source, report);
-    Ok(())
+    Ok(Some(source))
 }
 
 enum WorkflowOpenError {
@@ -220,7 +241,7 @@ fn inspect_workflow_source(path: &Path, source: &str, report: &mut WorkflowActio
             release_secret_violation(path, &format!("job {job_name} metadata"), report);
         }
         if let Some(reference) = mapping_value(job, "uses") {
-            inspect_action_reference(path, job_name, reference, report);
+            inspect_action_reference(path, job_name, reference, ActionUseSite::Job, report);
         }
         let Some(steps) = mapping_value(job, "steps") else {
             continue;
@@ -232,21 +253,7 @@ fn inspect_workflow_source(path: &Path, source: &str, report: &mut WorkflowActio
             let Some(step) = step.as_hash() else {
                 continue;
             };
-            if let Some(reference) = mapping_value(step, "uses") {
-                inspect_action_reference(
-                    path,
-                    &format!("{job_name}.steps[{index}]"),
-                    reference,
-                    report,
-                );
-                inspect_checkout_credentials(
-                    path,
-                    &format!("{job_name}.steps[{index}]"),
-                    reference,
-                    step,
-                    report,
-                );
-            }
+            inspect_step_action(path, &format!("{job_name}.steps[{index}]"), step, report);
             let location = format!("{job_name}.steps[{index}]");
             let step_secrets = mapping_value(step, "env").map_or_default(release_secrets);
             if step_secrets.any() || mapping_contains_release_token_expression_except(step, &[]) {
@@ -300,23 +307,37 @@ fn mapping_contains_release_token_expression_except(
     excluded: &[&str],
 ) -> bool {
     mapping.iter().any(|(key, value)| {
-        let excluded = yaml_scalar(key).is_some_and(|key| excluded.contains(&key));
-        !excluded && yaml_contains_release_token_expression(value)
+        let key = yaml_scalar(key);
+        let excluded = key.is_some_and(|key| excluded.contains(&key));
+        !excluded && yaml_value_contains_release_token_expression(value, key == Some("if"))
     })
 }
 
 fn yaml_contains_release_token_expression(value: &Yaml) -> bool {
+    yaml_value_contains_release_token_expression(value, false)
+}
+
+fn yaml_value_contains_release_token_expression(
+    value: &Yaml,
+    whole_value_is_expression: bool,
+) -> bool {
     match value {
-        Yaml::String(value) => scalar_contains_release_token_expression(value),
+        Yaml::String(value) => {
+            scalar_contains_release_token_expression(value)
+                || expressions::references_credential(value, whole_value_is_expression)
+        }
         Yaml::Array(values) => values.iter().any(yaml_contains_release_token_expression),
         Yaml::Hash(mapping) => mapping.iter().any(|(key, value)| {
+            let is_condition = yaml_scalar(key) == Some("if");
             yaml_contains_release_token_expression(key)
-                || yaml_contains_release_token_expression(value)
+                || yaml_value_contains_release_token_expression(value, is_condition)
         }),
         _ => false,
     }
 }
 
+/// Conservative literal match kept alongside the expression parser in
+/// [`expressions`], so text that merely names a release credential still fails.
 fn scalar_contains_release_token_expression(value: &str) -> bool {
     let compact = value
         .chars()
@@ -396,7 +417,7 @@ fn inspect_checkout_credentials(
     let Some(reference) = yaml_scalar(reference) else {
         return;
     };
-    if !reference.starts_with("actions/checkout@") {
+    if !action_identity_is(reference, "actions/checkout") {
         return;
     }
     let persists = mapping_value(step, "with")
@@ -414,10 +435,40 @@ fn inspect_checkout_credentials(
     }
 }
 
+/// GitHub owner and repository names are case-insensitive, so `Actions/Checkout`
+/// names the same action as `actions/checkout`.
+fn action_identity_is(reference: &str, identity: &str) -> bool {
+    reference
+        .split_once('@')
+        .is_some_and(|(action, _)| action.eq_ignore_ascii_case(identity))
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ActionUseSite {
+    /// `jobs.<id>.uses`: a reusable workflow.
+    Job,
+    /// `steps[*].uses`: an action.
+    Step,
+}
+
+fn inspect_step_action(
+    path: &Path,
+    location: &str,
+    step: &yaml_rust2::yaml::Hash,
+    report: &mut WorkflowActionReport,
+) {
+    let Some(reference) = mapping_value(step, "uses") else {
+        return;
+    };
+    inspect_action_reference(path, location, reference, ActionUseSite::Step, report);
+    inspect_checkout_credentials(path, location, reference, step, report);
+}
+
 fn inspect_action_reference(
     path: &Path,
     location: &str,
     reference: &Yaml,
+    site: ActionUseSite,
     report: &mut WorkflowActionReport,
 ) {
     report.action_use_count += 1;
@@ -432,6 +483,13 @@ fn inspect_action_reference(
         return;
     };
     if reference.starts_with("./") {
+        // Local reusable workflows live in the scanned workflow directory;
+        // local step actions are inspected from their metadata afterwards.
+        if site == ActionUseSite::Step {
+            report
+                .local_actions
+                .push(local_action::LocalActionUse::new(path, location, reference));
+        }
         return;
     }
     if let Some(image) = reference.strip_prefix("docker://") {
@@ -489,10 +547,7 @@ mod tests {
     }
 
     fn inspect_at(path: &Path, source: &str) -> WorkflowActionReport {
-        let mut report = WorkflowActionReport {
-            action_use_count: 0,
-            violations: Vec::new(),
-        };
+        let mut report = WorkflowActionReport::default();
         inspect_workflow_source(path, source, &mut report);
         report
     }
@@ -764,6 +819,51 @@ jobs:
     }
 
     #[test]
+    fn whole_context_and_indexed_secret_reads_are_rejected() {
+        for expression in [
+            "${{ toJSON(secrets) }}",
+            "${{ secrets[format('{0}_TOKEN', 'GH')] }}",
+            "${{ secrets['ANY_NAME'] }}",
+            "${{ SECRETS.UNLISTED_NAME }}",
+            "${{ toJSON(github) }}",
+        ] {
+            for source in [
+                format!("jobs:\n  build:\n    steps:\n      - run: echo \"{expression}\"\n"),
+                format!(
+                    "jobs:\n  build:\n    env:\n      VALUE: \"{expression}\"\n    steps:\n      - run: cargo build\n"
+                ),
+            ] {
+                let report = inspect(&source);
+                assert!(
+                    report
+                        .violations
+                        .iter()
+                        .any(|violation| violation.code == "workflow-release-secret-scope"),
+                    "{source}"
+                );
+            }
+        }
+        let condition = inspect(
+            "jobs:\n  build:\n    steps:\n      - if: secrets.GH_TOKEN != ''\n        run: cargo build\n",
+        );
+        assert_eq!(
+            condition.violations.first().map(|violation| violation.code),
+            Some("workflow-release-secret-scope")
+        );
+    }
+
+    #[test]
+    fn checkout_identity_is_matched_case_insensitively() {
+        let report = inspect(
+            "jobs:\n  build:\n    steps:\n      - uses: Actions/CHECKOUT@3d3c42e5aac5ba805825da76410c181273ba90b1\n",
+        );
+        assert_eq!(
+            report.violations.first().map(|violation| violation.code),
+            Some("workflow-checkout-persists-credentials")
+        );
+    }
+
+    #[test]
     fn malformed_workflow_yaml_is_rejected() {
         let report = inspect("jobs:\n  build: [\n");
         assert_eq!(report.action_use_count, 0);
@@ -826,10 +926,7 @@ jobs:
             "jobs:\n  build:\n    steps:\n      - uses: actions/checkout@v7\n",
         )
         .expect("write replacement target");
-        let mut report = WorkflowActionReport {
-            action_use_count: 0,
-            violations: Vec::new(),
-        };
+        let mut report = WorkflowActionReport::default();
 
         inspect_workflow_with_post_open_hook(repository.path(), &path, &mut report, || {
             std::fs::remove_file(&path).expect("remove original workflow path");

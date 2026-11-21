@@ -1,0 +1,11 @@
+[workspace]
+members = [
+    "ops/fixture-consumer",
+    "test-support/fixture-support",
+]
+exclude = ["external/fixture-support"]
+resolver = "3"
+
+[workspace.package]
+version = "0.2.0"
+edition = "2024"

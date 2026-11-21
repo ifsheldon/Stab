@@ -1,0 +1,7 @@
+jobs:
+  build:
+    steps:
+      - uses: ./actions/build
+      - uses: ./actions/build
+      - uses: ./missing
+      - uses: ./../escape

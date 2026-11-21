@@ -24,7 +24,7 @@ use thiserror::Error;
 pub use consumer::{ConsumerCheckError, ConsumerCheckSummary, check_external_consumers};
 pub use markdown::{DocsCheckError, DocsCheckReport, DocsViolation, check_markdown_docs};
 pub use policy::{
-    DeclaredPathDependency, DependencyKind, PackageSpec, WorkspaceEdge, WorkspaceGraph,
+    DeclaredPathDependency, DependencyKind, PackageSpec, TargetSpec, WorkspaceEdge, WorkspaceGraph,
 };
 
 const PREFIX: &str = "stab-architecture";

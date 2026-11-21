@@ -10,28 +10,33 @@
     )
 )]
 
+mod install;
 mod instruction_docs;
 mod large_files;
+mod paths;
+mod rust_checks;
+mod staged_tree;
 mod support;
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use clap::Parser;
-use gix::bstr::ByteSlice;
-use gix::index::entry::{Mode, Stage};
+use clap::{Args, Parser, Subcommand};
+use install::{InstallError, Replaced, install};
 use instruction_docs::{
-    DocCheckConfig, render_report as render_instruction_doc_report,
-    report_passed as instruction_doc_report_passed, scan_instruction_docs_with_cancel,
+    render_report as render_instruction_doc_report, report_passed as instruction_doc_report_passed,
+    scan_instruction_docs,
 };
 use large_files::{
     BlobScanConfig, DEFAULT_LINE_THRESHOLD, DEFAULT_WATCH_THRESHOLD, SourceBlob,
     is_source_file_path, render_report as render_large_file_report,
     report_passed as large_file_report_passed, scan_large_file_blobs,
 };
+use paths::{is_docs_policy_path, is_rust_affecting_path};
+use rust_checks::{DRY_RUN_ENV, RUST_TOOLS, RustTool, WorktreeDrift, worktree_drift};
+use staged_tree::{StagedChange, StagedTree, StagedTreeError};
 use support::{CommandOutput, DEFAULT_OUTPUT_LIMIT_BYTES, interrupted, run_command};
 use thiserror::Error;
 use tokio::process::Command;
@@ -42,9 +47,32 @@ const TOOL_OUTPUT_LIMIT_BYTES: usize = DEFAULT_OUTPUT_LIMIT_BYTES * 128;
 #[derive(Debug, Parser)]
 #[command(
     about = "Runs staged-aware Stab repository pre-commit checks.",
-    long_about = "Reads the staged index with gix, classifies touched paths, and runs Rust, instruction-doc, and large-file checks only when the staged commit requires them."
+    long_about = "Reads the index being committed (GIT_INDEX_FILE when Git sets it, otherwise the repository index) with gix, classifies touched paths, and runs Rust, instruction-doc, and large-file checks only when the staged commit requires them.",
+    args_conflicts_with_subcommands = true
 )]
 struct Cli {
+    #[command(subcommand)]
+    command: Option<CliCommand>,
+
+    #[command(flatten)]
+    check: CheckArgs,
+}
+
+#[derive(Debug, Subcommand)]
+enum CliCommand {
+    /// Install this binary as the repository's Git pre-commit hook.
+    Install {
+        /// Any path inside the target repository or worktree.
+        #[arg(long, default_value = ".")]
+        root: PathBuf,
+        /// Replace an existing hook that is not a copy of stab-pre-commit.
+        #[arg(long)]
+        force: bool,
+    },
+}
+
+#[derive(Debug, Args)]
+struct CheckArgs {
     #[arg(long, default_value = ".")]
     root: PathBuf,
 
@@ -58,10 +86,13 @@ struct Cli {
 #[tokio::main]
 async fn main() -> ExitCode {
     let cli = Cli::parse();
+    if let Some(CliCommand::Install { root, force }) = cli.command {
+        return run_install(&root, force);
+    }
     let cancel = Arc::new(AtomicBool::new(false));
     let run_cancel = Arc::clone(&cancel);
     tokio::select! {
-        result = run(cli, run_cancel) => match result {
+        result = run(cli.check, run_cancel) => match result {
             Ok(summary) => {
                 summary.print();
                 summary.exit_code()
@@ -82,238 +113,86 @@ async fn main() -> ExitCode {
     }
 }
 
-async fn run(cli: Cli, cancel: Arc<AtomicBool>) -> Result<PreCommitSummary, PreCommitError> {
-    let (repo_root, plan, large_file_blobs) = {
-        let repo = StagedRepository::open(&cli.root)?;
-        let staged = repo.staged_changes()?;
-        if staged.is_empty() {
-            return Ok(PreCommitSummary::empty());
+fn run_install(root: &std::path::Path, force: bool) -> ExitCode {
+    match install(root, force) {
+        Ok(report) => {
+            let note = match report.replaced {
+                Replaced::Nothing => "",
+                Replaced::PreviousCopy => " (replaced a previous stab-pre-commit copy)",
+                Replaced::ForeignHook => " (replaced a foreign hook because of --force)",
+            };
+            println!(
+                "[{PREFIX}] installed pre-commit hook at {}{note}",
+                report.hook_path.display()
+            );
+            ExitCode::SUCCESS
         }
-        let plan = CheckPlan::from_changes(&staged);
-        let large_file_blobs = repo.source_blobs(&staged)?;
-        (repo.root.clone(), plan, large_file_blobs)
+        Err(error @ InstallError::ForeignHook { .. }) => {
+            eprintln!("[{PREFIX}] ERROR: {error}");
+            ExitCode::from(1)
+        }
+        Err(error) => {
+            eprintln!("[{PREFIX}] ERROR: {error}");
+            ExitCode::from(2)
+        }
+    }
+}
+
+async fn run(args: CheckArgs, cancel: Arc<AtomicBool>) -> Result<PreCommitSummary, PreCommitError> {
+    let staged = tokio::task::spawn_blocking(move || check_staged_tree(&args, &cancel))
+        .await
+        .map_err(|error| PreCommitError::Task(error.to_string()))??;
+    let Some(staged) = staged else {
+        return Ok(PreCommitSummary::empty());
     };
-
-    let instruction_docs =
-        run_instruction_docs_check(repo_root.clone(), plan.has_docs, Arc::clone(&cancel));
-    let large_files = run_large_files_check(
-        large_file_blobs,
-        cli.large_file_threshold,
-        cli.large_file_watch_threshold,
-        plan.large_files,
-    );
-    let rust = run_rust_checks(repo_root, plan.has_rust);
-
-    let (instruction_docs, large_files, rust) = tokio::join!(instruction_docs, large_files, rust);
-
-    let mut outcomes = vec![instruction_docs, large_files];
+    let rust = match staged.rust {
+        RustDecision::Run(root) => run_rust_checks(root).await,
+        RustDecision::Done(outcome) => vec![outcome],
+    };
+    let mut outcomes = staged.outcomes;
     outcomes.extend(rust);
     Ok(PreCommitSummary {
-        staged: Some(plan.summary()),
+        staged: Some(staged.plan.summary()),
         outcomes,
     })
 }
 
-struct StagedRepository {
-    repo: gix::Repository,
-    root: PathBuf,
+/// Results of every check that reads the staged tree, plus what the Rust checks must do next.
+struct StagedResults {
+    plan: CheckPlan,
+    outcomes: Vec<CheckOutcome>,
+    rust: RustDecision,
 }
 
-impl StagedRepository {
-    fn open(root: &Path) -> Result<Self, PreCommitError> {
-        let repo = gix::discover(root).map_err(|source| PreCommitError::Discover {
-            path: root.to_path_buf(),
-            source: Box::new(source),
-        })?;
-        let workdir = repo.workdir().ok_or(PreCommitError::BareRepository)?;
-        let root =
-            std::fs::canonicalize(workdir).map_err(|source| PreCommitError::ResolveRoot {
-                path: workdir.to_path_buf(),
-                source,
-            })?;
-        Ok(Self { repo, root })
-    }
-
-    fn staged_changes(&self) -> Result<Vec<StagedChange>, PreCommitError> {
-        let head_tree_id =
-            self.repo
-                .head_tree_id_or_empty()
-                .map_err(|source| PreCommitError::HeadTree {
-                    source: Box::new(source),
-                })?;
-        let head_index = self
-            .repo
-            .index_from_tree(head_tree_id.as_ref())
-            .map_err(|source| PreCommitError::HeadIndex {
-                source: Box::new(source),
-            })?;
-        let worktree_index =
-            self.repo
-                .index_or_empty()
-                .map_err(|source| PreCommitError::Index {
-                    source: Box::new(source),
-                })?;
-
-        let head_entries = collect_index_entries(&head_index)?;
-        let staged_entries = collect_index_entries(&worktree_index)?;
-        let all_paths = head_entries
-            .keys()
-            .chain(staged_entries.keys())
-            .cloned()
-            .collect::<BTreeSet<_>>();
-
-        let mut changes = Vec::new();
-        for path in all_paths {
-            match (head_entries.get(&path), staged_entries.get(&path)) {
-                (None, Some(new)) => changes.push(StagedChange::added(new)),
-                (Some(old), None) => changes.push(StagedChange::deleted(old)),
-                (Some(old), Some(new)) if old.id == new.id && old.mode == new.mode => {}
-                (Some(old), Some(new)) if old.mode != new.mode => {
-                    changes.push(StagedChange::type_changed(old, new));
-                }
-                (Some(_old), Some(new)) => changes.push(StagedChange::modified(new)),
-                (None, None) => {}
-            }
-        }
-        Ok(changes)
-    }
-
-    fn source_blobs(&self, changes: &[StagedChange]) -> Result<Vec<SourceBlob>, PreCommitError> {
-        let mut blobs = Vec::new();
-        for change in changes {
-            if !change.has_staged_blob()
-                || change.is_submodule
-                || !change.mode_has_blob()
-                || !is_source_file_path(&change.path)
-            {
-                continue;
-            }
-            let id = change
-                .object_id
-                .ok_or_else(|| PreCommitError::MissingBlobId {
-                    path: change.path.clone(),
-                })?;
-            let mut blob = self
-                .repo
-                .find_blob(id)
-                .map_err(|source| PreCommitError::Blob {
-                    path: change.path.clone(),
-                    source: Box::new(source),
-                })?;
-            blobs.push(SourceBlob::new(change.path.clone(), blob.take_data()));
-        }
-        Ok(blobs)
-    }
+enum RustDecision {
+    Run(PathBuf),
+    Done(CheckOutcome),
 }
 
-fn collect_index_entries(
-    index: &gix::index::State,
-) -> Result<BTreeMap<Vec<u8>, IndexEntry>, PreCommitError> {
-    let mut entries = BTreeMap::new();
-    for entry in index.entries() {
-        let path = entry.path(index);
-        if entry.stage() != Stage::Unconflicted {
-            return Err(PreCommitError::UnresolvedConflict {
-                path: path_to_path_buf(path.as_bytes())?,
-            });
-        }
-        let path_bytes = path.as_bytes().to_vec();
-        let path_buf = path_to_path_buf(&path_bytes)?;
-        let info = IndexEntry {
-            path: path_buf.clone(),
-            id: entry.id,
-            mode: entry.mode,
-        };
-        if entries.insert(path_bytes, info).is_some() {
-            return Err(PreCommitError::DuplicateIndexPath { path: path_buf });
-        }
+fn check_staged_tree(
+    args: &CheckArgs,
+    cancel: &AtomicBool,
+) -> Result<Option<StagedResults>, PreCommitError> {
+    let tree = StagedTree::open(&args.root)?;
+    let changes = tree.changes();
+    if changes.is_empty() {
+        return Ok(None);
     }
-    Ok(entries)
-}
-
-fn path_to_path_buf(path: &[u8]) -> Result<PathBuf, PreCommitError> {
-    let path = std::str::from_utf8(path).map_err(|source| PreCommitError::NonUtf8Path {
-        source,
-        path: path.to_vec(),
-    })?;
-    Ok(PathBuf::from(path))
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct IndexEntry {
-    path: PathBuf,
-    id: gix::ObjectId,
-    mode: Mode,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct StagedChange {
-    path: PathBuf,
-    kind: ChangeKind,
-    object_id: Option<gix::ObjectId>,
-    mode: Option<Mode>,
-    is_submodule: bool,
-}
-
-impl StagedChange {
-    fn added(new: &IndexEntry) -> Self {
-        Self::from_entries(new.path.clone(), ChangeKind::Added, None, Some(new))
-    }
-
-    fn modified(new: &IndexEntry) -> Self {
-        Self::from_entries(new.path.clone(), ChangeKind::Modified, None, Some(new))
-    }
-
-    fn deleted(old: &IndexEntry) -> Self {
-        Self::from_entries(old.path.clone(), ChangeKind::Deleted, Some(old), None)
-    }
-
-    fn type_changed(old: &IndexEntry, new: &IndexEntry) -> Self {
-        Self::from_entries(
-            new.path.clone(),
-            ChangeKind::TypeChanged,
-            Some(old),
-            Some(new),
-        )
-    }
-
-    fn from_entries(
-        path: PathBuf,
-        kind: ChangeKind,
-        old: Option<&IndexEntry>,
-        new: Option<&IndexEntry>,
-    ) -> Self {
-        let effective = new.or(old);
-        let mode = new.map(|entry| entry.mode);
-        let is_submodule = effective.is_some_and(|entry| entry.mode == Mode::COMMIT);
-        Self {
-            path,
-            kind,
-            object_id: new.map(|entry| entry.id),
-            mode,
-            is_submodule,
-        }
-    }
-
-    fn has_staged_blob(&self) -> bool {
-        matches!(
-            self.kind,
-            ChangeKind::Added | ChangeKind::Modified | ChangeKind::TypeChanged
-        ) && self.object_id.is_some()
-    }
-
-    fn mode_has_blob(&self) -> bool {
-        self.mode
-            .is_some_and(|mode| matches!(mode, Mode::FILE | Mode::FILE_EXECUTABLE | Mode::SYMLINK))
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ChangeKind {
-    Added,
-    Modified,
-    Deleted,
-    TypeChanged,
+    let plan = CheckPlan::from_changes(&changes);
+    let instruction_docs = instruction_docs_outcome(&tree, plan.has_docs, cancel);
+    let large_files = large_files_outcome(
+        &tree,
+        &changes,
+        args.large_file_threshold,
+        args.large_file_watch_threshold,
+        plan.large_files,
+    );
+    let rust = rust_decision(&tree, plan.has_rust);
+    Ok(Some(StagedResults {
+        plan,
+        outcomes: vec![instruction_docs, large_files],
+        rust,
+    }))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -342,10 +221,7 @@ impl CheckPlan {
             if is_rust_affecting_path(&change.path) {
                 has_rust = true;
             }
-            if change.has_staged_blob()
-                && change.mode_has_blob()
-                && is_source_file_path(&change.path)
-            {
+            if is_large_file_candidate(change) {
                 large_files = large_files.saturating_add(1);
             }
         }
@@ -369,60 +245,28 @@ impl CheckPlan {
     }
 }
 
-fn is_docs_policy_path(path: &Path) -> bool {
-    if path == Path::new(".gitmodules") {
-        return true;
-    }
-    path.file_name().is_some_and(|file_name| {
-        matches!(
-            file_name.to_str(),
-            Some("README.md" | "AGENTS.md" | "CLAUDE.md")
-        )
-    })
+fn is_large_file_candidate(change: &StagedChange) -> bool {
+    !change.is_submodule && change.has_staged_blob() && is_source_file_path(&change.path)
 }
 
-fn is_rust_affecting_path(path: &Path) -> bool {
-    path.extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| extension == "rs")
-        || path.file_name().is_some_and(|file_name| {
-            matches!(file_name.to_str(), Some("Cargo.toml" | "Cargo.lock"))
-        })
-}
-
-async fn run_instruction_docs_check(
-    repo_root: PathBuf,
-    enabled: bool,
-    cancel: Arc<AtomicBool>,
-) -> CheckOutcome {
+fn instruction_docs_outcome(tree: &StagedTree, enabled: bool, cancel: &AtomicBool) -> CheckOutcome {
     if !enabled {
         return CheckOutcome::skip("instruction docs", "no staged instruction docs");
     }
-    match tokio::task::spawn_blocking(move || {
-        let config = DocCheckConfig::new(repo_root);
-        scan_instruction_docs_with_cancel(&config, Some(&cancel))
-    })
-    .await
-    {
-        Ok(Ok(report)) => {
-            if instruction_doc_report_passed(&report) {
-                CheckOutcome::pass("instruction docs", render_instruction_doc_report(&report))
-            } else {
-                CheckOutcome::fail("instruction docs", render_instruction_doc_report(&report))
-            }
+    match scan_instruction_docs(tree, Some(cancel)) {
+        Ok(report) if instruction_doc_report_passed(&report) => {
+            CheckOutcome::pass("instruction docs", render_instruction_doc_report(&report))
         }
-        Ok(Err(error)) => CheckOutcome::error("instruction docs", error.to_string()),
-        Err(error) if error.is_cancelled() => {
-            CheckOutcome::error("instruction docs", "check task was cancelled".to_string())
+        Ok(report) => {
+            CheckOutcome::fail("instruction docs", render_instruction_doc_report(&report))
         }
-        Err(error) => {
-            CheckOutcome::error("instruction docs", format!("check task failed: {error}"))
-        }
+        Err(error) => CheckOutcome::error("instruction docs", error.to_string()),
     }
 }
 
-async fn run_large_files_check(
-    blobs: Vec<SourceBlob>,
+fn large_files_outcome(
+    tree: &StagedTree,
+    changes: &[StagedChange],
     threshold: usize,
     watch_threshold: usize,
     expected_files: usize,
@@ -430,74 +274,94 @@ async fn run_large_files_check(
     if expected_files == 0 {
         return CheckOutcome::skip("large files", "no staged source blobs");
     }
-    let watch_threshold = if watch_threshold == 0 {
-        None
-    } else {
-        Some(watch_threshold)
-    };
+    let mut blobs = Vec::new();
+    for change in changes
+        .iter()
+        .filter(|change| is_large_file_candidate(change))
+    {
+        match tree.blob(&change.path) {
+            Ok(content) => blobs.push(SourceBlob::new(change.path.clone(), content)),
+            Err(error) => return CheckOutcome::error("large files", error.to_string()),
+        }
+    }
+    let watch_threshold = (watch_threshold != 0).then_some(watch_threshold);
     let config = match BlobScanConfig::new(blobs, threshold, watch_threshold) {
         Ok(config) => config,
         Err(error) => return CheckOutcome::error("large files", error.to_string()),
     };
-    match tokio::task::spawn_blocking(move || scan_large_file_blobs(&config)).await {
-        Ok(Ok(report)) => {
-            if large_file_report_passed(&report) {
-                CheckOutcome::pass("large files", render_large_file_report(&report))
-            } else {
-                CheckOutcome::fail("large files", render_large_file_report(&report))
-            }
+    match scan_large_file_blobs(&config) {
+        Ok(report) if large_file_report_passed(&report) => {
+            CheckOutcome::pass("large files", render_large_file_report(&report))
         }
-        Ok(Err(error)) => CheckOutcome::error("large files", error.to_string()),
-        Err(error) if error.is_cancelled() => {
-            CheckOutcome::error("large files", "check task was cancelled".to_string())
-        }
-        Err(error) => CheckOutcome::error("large files", format!("check task failed: {error}")),
+        Ok(report) => CheckOutcome::fail("large files", render_large_file_report(&report)),
+        Err(error) => CheckOutcome::error("large files", error.to_string()),
     }
 }
 
-async fn run_rust_checks(repo_root: PathBuf, enabled: bool) -> Vec<CheckOutcome> {
+/// Decides whether the working-tree Rust tools may run: only when Cargo would read exactly the staged Rust-affecting content.
+fn rust_decision(tree: &StagedTree, enabled: bool) -> RustDecision {
     if !enabled {
-        return vec![CheckOutcome::skip(
+        return RustDecision::Done(CheckOutcome::skip(
             "rust checks",
             "no staged Rust-affecting files",
-        )];
+        ));
     }
-
-    let rustfmt = run_tool_check(
-        "rustfmt",
-        "cargo",
-        ["fmt", "--all", "--check"]
-            .into_iter()
-            .map(str::to_string)
-            .collect(),
-        repo_root.clone(),
-    );
-    let clippy = run_tool_check(
-        "rust clippy",
-        "cargo",
-        [
-            "clippy",
-            "--workspace",
-            "--all-targets",
-            "--config",
-            "build.warnings='deny'",
-        ]
-        .into_iter()
-        .map(str::to_string)
-        .collect(),
-        repo_root,
-    );
-
-    let (rustfmt, clippy) = tokio::join!(rustfmt, clippy);
-    vec![rustfmt, clippy]
+    match worktree_drift(tree) {
+        Ok(drift) if drift.is_empty() => RustDecision::Run(tree.root().to_path_buf()),
+        Ok(drift) => RustDecision::Done(CheckOutcome::fail("rust checks", drift_lines(&drift))),
+        Err(error) => RustDecision::Done(CheckOutcome::error("rust checks", error.to_string())),
+    }
 }
 
-async fn run_tool_check(
-    name: &'static str,
-    program: &'static str,
-    args: Vec<String>,
-    cwd: PathBuf,
-) -> CheckOutcome {
+fn drift_lines(drift: &[WorktreeDrift]) -> Vec<String> {
+    let mut lines = vec![format!(
+        "[{PREFIX}] FAIL cargo fmt and clippy read the working tree, which differs from the index being committed in {} Rust-affecting path(s); not running them",
+        drift.len()
+    )];
+    lines.extend(
+        drift
+            .iter()
+            .map(|entry| format!("[{PREFIX}] FAIL {}", entry.message())),
+    );
+    lines.push(format!(
+        "[{PREFIX}] HINT stage the changes, ignore or remove the untracked files, or set them aside with `git stash push --keep-index --include-untracked` before committing"
+    ));
+    lines
+}
+
+async fn run_rust_checks(repo_root: PathBuf) -> Vec<CheckOutcome> {
+    let dry_run = std::env::var_os(DRY_RUN_ENV).is_some_and(|value| !value.is_empty());
+    let mut outcomes = Vec::with_capacity(RUST_TOOLS.len());
+    let mut runs = Vec::with_capacity(RUST_TOOLS.len());
+    for tool in RUST_TOOLS {
+        if dry_run {
+            outcomes.push(CheckOutcome::skip(
+                tool.name,
+                format!("dry run: would run `{}`", tool.command_line()),
+            ));
+        } else {
+            runs.push(run_tool_check(*tool, repo_root.clone()));
+        }
+    }
+    let mut tasks = Vec::with_capacity(runs.len());
+    for run in runs {
+        tasks.push(tokio::spawn(run));
+    }
+    for task in tasks {
+        outcomes.push(match task.await {
+            Ok(outcome) => outcome,
+            Err(error) => CheckOutcome::error("rust checks", format!("check task failed: {error}")),
+        });
+    }
+    outcomes
+}
+
+async fn run_tool_check(tool: RustTool, cwd: PathBuf) -> CheckOutcome {
+    let RustTool {
+        name,
+        program,
+        args,
+    } = tool;
     let mut command = Command::new(program);
     command.args(args).current_dir(cwd);
     match run_command(command, program, TOOL_OUTPUT_LIMIT_BYTES).await {
@@ -647,102 +511,27 @@ enum CheckStatus {
 
 #[derive(Debug, Error)]
 enum PreCommitError {
-    #[error("failed to discover Git repository from {path}: {source}")]
-    Discover {
-        path: PathBuf,
-        source: Box<gix::discover::Error>,
-    },
-    #[error("pre-commit requires a non-bare repository with a worktree")]
-    BareRepository,
-    #[error("failed to resolve repository root {path}: {source}")]
-    ResolveRoot {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-    #[error("failed to resolve HEAD tree: {source}")]
-    HeadTree {
-        source: Box<dyn std::error::Error + Send + Sync>,
-    },
-    #[error("failed to build HEAD index: {source}")]
-    HeadIndex {
-        source: Box<dyn std::error::Error + Send + Sync>,
-    },
-    #[error("failed to read staged index: {source}")]
-    Index {
-        source: Box<dyn std::error::Error + Send + Sync>,
-    },
-    #[error(
-        "index contains unresolved conflict entry for {path:?}; resolve conflicts before committing"
-    )]
-    UnresolvedConflict { path: PathBuf },
-    #[error("index contains duplicate path {path:?}")]
-    DuplicateIndexPath { path: PathBuf },
-    #[error("index path is not UTF-8: {path:?}: {source}")]
-    NonUtf8Path {
-        path: Vec<u8>,
-        source: std::str::Utf8Error,
-    },
-    #[error("staged source file {path:?} has no blob id")]
-    MissingBlobId { path: PathBuf },
-    #[error("failed to read staged blob for {path:?}: {source}")]
-    Blob {
-        path: PathBuf,
-        source: Box<dyn std::error::Error + Send + Sync>,
-    },
+    #[error(transparent)]
+    Tree(#[from] StagedTreeError),
+    #[error("staged-tree check task failed: {0}")]
+    Task(String),
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use staged_tree::{ChangeKind, EntryKind, StagedEntry};
 
-    fn change(path: &str, kind: ChangeKind, is_submodule: bool) -> StagedChange {
+    fn change(path: &str, kind: EntryKind, is_submodule: bool) -> StagedChange {
         StagedChange {
             path: PathBuf::from(path),
-            kind,
-            object_id: None,
-            mode: Some(Mode::FILE),
+            kind: ChangeKind::Modified,
+            staged: Some(StagedEntry {
+                kind,
+                id: gix::ObjectId::empty_blob(gix::hash::Kind::Sha1),
+            }),
             is_submodule,
         }
-    }
-
-    fn blob_change(path: &str) -> StagedChange {
-        StagedChange {
-            path: PathBuf::from(path),
-            kind: ChangeKind::Added,
-            object_id: Some(gix::ObjectId::empty_blob(gix::hash::Kind::Sha1)),
-            mode: Some(Mode::FILE),
-            is_submodule: false,
-        }
-    }
-
-    #[test]
-    fn staged_file_classification_detects_rust_work() {
-        let staged = vec![
-            change("crates/stab-core/src/lib.rs", ChangeKind::Modified, false),
-            change(
-                "docs/plans/stim-core-parity-and-lean-evidence-plan.md",
-                ChangeKind::Modified,
-                false,
-            ),
-        ];
-
-        let plan = CheckPlan::from_changes(&staged);
-
-        assert!(plan.has_rust);
-        assert!(!plan.has_docs);
-    }
-
-    #[test]
-    fn staged_file_classification_detects_cargo_files() {
-        let manifest = CheckPlan::from_changes(&[change(
-            "crates/stab-core/Cargo.toml",
-            ChangeKind::Modified,
-            false,
-        )]);
-        let lock = CheckPlan::from_changes(&[change("Cargo.lock", ChangeKind::Modified, false)]);
-
-        assert!(manifest.has_rust);
-        assert!(lock.has_rust);
     }
 
     #[test]
@@ -753,14 +542,14 @@ mod tests {
             "docs/CLAUDE.md",
             ".gitmodules",
         ] {
-            let plan = CheckPlan::from_changes(&[change(path, ChangeKind::Modified, false)]);
+            let plan = CheckPlan::from_changes(&[change(path, EntryKind::File, false)]);
             assert!(plan.has_docs, "{path}");
         }
     }
 
     #[test]
     fn staged_file_classification_treats_submodule_as_pointer() {
-        let plan = CheckPlan::from_changes(&[change("vendor/stim", ChangeKind::Modified, true)]);
+        let plan = CheckPlan::from_changes(&[change("vendor/stim", EntryKind::Gitlink, true)]);
 
         assert_eq!(plan.submodules, 1);
         assert!(!plan.has_rust);
@@ -769,12 +558,17 @@ mod tests {
     }
 
     #[test]
-    fn staged_file_classification_counts_large_file_candidates() {
+    fn staged_file_classification_counts_only_staged_source_blobs() {
+        let mut deleted = change("ops/pre-commit/src/old.rs", EntryKind::File, false);
+        deleted.kind = ChangeKind::Deleted;
+        deleted.staged = None;
         let plan = CheckPlan::from_changes(&[
-            blob_change("ops/pre-commit/src/main.rs"),
-            change("Cargo.lock", ChangeKind::Modified, false),
+            change("ops/pre-commit/src/main.rs", EntryKind::File, false),
+            change("Cargo.lock", EntryKind::File, false),
+            deleted,
         ]);
 
         assert_eq!(plan.large_files, 1);
+        assert!(plan.has_rust);
     }
 }

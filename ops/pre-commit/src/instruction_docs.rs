@@ -1,40 +1,21 @@
-//! Stab instruction-document policy checks.
+//! Stab instruction-document policy checks over the staged tree.
+//!
+//! Paths, file kinds, and symlink targets all come from the index the commit will record, so an untracked file, a file removed with `git rm --cached`, or an ignored path that was force-added is judged by what is staged rather than by what is on disk.
+//! Submodule pointers carry no tree of their own here, so instruction documents inside submodules are never scanned.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use ignore::WalkBuilder;
 use thiserror::Error;
+
+use crate::staged_tree::{EntryKind, ResolveError, StagedTree, StagedTreeError};
 
 const PREFIX: &str = "stab-instruction-docs";
 const AGENTS_FILE: &str = "AGENTS.md";
 const CLAUDE_FILE: &str = "CLAUDE.md";
 const README_FILE: &str = "README.md";
-
-const EXCLUDED_COMPONENTS: &[&str] = &[
-    ".git",
-    ".next",
-    ".pytest_cache",
-    ".turbo",
-    "build",
-    "coverage",
-    "dist",
-    "node_modules",
-    "target",
-];
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct DocCheckConfig {
-    root: PathBuf,
-}
-
-impl DocCheckConfig {
-    pub(crate) fn new(root: PathBuf) -> Self {
-        Self { root }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DocCheckReport {
@@ -58,12 +39,6 @@ struct ClaudeLink {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ReadmeEntry {
-    path: PathBuf,
-    canonical_path: PathBuf,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 struct AgentEntry {
     path: PathBuf,
     canonical_path: PathBuf,
@@ -73,6 +48,7 @@ struct AgentEntry {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum DocViolation {
     MissingColocatedAgents { path: PathBuf },
+    ReadmeBrokenSymlink { path: PathBuf, error: String },
     AgentsSymlinkTargetIsNotReadme { path: PathBuf, target: PathBuf },
     AgentsBrokenSymlink { path: PathBuf, error: String },
     MissingClaudeSymlink { path: PathBuf },
@@ -83,165 +59,110 @@ pub(crate) enum DocViolation {
 
 #[derive(Debug, Error)]
 pub(crate) enum DocCheckError {
-    #[error("failed to resolve scan root {path}: {source}")]
-    ResolveRoot {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-
-    #[error("failed to read {path}: {source}")]
-    ReadGitmodules {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-
-    #[error("failed to walk source tree: {0}")]
-    Walk(#[from] ignore::Error),
-
-    #[error("failed to inspect {path}: {source}")]
-    Metadata {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-
-    #[error("failed to canonicalize {path}: {source}")]
-    Canonicalize {
-        path: PathBuf,
-        source: std::io::Error,
-    },
+    #[error(transparent)]
+    Tree(#[from] StagedTreeError),
 
     #[error("scan cancelled")]
     Cancelled,
 }
 
-pub(crate) fn scan_instruction_docs_with_cancel(
-    config: &DocCheckConfig,
+/// Resolves `path` through staged symlinks, turning a broken chain into its message.
+fn resolve(tree: &StagedTree, path: &Path) -> Result<Result<PathBuf, String>, DocCheckError> {
+    match tree.resolve(path) {
+        Ok(target) => Ok(Ok(target)),
+        Err(ResolveError::Broken(reason)) => Ok(Err(reason.to_string())),
+        Err(ResolveError::Tree(error)) => Err(error.into()),
+    }
+}
+
+pub(crate) fn scan_instruction_docs(
+    tree: &StagedTree,
     cancel: Option<&AtomicBool>,
 ) -> Result<DocCheckReport, DocCheckError> {
-    let root =
-        std::fs::canonicalize(&config.root).map_err(|source| DocCheckError::ResolveRoot {
-            path: config.root.clone(),
-            source,
-        })?;
-    let submodule_paths = submodule_paths(&root)?;
-    let mut readmes_by_directory = BTreeMap::<PathBuf, ReadmeEntry>::new();
+    let mut readme_directories = BTreeSet::<PathBuf>::new();
+    let mut readmes = Vec::<PathBuf>::new();
     let mut readme_canonicals = BTreeSet::<PathBuf>::new();
     let mut agents_by_directory = BTreeMap::<PathBuf, AgentEntry>::new();
     let mut claude_targets = BTreeMap::<PathBuf, BTreeSet<PathBuf>>::new();
-    let mut seen_claude_links = BTreeSet::<PathBuf>::new();
     let mut claude_files_seen = 0usize;
     let mut violations = Vec::new();
 
-    let filter_root = root.clone();
-    let filter_submodule_paths = submodule_paths.clone();
-    for entry in WalkBuilder::new(&root)
-        .parents(true)
-        .hidden(false)
-        .follow_links(false)
-        .filter_entry(move |entry| {
-            let relative = relative_path(&filter_root, entry.path());
-            !is_submodule_path(&relative, &filter_submodule_paths)
-                && !is_git_internal_path(&relative)
-                && !has_excluded_component(&relative)
-        })
-        .build()
-    {
+    for (path, entry) in tree.entries() {
         ensure_not_cancelled(cancel)?;
-        let entry = entry?;
-        let path = entry.path();
+        if entry.kind == EntryKind::Gitlink {
+            continue;
+        }
         let Some(file_name) = path.file_name() else {
             continue;
         };
         if !is_instruction_doc_name(file_name) {
             continue;
         }
-
-        let relative = relative_path(&root, path);
+        let relative = path.to_path_buf();
         let directory = relative
             .parent()
             .map_or_else(PathBuf::new, Path::to_path_buf);
-        let metadata =
-            std::fs::symlink_metadata(path).map_err(|source| DocCheckError::Metadata {
-                path: relative.clone(),
-                source,
-            })?;
-        let file_type = metadata.file_type();
+        let is_symlink = entry.kind == EntryKind::Symlink;
 
         if file_name == OsStr::new(README_FILE) {
-            let canonical =
-                std::fs::canonicalize(path).map_err(|source| DocCheckError::Canonicalize {
-                    path: relative.clone(),
-                    source,
-                })?;
-            readme_canonicals.insert(canonical.clone());
-            readmes_by_directory
-                .entry(directory)
-                .or_insert(ReadmeEntry {
+            readme_directories.insert(directory);
+            readmes.push(relative.clone());
+            match resolve(tree, path)? {
+                Ok(canonical) => {
+                    readme_canonicals.insert(canonical);
+                }
+                Err(error) => violations.push(DocViolation::ReadmeBrokenSymlink {
                     path: relative,
-                    canonical_path: canonical,
-                });
+                    error,
+                }),
+            }
             continue;
         }
 
         if file_name == OsStr::new(AGENTS_FILE) {
-            let canonical = match std::fs::canonicalize(path) {
+            let canonical = match resolve(tree, path)? {
                 Ok(canonical) => canonical,
-                Err(error) if file_type.is_symlink() => {
+                Err(error) => {
                     violations.push(DocViolation::AgentsBrokenSymlink {
                         path: relative,
-                        error: error.to_string(),
+                        error,
                     });
                     continue;
                 }
-                Err(source) => {
-                    return Err(DocCheckError::Canonicalize {
-                        path: relative,
-                        source,
-                    });
-                }
             };
-            let symlink_target = if file_type.is_symlink() {
-                Some(display_target(&root, &canonical))
-            } else {
-                None
-            };
-            agents_by_directory.entry(directory).or_insert(AgentEntry {
-                path: relative,
-                canonical_path: canonical,
-                symlink_target,
-            });
+            let symlink_target = is_symlink.then(|| canonical.clone());
+            agents_by_directory.insert(
+                directory,
+                AgentEntry {
+                    path: relative,
+                    canonical_path: canonical,
+                    symlink_target,
+                },
+            );
             continue;
         }
 
         claude_files_seen = claude_files_seen.saturating_add(1);
-        if !file_type.is_symlink() {
+        if !is_symlink {
             violations.push(DocViolation::ClaudeIsNotSymlink { path: relative });
             continue;
         }
-
-        let canonical_link =
-            canonical_link_path(path).map_err(|source| DocCheckError::Canonicalize {
-                path: relative.clone(),
-                source,
-            })?;
-        if !seen_claude_links.insert(canonical_link) {
-            continue;
-        }
-        match std::fs::canonicalize(path) {
+        match resolve(tree, path)? {
             Ok(target) => {
                 claude_targets.entry(target).or_default().insert(relative);
             }
             Err(error) => violations.push(DocViolation::ClaudeBrokenSymlink {
                 path: relative,
-                error: error.to_string(),
+                error,
             }),
         }
     }
 
-    for (directory, readme) in &readmes_by_directory {
-        if !agents_by_directory.contains_key(directory) {
+    for readme in &readmes {
+        let directory = readme.parent().map_or_else(PathBuf::new, Path::to_path_buf);
+        if !agents_by_directory.contains_key(&directory) {
             violations.push(DocViolation::MissingColocatedAgents {
-                path: readme.path.clone(),
+                path: readme.clone(),
             });
         }
     }
@@ -262,16 +183,13 @@ pub(crate) fn scan_instruction_docs_with_cancel(
             .or_insert_with(|| agent.path.clone());
     }
 
-    for target in claude_targets.keys() {
+    for (target, paths) in &claude_targets {
         if !source_by_canonical.contains_key(target) {
-            let display_target = display_target(&root, target);
-            if let Some(paths) = claude_targets.get(target) {
-                for path in paths {
-                    violations.push(DocViolation::ClaudeTargetIsNotAgentSource {
-                        path: path.clone(),
-                        target: display_target.clone(),
-                    });
-                }
+            for path in paths {
+                violations.push(DocViolation::ClaudeTargetIsNotAgentSource {
+                    path: path.clone(),
+                    target: target.clone(),
+                });
             }
         }
     }
@@ -312,7 +230,7 @@ pub(crate) fn scan_instruction_docs_with_cancel(
     sort_violations(&mut violations);
 
     Ok(DocCheckReport {
-        readme_files_seen: readmes_by_directory.len(),
+        readme_files_seen: readme_directories.len(),
         effective_agent_sources,
         claude_files_seen,
         valid_claude_links,
@@ -359,6 +277,9 @@ impl DocViolation {
             Self::MissingColocatedAgents { path } => {
                 format!("{} has no colocated AGENTS.md", display_path(path))
             }
+            Self::ReadmeBrokenSymlink { path, error } => {
+                format!("{} is a broken symlink: {error}", display_path(path))
+            }
             Self::AgentsSymlinkTargetIsNotReadme { path, target } => format!(
                 "{} is a symlink to {}; AGENTS.md symlinks may only target scanned README.md files",
                 display_path(path),
@@ -386,6 +307,7 @@ impl DocViolation {
     fn sort_key(&self) -> (&Path, u8, Option<&Path>) {
         match self {
             Self::MissingColocatedAgents { path } => (path.as_path(), 0, None),
+            Self::ReadmeBrokenSymlink { path, .. } => (path.as_path(), 0, None),
             Self::AgentsSymlinkTargetIsNotReadme { path, target } => {
                 (path.as_path(), 1, Some(target.as_path()))
             }
@@ -404,85 +326,10 @@ fn sort_violations(violations: &mut [DocViolation]) {
     violations.sort_by(|left, right| left.sort_key().cmp(&right.sort_key()));
 }
 
-fn submodule_paths(root: &Path) -> Result<Vec<PathBuf>, DocCheckError> {
-    let path = root.join(".gitmodules");
-    let raw = match std::fs::read_to_string(&path) {
-        Ok(raw) => raw,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(source) => {
-            return Err(DocCheckError::ReadGitmodules {
-                path: relative_path(root, &path),
-                source,
-            });
-        }
-    };
-    let mut paths = Vec::new();
-    for line in raw.lines() {
-        let trimmed = line.trim();
-        let Some((key, value)) = trimmed.split_once('=') else {
-            continue;
-        };
-        if key.trim() != "path" {
-            continue;
-        }
-        let value = value.trim().trim_matches('"');
-        if value.is_empty() {
-            continue;
-        }
-        let submodule_path = PathBuf::from(value);
-        if submodule_path.is_absolute() {
-            continue;
-        }
-        paths.push(submodule_path);
-    }
-    paths.sort();
-    paths.dedup();
-    Ok(paths)
-}
-
-fn is_submodule_path(path: &Path, submodule_paths: &[PathBuf]) -> bool {
-    submodule_paths
-        .iter()
-        .any(|submodule_path| path == submodule_path || path.starts_with(submodule_path))
-}
-
-fn is_git_internal_path(path: &Path) -> bool {
-    path.components()
-        .next()
-        .is_some_and(|component| component.as_os_str() == OsStr::new(".git"))
-}
-
-fn has_excluded_component(path: &Path) -> bool {
-    path.components().any(|component| {
-        let name = component.as_os_str();
-        EXCLUDED_COMPONENTS
-            .iter()
-            .any(|excluded| name == OsStr::new(*excluded))
-    })
-}
-
 fn is_instruction_doc_name(file_name: &OsStr) -> bool {
     [AGENTS_FILE, CLAUDE_FILE, README_FILE]
         .into_iter()
         .any(|expected| file_name == OsStr::new(expected))
-}
-
-fn canonical_link_path(path: &Path) -> Result<PathBuf, std::io::Error> {
-    let Some(parent) = path.parent() else {
-        return std::fs::canonicalize(path);
-    };
-    let Some(file_name) = path.file_name() else {
-        return std::fs::canonicalize(path);
-    };
-    Ok(std::fs::canonicalize(parent)?.join(file_name))
-}
-
-fn display_target(root: &Path, target: &Path) -> PathBuf {
-    target.trim_prefix(root).to_path_buf()
-}
-
-fn relative_path(root: &Path, path: &Path) -> PathBuf {
-    path.trim_prefix(root).to_path_buf()
 }
 
 fn display_path(path: &Path) -> String {
@@ -499,116 +346,71 @@ mod tests {
 
     use super::*;
 
-    #[cfg(unix)]
-    use std::os::unix::fs::symlink;
+    fn scan(staged: &[(&str, EntryKind, &[u8])]) -> DocCheckReport {
+        let tree = StagedTree::from_memory(PathBuf::from("/repo"), &[], staged);
+        scan_instruction_docs(&tree, None).expect("scan staged tree")
+    }
 
     #[test]
-    fn scan_reports_agents_without_claude_symlink() {
-        let temp = tempfile::tempdir().expect("create temp repo");
-        write_file(&temp.path().join("README.md"), "root readme");
-        write_file(&temp.path().join("AGENTS.md"), "root agents");
+    fn scan_accepts_claude_link_through_agents_symlink_to_readme() {
+        let report = scan(&[
+            ("docs/README.md", EntryKind::File, b"docs"),
+            ("docs/AGENTS.md", EntryKind::Symlink, b"README.md"),
+            ("docs/CLAUDE.md", EntryKind::Symlink, b"README.md"),
+            ("docs/x/README.md", EntryKind::File, b"x"),
+            ("docs/x/AGENTS.md", EntryKind::Symlink, b"README.md"),
+            ("docs/x/CLAUDE.md", EntryKind::Symlink, b"AGENTS.md"),
+        ]);
 
-        let report = scan_instruction_docs_with_cancel(
-            &DocCheckConfig::new(temp.path().to_path_buf()),
-            None,
-        )
-        .expect("scan temp repo");
+        assert!(report.violations.is_empty(), "{:?}", report.violations);
+        assert_eq!(report.effective_agent_sources.len(), 2);
+        assert_eq!(report.valid_claude_links.len(), 2);
+    }
+
+    #[test]
+    fn scan_reports_each_policy_violation_from_staged_entries() {
+        let report = scan(&[
+            ("README.md", EntryKind::File, b"root"),
+            ("AGENTS.md", EntryKind::File, b"agents"),
+            ("CLAUDE.md", EntryKind::File, b"not a link"),
+            ("a/README.md", EntryKind::File, b"a"),
+            ("notes.md", EntryKind::File, b"notes"),
+            ("b/AGENTS.md", EntryKind::Symlink, b"../notes.md"),
+            ("b/CLAUDE.md", EntryKind::Symlink, b"AGENTS.md"),
+            ("c/AGENTS.md", EntryKind::Symlink, b"missing.md"),
+            ("d/CLAUDE.md", EntryKind::Symlink, b"../README.md"),
+            ("vendor/stim", EntryKind::Gitlink, b"commit"),
+        ]);
 
         assert_eq!(
             report.violations,
-            vec![DocViolation::MissingClaudeSymlink {
-                path: PathBuf::from("AGENTS.md"),
-            }]
-        );
-        assert_eq!(report.readme_files_seen, 1);
-        assert_eq!(report.effective_agent_sources.len(), 1);
-        assert_eq!(report.claude_files_seen, 0);
-    }
-
-    #[test]
-    fn scan_reports_readme_without_colocated_agents() {
-        let temp = tempfile::tempdir().expect("create temp repo");
-        std::fs::create_dir_all(temp.path().join("docs")).expect("create docs");
-        write_file(&temp.path().join("docs/README.md"), "docs");
-
-        let report = scan_instruction_docs_with_cancel(
-            &DocCheckConfig::new(temp.path().to_path_buf()),
-            None,
-        )
-        .expect("scan temp repo");
-
-        assert_eq!(
-            report.violations,
-            vec![DocViolation::MissingColocatedAgents {
-                path: PathBuf::from("docs/README.md"),
-            }]
-        );
-    }
-
-    #[test]
-    fn scan_ignores_submodule_readmes() {
-        let temp = tempfile::tempdir().expect("create temp repo");
-        write_file(
-            &temp.path().join(".gitmodules"),
-            "[submodule \"vendor/stim\"]\n\tpath = vendor/stim\n\turl = https://example.invalid/stim\n",
-        );
-        std::fs::create_dir_all(temp.path().join("vendor/stim")).expect("create vendor");
-        write_file(&temp.path().join("vendor/stim/README.md"), "upstream");
-
-        let report = scan_instruction_docs_with_cancel(
-            &DocCheckConfig::new(temp.path().to_path_buf()),
-            None,
-        )
-        .expect("scan temp repo");
-
-        assert!(report.violations.is_empty());
-        assert_eq!(report.readme_files_seen, 0);
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn scan_accepts_claude_symlink_to_agents() {
-        let temp = tempfile::tempdir().expect("create temp repo");
-        write_file(&temp.path().join("README.md"), "root readme");
-        write_file(&temp.path().join("AGENTS.md"), "root agents");
-        symlink("AGENTS.md", temp.path().join("CLAUDE.md")).expect("link claude");
-
-        let report = scan_instruction_docs_with_cancel(
-            &DocCheckConfig::new(temp.path().to_path_buf()),
-            None,
-        )
-        .expect("scan temp repo");
-
-        assert!(report.violations.is_empty());
-        assert_eq!(report.valid_claude_links.len(), 1);
-    }
-
-    #[test]
-    fn scan_rejects_regular_claude_file() {
-        let temp = tempfile::tempdir().expect("create temp repo");
-        write_file(&temp.path().join("README.md"), "root readme");
-        write_file(&temp.path().join("AGENTS.md"), "root agents");
-        write_file(&temp.path().join("CLAUDE.md"), "not a symlink");
-
-        let report = scan_instruction_docs_with_cancel(
-            &DocCheckConfig::new(temp.path().to_path_buf()),
-            None,
-        )
-        .expect("scan temp repo");
-
-        assert!(
-            report
-                .violations
-                .contains(&DocViolation::ClaudeIsNotSymlink {
+            vec![
+                DocViolation::MissingClaudeSymlink {
+                    path: PathBuf::from("AGENTS.md"),
+                },
+                DocViolation::ClaudeIsNotSymlink {
                     path: PathBuf::from("CLAUDE.md"),
-                })
+                },
+                DocViolation::MissingColocatedAgents {
+                    path: PathBuf::from("a/README.md"),
+                },
+                DocViolation::AgentsSymlinkTargetIsNotReadme {
+                    path: PathBuf::from("b/AGENTS.md"),
+                    target: PathBuf::from("notes.md"),
+                },
+                DocViolation::ClaudeTargetIsNotAgentSource {
+                    path: PathBuf::from("b/CLAUDE.md"),
+                    target: PathBuf::from("notes.md"),
+                },
+                DocViolation::AgentsBrokenSymlink {
+                    path: PathBuf::from("c/AGENTS.md"),
+                    error: "target c/missing.md is not a staged file".to_string(),
+                },
+                DocViolation::ClaudeTargetIsNotAgentSource {
+                    path: PathBuf::from("d/CLAUDE.md"),
+                    target: PathBuf::from("README.md"),
+                },
+            ]
         );
-    }
-
-    fn write_file(path: &Path, content: &str) {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).expect("create parent");
-        }
-        std::fs::write(path, content).expect("write file");
     }
 }

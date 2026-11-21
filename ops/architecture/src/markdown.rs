@@ -5,11 +5,17 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{BrokenLink, Event, LinkType, Options, Parser, Tag, TagEnd};
 use thiserror::Error;
 use unicode_general_category::{GeneralCategory, get_general_category};
 
+mod html;
+mod inventory;
+
+use inventory::Inventory;
+
 const PREFIX: &str = "stab-architecture";
+/// Directories skipped only by the non-Git filesystem fallback walker.
 const EXCLUDED_DIRECTORIES: &[&str] = &[
     ".git",
     ".next",
@@ -78,6 +84,21 @@ pub enum DocsCheckError {
         path: PathBuf,
         source: std::io::Error,
     },
+
+    #[error("{path} has a .git entry but could not be opened as a Git repository: {source}")]
+    OpenRepository {
+        path: PathBuf,
+        source: Box<gix::open::Error>,
+    },
+
+    #[error("failed to read the Git index of {path}: {source}")]
+    ReadIndex {
+        path: PathBuf,
+        source: Box<gix::worktree::open_index::Error>,
+    },
+
+    #[error("tracked path is not UTF-8: {path}")]
+    NonUtf8Path { path: String },
 }
 
 #[derive(Debug)]
@@ -92,6 +113,16 @@ struct MarkdownDocument {
 struct MarkdownLink {
     offset: usize,
     destination: String,
+    kind: LinkKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LinkKind {
+    Destination,
+    /// `<user@example.com>`: rendered as `mailto:`, never a repository path.
+    EmailAutolink,
+    /// `[text][label]` or `[label][]` whose label has no definition.
+    UndefinedReference,
 }
 
 #[derive(Debug)]
@@ -112,15 +143,25 @@ enum Destination {
     },
 }
 
-/// Recursively validates repository-owned Markdown links and heading anchors.
+/// Validates repository-owned Markdown links and heading anchors.
+///
+/// In a Git checkout the tracked index decides which files are checked and
+/// which link targets exist; elsewhere the directory tree is walked.
 pub fn check_markdown_docs(root: &Path) -> Result<DocsCheckReport, DocsCheckError> {
     let root = fs::canonicalize(root).map_err(|source| DocsCheckError::ResolveRoot {
         path: root.to_path_buf(),
         source,
     })?;
-    let mut markdown_paths = Vec::new();
+    let inventory = Inventory::load(&root)?;
     let mut walk_violations = Vec::new();
-    collect_markdown_paths(&root, &root, &mut markdown_paths, &mut walk_violations);
+    let mut markdown_paths = match &inventory {
+        Inventory::Git(tracked) => tracked.markdown_paths(),
+        Inventory::Filesystem => {
+            let mut paths = Vec::new();
+            collect_markdown_paths(&root, &root, &mut paths, &mut walk_violations);
+            paths
+        }
+    };
     markdown_paths.sort();
     markdown_paths.dedup();
 
@@ -140,6 +181,27 @@ pub fn check_markdown_docs(root: &Path) -> Result<DocsCheckReport, DocsCheckErro
     for document in documents.values() {
         for link in &document.links {
             let (line, column) = document.line_column(link.offset);
+            match link.kind {
+                LinkKind::Destination => {}
+                LinkKind::EmailAutolink => {
+                    external_link_count += 1;
+                    continue;
+                }
+                LinkKind::UndefinedReference => {
+                    violations.push(DocsViolation {
+                        path: document.relative_path.clone(),
+                        line,
+                        column,
+                        code: "markdown-undefined-reference",
+                        destination: link.destination.clone(),
+                        message: format!(
+                            "reference-style link label [{}] has no link reference definition",
+                            link.destination
+                        ),
+                    });
+                    continue;
+                }
+            }
             match classify_destination(&link.destination) {
                 Destination::External => external_link_count += 1,
                 Destination::Invalid { code, message } => {
@@ -154,9 +216,14 @@ pub fn check_markdown_docs(root: &Path) -> Result<DocsCheckReport, DocsCheckErro
                 }
                 Destination::Local { path, fragment } => {
                     local_link_count += 1;
-                    if let Err((code, message)) =
-                        validate_local_link(&root, &documents, document, &path, fragment.as_deref())
-                    {
+                    if let Err((code, message)) = validate_local_link(
+                        &root,
+                        &inventory,
+                        &documents,
+                        document,
+                        &path,
+                        fragment.as_deref(),
+                    ) {
                         violations.push(DocsViolation {
                             path: document.relative_path.clone(),
                             line,
@@ -307,7 +374,22 @@ fn read_document(root: &Path, relative_path: &Path) -> Result<MarkdownDocument, 
 }
 
 fn parse_document(source: &str) -> (BTreeSet<String>, Vec<MarkdownLink>) {
-    let parser = Parser::new_ext(source, gfm_options()).into_offset_iter();
+    let mut broken_references = Vec::new();
+    let record_broken_reference = |link: BrokenLink<'_>| {
+        // A shortcut `[label]` without a definition is ordinary bracketed text,
+        // so only full and collapsed references are unambiguous link intents.
+        if matches!(link.link_type, LinkType::Reference | LinkType::Collapsed) {
+            broken_references.push(MarkdownLink {
+                offset: link.span.start,
+                destination: link.reference.into_string(),
+                kind: LinkKind::UndefinedReference,
+            });
+        }
+        None
+    };
+    let parser =
+        Parser::new_with_broken_link_callback(source, gfm_options(), Some(record_broken_reference))
+            .into_offset_iter();
     let mut links = Vec::new();
     let mut anchors = BTreeSet::new();
     let mut used_anchors = BTreeSet::new();
@@ -326,11 +408,36 @@ fn parse_document(source: &str) -> (BTreeSet<String>, Vec<MarkdownLink>) {
                     anchors.insert(unique_anchor(base, &mut used_anchors));
                 }
             }
-            Event::Start(Tag::Link { dest_url, .. } | Tag::Image { dest_url, .. }) => {
+            Event::Start(
+                Tag::Link {
+                    link_type,
+                    dest_url,
+                    ..
+                }
+                | Tag::Image {
+                    link_type,
+                    dest_url,
+                    ..
+                },
+            ) => {
                 links.push(MarkdownLink {
                     offset: range.start,
                     destination: dest_url.into_string(),
+                    kind: if link_type == LinkType::Email {
+                        LinkKind::EmailAutolink
+                    } else {
+                        LinkKind::Destination
+                    },
                 });
+            }
+            Event::Html(html) | Event::InlineHtml(html) => {
+                links.extend(html::link_destinations(&html).into_iter().map(
+                    |(offset, destination)| MarkdownLink {
+                        offset: range.start.saturating_add(offset),
+                        destination,
+                        kind: LinkKind::Destination,
+                    },
+                ));
             }
             Event::Text(text) | Event::Code(text) if heading.is_some() => {
                 if let Some(heading) = heading.as_mut() {
@@ -345,6 +452,8 @@ fn parse_document(source: &str) -> (BTreeSet<String>, Vec<MarkdownLink>) {
             _ => {}
         }
     }
+    links.append(&mut broken_references);
+    links.sort_by_key(|link| link.offset);
     (anchors, links)
 }
 
@@ -502,6 +611,7 @@ fn hex_value(value: u8) -> Option<u8> {
 
 fn validate_local_link(
     root: &Path,
+    inventory: &Inventory,
     documents: &BTreeMap<PathBuf, MarkdownDocument>,
     source: &MarkdownDocument,
     destination_path: &str,
@@ -541,6 +651,11 @@ fn validate_local_link(
                 target_relative.display()
             ),
         ));
+    }
+    if let Inventory::Git(tracked) = inventory
+        && !tracked.contains(&target_relative)
+    {
+        return Err(inventory::untracked_target_error(&target_relative));
     }
 
     let Some(fragment) = fragment.filter(|fragment| !fragment.is_empty()) else {
@@ -640,201 +755,4 @@ fn filesystem_violation(
 }
 
 #[cfg(test)]
-mod tests {
-    use std::fs;
-    use std::path::Path;
-
-    use tempfile::TempDir;
-
-    use super::{DocsCheckReport, check_markdown_docs, github_heading_slug};
-
-    fn repository(files: &[(&str, &str)]) -> TempDir {
-        let root = tempfile::tempdir().expect("fixture repository should be created");
-        for (relative, contents) in files {
-            let path = root.path().join(relative);
-            fs::create_dir_all(path.parent().expect("fixture path should have a parent"))
-                .expect("fixture parent should be created");
-            fs::write(path, contents).expect("fixture Markdown should be written");
-        }
-        root
-    }
-
-    fn report(root: &Path) -> DocsCheckReport {
-        check_markdown_docs(root).expect("fixture repository should be checkable")
-    }
-
-    fn codes(report: &DocsCheckReport) -> Vec<&'static str> {
-        report
-            .violations
-            .iter()
-            .map(|violation| violation.code)
-            .collect()
-    }
-
-    #[test]
-    fn accepts_local_files_same_and_cross_file_anchors_and_external_links() {
-        let root = repository(&[
-            (
-                "README.md",
-                "# Home\n\n[local](docs/guide.md#details)\n[same](#home)\n[site](https://example.com)\n",
-            ),
-            (
-                "docs/guide.md",
-                "# Guide\n\n## Details\n\n[up](../README.md)\n",
-            ),
-        ]);
-
-        let report = report(root.path());
-
-        assert!(report.passed(), "{:?}", report.violations);
-        assert_eq!(report.markdown_file_count, 2);
-        assert_eq!(report.local_link_count, 3);
-        assert_eq!(report.external_link_count, 1);
-    }
-
-    #[test]
-    fn reports_missing_paths_and_broken_anchors_together_in_source_order() {
-        let root = repository(&[
-            (
-                "README.md",
-                "# Home\n\n[missing](missing.md)\n[anchor](guide.md#absent)\n",
-            ),
-            ("guide.md", "# Present\n"),
-        ]);
-
-        let first_report = report(root.path());
-        let repeated_report = report(root.path());
-
-        assert_eq!(
-            codes(&first_report),
-            vec!["markdown-missing-target", "markdown-missing-anchor"]
-        );
-        assert_eq!(first_report.violations, repeated_report.violations);
-        assert_eq!(
-            first_report
-                .violations
-                .first()
-                .expect("missing-target violation should exist")
-                .line,
-            3
-        );
-        assert_eq!(
-            first_report
-                .violations
-                .get(1)
-                .expect("missing-anchor violation should exist")
-                .line,
-            4
-        );
-    }
-
-    #[test]
-    fn disambiguates_duplicate_heading_anchors() {
-        let root = repository(&[(
-            "README.md",
-            "# Echo\n\n# Echo\n\n# Echo 1\n\n# Echo-1\n\n# Echo\n\n[first](#echo)\n[second](#echo-1)\n[derived](#echo-1-1)\n[collision](#echo-1-2)\n[last](#echo-2)\n[missing](#echo-3)\n",
-        )]);
-
-        let report = report(root.path());
-
-        assert_eq!(codes(&report), vec!["markdown-missing-anchor"]);
-        assert_eq!(
-            report
-                .violations
-                .first()
-                .expect("missing-anchor violation should exist")
-                .destination,
-            "#echo-3"
-        );
-    }
-
-    #[test]
-    fn treats_heading_attribute_syntax_as_gfm_text() {
-        let root = repository(&[(
-            "README.md",
-            "# Section {#custom}\n\n[rendered heading](#section-custom)\n[not a custom id](#custom)\n",
-        )]);
-
-        let report = report(root.path());
-
-        assert_eq!(codes(&report), vec!["markdown-missing-anchor"]);
-        assert_eq!(
-            report
-                .violations
-                .first()
-                .expect("missing-anchor violation should exist")
-                .destination,
-            "#custom"
-        );
-    }
-
-    #[test]
-    fn matches_github_unicode_heading_slug_rules() {
-        assert_eq!(github_heading_slug("What’s new?"), "whats-new");
-        assert_eq!(github_heading_slug("I ♥ Unicode"), "i--unicode");
-        assert_eq!(github_heading_slug("Greek Θ"), "greek-θ");
-        assert_eq!(github_heading_slug("alpha\tbeta\u{200e}"), "alphabeta");
-        assert_eq!(github_heading_slug("alpha\u{a0}beta"), "alphabeta");
-    }
-
-    #[test]
-    fn ignores_link_syntax_inside_code_fences_and_inline_code() {
-        let root = repository(&[(
-            "README.md",
-            "# Code\n\n```markdown\n[not a link](missing.md)\n```\n\n`[also not](absent.md)`\n",
-        )]);
-
-        let report = report(root.path());
-
-        assert!(report.passed(), "{:?}", report.violations);
-        assert_eq!(report.local_link_count, 0);
-    }
-
-    #[test]
-    fn rejects_lexical_and_symlink_traversal_outside_the_repository() {
-        let parent = tempfile::tempdir().expect("fixture parent should be created");
-        let root = parent.path().join("repo");
-        fs::create_dir(&root).expect("fixture repository should be created");
-        fs::write(parent.path().join("outside.md"), "# Outside\n")
-            .expect("outside fixture should be written");
-        fs::write(
-            root.join("README.md"),
-            "# Home\n\n[lexical](../../outside.md)\n[symlink](escape.md)\n",
-        )
-        .expect("fixture Markdown should be written");
-        #[cfg(unix)]
-        std::os::unix::fs::symlink(parent.path().join("outside.md"), root.join("escape.md"))
-            .expect("fixture symlink should be created");
-
-        let report = report(&root);
-
-        #[cfg(unix)]
-        assert_eq!(
-            codes(&report),
-            vec![
-                "markdown-path-traversal",
-                "markdown-target-outside-repository",
-                "markdown-source-outside-repository"
-            ]
-        );
-        #[cfg(not(unix))]
-        assert_eq!(codes(&report), vec!["markdown-path-traversal"]);
-    }
-
-    #[test]
-    fn excludes_generated_build_vendor_and_git_trees() {
-        let root = repository(&[
-            ("README.md", "# Home\n"),
-            ("target/broken.md", "[bad](missing.md)\n"),
-            ("build/broken.md", "[bad](missing.md)\n"),
-            ("generated/broken.md", "[bad](missing.md)\n"),
-            ("vendor/broken.md", "[bad](missing.md)\n"),
-            (".git/broken.md", "[bad](missing.md)\n"),
-        ]);
-
-        let report = report(root.path());
-
-        assert!(report.passed(), "{:?}", report.violations);
-        assert_eq!(report.markdown_file_count, 1);
-    }
-}
+mod tests;

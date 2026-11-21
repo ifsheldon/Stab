@@ -1,8 +1,10 @@
 //! Staged source-file line-count checks.
 
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use thiserror::Error;
+
+use crate::paths::is_excluded_tree;
 
 const PREFIX: &str = "stab-large-files";
 
@@ -10,24 +12,11 @@ pub(crate) const DEFAULT_LINE_THRESHOLD: usize = 1_200;
 pub(crate) const DEFAULT_WATCH_THRESHOLD: usize = 900;
 
 const CODE_EXTENSIONS: &[&str] = &[
-    "bash", "cjs", "css", "html", "js", "jsx", "mjs", "py", "rs", "sass", "scss", "sh", "sql",
-    "toml", "ts", "tsx", "vue", "yaml", "yml", "zsh",
+    "bash", "cjs", "css", "html", "js", "jsx", "just", "mjs", "py", "rs", "sass", "scss", "sh",
+    "sql", "toml", "ts", "tsx", "vue", "yaml", "yml", "zsh",
 ];
 
 const CODE_BASENAMES: &[&str] = &["Dockerfile", "Justfile", "Makefile", "Rakefile", "justfile"];
-
-const EXCLUDED_COMPONENTS: &[&str] = &[
-    ".git",
-    ".next",
-    ".turbo",
-    "build",
-    "coverage",
-    "dist",
-    "generated",
-    "node_modules",
-    "target",
-    "vendor",
-];
 
 const EXCLUDED_FILENAMES: &[&str] = &[
     "Cargo.lock",
@@ -220,16 +209,7 @@ fn count_lines_in_bytes(bytes: &[u8]) -> Option<usize> {
 }
 
 fn should_skip(path: &Path) -> bool {
-    has_excluded_component(path) || has_excluded_filename(path)
-}
-
-fn has_excluded_component(path: &Path) -> bool {
-    path.components().any(|component| {
-        let Component::Normal(name) = component else {
-            return false;
-        };
-        EXCLUDED_COMPONENTS.iter().any(|excluded| name == *excluded)
-    })
+    is_excluded_tree(path) || has_excluded_filename(path)
 }
 
 fn has_excluded_filename(path: &Path) -> bool {
@@ -293,5 +273,29 @@ mod tests {
 
         assert_eq!(report.scanned_files, 0);
         assert!(report_passed(&report));
+    }
+
+    #[test]
+    fn staged_blob_scan_checks_nested_build_modules_and_just_files() {
+        let config = BlobScanConfig::new(
+            vec![
+                SourceBlob::new(
+                    PathBuf::from("crates/stab-x/src/build/mod.rs"),
+                    b"x\nx\n".to_vec(),
+                ),
+                SourceBlob::new(
+                    PathBuf::from("justfiles/maintenance.just"),
+                    b"x\nx\n".to_vec(),
+                ),
+            ],
+            2,
+            None,
+        )
+        .expect("valid config");
+
+        let report = scan_large_file_blobs(&config).expect("scan blobs");
+
+        assert_eq!(report.scanned_files, 2);
+        assert_eq!(report.oversized.len(), 2);
     }
 }

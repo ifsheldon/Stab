@@ -2532,6 +2532,7 @@ version = "0.2.0"
 dependencies = [
  "cargo_metadata",
  "clap",
+ "gix",
  "proc-macro2",
  "pulldown-cmark",
  "rustix",

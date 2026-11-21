@@ -1,0 +1,9 @@
+name: Build
+inputs:
+  token:
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - uses: Actions/Checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+    - uses: ./actions/nested

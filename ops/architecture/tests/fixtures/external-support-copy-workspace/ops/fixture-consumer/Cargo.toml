@@ -1,0 +1,11 @@
+[package]
+name = "fixture-consumer"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dev-dependencies]
+fixture-support-copy = { package = "fixture-support", path = "../../external/fixture-support" }
+
+[lib]
+path = "src/lib.rs"

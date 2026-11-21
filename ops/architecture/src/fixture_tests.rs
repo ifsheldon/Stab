@@ -75,6 +75,7 @@ fn assert_fixture(source: &str) {
                 } else {
                     Vec::new()
                 },
+                targets: Vec::new(),
                 name: package.name,
                 relative_path: package.path,
                 rust_version,
@@ -134,6 +135,7 @@ fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
             } else {
                 Vec::new()
             },
+            targets: Vec::new(),
         })
         .collect::<Vec<_>>();
     for from in &product_packages {

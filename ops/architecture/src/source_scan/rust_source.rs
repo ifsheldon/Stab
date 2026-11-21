@@ -4,10 +4,15 @@ use syn::punctuated::Punctuated;
 use syn::visit::Visit;
 use syn::{Meta, Token};
 
+pub(super) const NON_LITERAL_PATH: &str = "<non-literal path expression>";
+
 #[derive(Default)]
 pub(super) struct SourceFacts {
     pub(super) feature_gates: BTreeSet<String>,
     pub(super) has_macro_export: bool,
+    /// Literal `#[path = "..."]` values on out-of-line `mod` items, including
+    /// ones applied through `cfg_attr`.
+    pub(super) module_path_overrides: Vec<String>,
 }
 
 pub(super) fn inspect(source: &str) -> syn::Result<SourceFacts> {
@@ -43,6 +48,42 @@ impl<'ast> Visit<'ast> for SourceInspector {
         if let Err(error) = collect_feature_gates(&attribute.meta, &mut self.facts.feature_gates) {
             self.attribute_error = Some(error);
         }
+    }
+
+    fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
+        for attribute in &item.attrs {
+            if let Err(error) =
+                collect_path_overrides(&attribute.meta, &mut self.facts.module_path_overrides)
+            {
+                self.attribute_error.get_or_insert(error);
+            }
+        }
+        syn::visit::visit_item_mod(self, item);
+    }
+}
+
+fn collect_path_overrides(meta: &Meta, output: &mut Vec<String>) -> syn::Result<()> {
+    match meta {
+        Meta::NameValue(name_value) if name_value.path.is_ident("path") => {
+            match &name_value.value {
+                syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(value),
+                    ..
+                }) => output.push(value.value()),
+                // A non-literal path cannot be audited; record it so the policy
+                // rejects it rather than silently skipping it.
+                _ => output.push(NON_LITERAL_PATH.to_owned()),
+            }
+            Ok(())
+        }
+        Meta::List(list) if list.path.is_ident("cfg_attr") => {
+            let nested = list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
+            for meta in nested {
+                collect_path_overrides(&meta, output)?;
+            }
+            Ok(())
+        }
+        Meta::Path(_) | Meta::List(_) | Meta::NameValue(_) => Ok(()),
     }
 }
 
@@ -137,6 +178,19 @@ mod tests {
 
         assert!(facts.feature_gates.is_empty());
         assert!(!facts.has_macro_export);
+    }
+
+    #[test]
+    fn records_direct_and_conditional_module_path_overrides() {
+        let facts = inspect(
+            "#[path = \"elsewhere.rs\"] mod direct;\nmod inline { #[cfg_attr(unix, path = \"../escape.rs\")] mod nested; }\n#[doc = \"path = ignored.rs\"] mod documented;",
+        )
+        .expect("fixture should parse");
+
+        assert_eq!(
+            facts.module_path_overrides,
+            ["elsewhere.rs".to_owned(), "../escape.rs".to_owned()]
+        );
     }
 
     #[test]

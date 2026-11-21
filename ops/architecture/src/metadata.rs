@@ -6,8 +6,8 @@ use cargo_metadata::{
 };
 
 use crate::{
-    CheckError, DeclaredPathDependency, DependencyKind, PackageSpec, WorkspaceEdge, WorkspaceGraph,
-    policy::ResolvedDependencyIdentity,
+    CheckError, DeclaredPathDependency, DependencyKind, PackageSpec, TargetSpec, WorkspaceEdge,
+    WorkspaceGraph, policy::ResolvedDependencyIdentity,
 };
 
 pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckError> {
@@ -73,6 +73,25 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
             .collect::<Vec<_>>();
         binary_targets.sort();
         binary_targets.dedup();
+        let mut targets = package
+            .targets
+            .iter()
+            .map(|target| {
+                let src_path =
+                    std::fs::canonicalize(target.src_path.as_std_path()).map_err(|source| {
+                        CheckError::InspectSource {
+                            path: target.src_path.clone().into_std_path_buf(),
+                            source,
+                        }
+                    })?;
+                Ok(TargetSpec {
+                    name: target.name.clone(),
+                    library: target.kind.iter().any(is_library_kind),
+                    src_path,
+                })
+            })
+            .collect::<Result<Vec<_>, CheckError>>()?;
+        targets.sort();
         packages.push(PackageSpec {
             name: package.name.to_string(),
             relative_path,
@@ -80,6 +99,7 @@ pub(super) fn load_workspace_graph(root: &Path) -> Result<WorkspaceGraph, CheckE
             version: package.version.clone(),
             publish: package.publish.clone(),
             binary_targets,
+            targets,
         });
     }
     packages.sort_by(|left, right| {
@@ -227,6 +247,18 @@ fn dependency_is_optional(
     Ok(!declarations.is_empty() && declarations.iter().all(|dependency| dependency.optional))
 }
 
+fn is_library_kind(kind: &TargetKind) -> bool {
+    matches!(
+        kind,
+        TargetKind::Lib
+            | TargetKind::RLib
+            | TargetKind::DyLib
+            | TargetKind::CDyLib
+            | TargetKind::StaticLib
+            | TargetKind::ProcMacro
+    )
+}
+
 fn metadata_options() -> Vec<String> {
     vec!["--locked".to_owned(), "--all-features".to_owned()]
 }
@@ -255,35 +287,6 @@ impl DependencyKind {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn cargo_dependency_kinds_are_preserved() {
-        assert_eq!(
-            DependencyKind::from_cargo(CargoDependencyKind::Normal),
-            DependencyKind::Normal
-        );
-        assert_eq!(
-            DependencyKind::from_cargo(CargoDependencyKind::Development),
-            DependencyKind::Development
-        );
-        assert_eq!(
-            DependencyKind::from_cargo(CargoDependencyKind::Build),
-            DependencyKind::Build
-        );
-    }
-
-    #[test]
-    fn workspace_paths_are_repository_relative() {
-        let package = PackageSpec {
-            name: "stab-core".to_owned(),
-            relative_path: std::path::PathBuf::from("crates/stab-core"),
-            rust_version: None,
-            version: cargo_metadata::semver::Version::new(0, 2, 0),
-            publish: None,
-            binary_targets: Vec::new(),
-        };
-        assert_eq!(package.relative_path, Path::new("crates/stab-core"));
-    }
 
     #[test]
     fn metadata_exposes_forbidden_optional_product_edges() {
@@ -348,6 +351,24 @@ mod tests {
         assert!(violation.message.contains("fixture-consumer"));
         assert!(violation.message.contains("stab-core"));
         assert!(violation.message.contains("external/stab-core"));
+    }
+
+    #[test]
+    fn metadata_rejects_an_external_path_copy_of_a_test_support_package() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/external-support-copy-workspace");
+        let graph = load_workspace_graph(&root).expect("load external-support-copy fixture");
+
+        let report = crate::policy::validate_graph(&graph);
+        let [violation] = report.violations.as_slice() else {
+            panic!(
+                "expected one shadowed-package violation: {:?}",
+                report.violations
+            );
+        };
+        assert_eq!(violation.code, "external-workspace-package-dependency");
+        assert!(violation.message.contains("fixture-consumer"));
+        assert!(violation.message.contains("external/fixture-support"));
     }
 
     #[test]
