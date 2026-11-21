@@ -8,9 +8,9 @@ use std::convert::Infallible;
 
 use stab_engine::{
     DetectionCompileError, DetectionConversionLimits, DetectionError, DetectionResourceKind,
-    DetectionResourceLimitError, DetectionSamplingCompiler, MeasurementToDetectionCompiler,
-    RandomPolicy, ReferenceSampleMode, Seed, ShotCount, circuit_reference_signs_with_limits,
-    validate_detection_sampling_circuit_with_limits,
+    DetectionResourceLimitError, DetectionSamplingCompiler, DetectionSamplingSessionOptions,
+    MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode, Seed, ShotCount,
+    circuit_reference_signs,
 };
 use stab_model::{
     Circuit, CircuitInstruction, Gate, MemoryBudget, QubitId, RepeatBlock, RepeatCount,
@@ -40,10 +40,12 @@ fn compile(
     circuit: &Circuit,
     limits: DetectionConversionLimits,
 ) -> Result<stab_engine::MeasurementToDetectionPlan, DetectionCompileError> {
-    MeasurementToDetectionCompiler::new()
-        .limits(limits)
-        .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample)
-        .compile(circuit)
+    MeasurementToDetectionCompiler {
+        reference_sample_mode: ReferenceSampleMode::SkipReferenceSample,
+        memory_budget: limits.memory_budget,
+        cancellation: limits.cancellation,
+    }
+    .compile(circuit)
 }
 
 fn compile_resource(error: DetectionCompileError) -> DetectionResourceLimitError {
@@ -63,10 +65,12 @@ fn detection_resource(error: DetectionError) -> DetectionResourceLimitError {
 fn compact_reference_sign_plan_bytes(circuit: &Circuit) -> u64 {
     let mut limit = 0;
     loop {
-        match circuit_reference_signs_with_limits(
+        match circuit_reference_signs(
             circuit,
-            DetectionConversionLimits::default()
-                .with_memory_budget(MemoryBudget::from_bytes(limit)),
+            &DetectionConversionLimits {
+                memory_budget: MemoryBudget::from_bytes(limit),
+                ..Default::default()
+            },
         ) {
             Ok(_) => return limit,
             Err(error) => {
@@ -118,7 +122,7 @@ fn shallow_repeat_breadth_does_not_consume_nesting_budget() {
         sibling_count,
         &Circuit::from_stim_str("RX 0\nOBSERVABLE_INCLUDE(0) X0\n").expect("direct-frame body"),
     );
-    DetectionSamplingCompiler::new()
+    DetectionSamplingCompiler::default()
         .compile(&direct)
         .expect("shallow direct-frame siblings must not count as nested repeats");
 }
@@ -136,12 +140,14 @@ fn repeat_nesting_rejects_before_recursive_work() {
                     Circuit::from_stim_str("M 0\nDETECTOR rec[-1]\n").expect("parse fused fixture")
                 };
                 let circuit = nested_circuit(RepeatNestingLimit::HARD_MAX, body);
-                let plan = DetectionSamplingCompiler::new()
-                    .limits(DetectionConversionLimits::default())
+                let plan = DetectionSamplingCompiler::default()
                     .compile(&circuit)
                     .expect("the accepted detector nesting boundary must compile");
                 let mut session = plan
-                    .session(RandomPolicy::Seeded(Seed::new(7)))
+                    .session(&DetectionSamplingSessionOptions {
+                        random: RandomPolicy::Seeded(Seed::new(7)),
+                        ..Default::default()
+                    })
                     .expect("the accepted detector nesting boundary must allocate state");
                 let mut sink = NullDetectionSink::default();
                 session
@@ -163,12 +169,10 @@ fn repeat_nesting_rejects_before_recursive_work() {
             compile(&rejected, DetectionConversionLimits::default())
                 .expect_err("the first excess direct-conversion level must reject"),
         ),
-        detection_resource(
-            validate_detection_sampling_circuit_with_limits(
-                &rejected,
-                DetectionConversionLimits::default(),
-            )
-            .expect_err("detection sampling must apply the same nesting boundary"),
+        compile_resource(
+            DetectionSamplingCompiler::default()
+                .compile(&rejected)
+                .expect_err("detection sampling must apply the same nesting boundary"),
         ),
     ] {
         assert_eq!(resource.kind(), DetectionResourceKind::RepeatNesting);
@@ -188,12 +192,10 @@ fn repeat_nesting_rejects_before_recursive_work() {
                 };
                 let circuit = nested_circuit(10_000, body);
                 if detector_frame {
-                    detection_resource(
-                        validate_detection_sampling_circuit_with_limits(
-                            &circuit,
-                            DetectionConversionLimits::default(),
-                        )
-                        .expect_err("deep frame admission must reject"),
+                    compile_resource(
+                        DetectionSamplingCompiler::default()
+                            .compile(&circuit)
+                            .expect_err("deep frame admission must reject"),
                     )
                 } else {
                     compile_resource(
@@ -248,13 +250,13 @@ fn reference_sign_entrypoint_propagates_the_exact_budget() {
     let repeated = Circuit::from_stim_str("M 0\nREPEAT 3 {\nDETECTOR rec[-1]\n}\n")
         .expect("parse repeated term fixture");
     let exact_bytes = compact_reference_sign_plan_bytes(&repeated);
-    let limits = |bytes| {
-        DetectionConversionLimits::default().with_memory_budget(MemoryBudget::from_bytes(bytes))
+    let limits = |bytes| DetectionConversionLimits {
+        memory_budget: MemoryBudget::from_bytes(bytes),
+        ..Default::default()
     };
-    circuit_reference_signs_with_limits(&repeated, limits(exact_bytes))
-        .expect("admit the exact budget");
+    circuit_reference_signs(&repeated, &limits(exact_bytes)).expect("admit the exact budget");
     let error = detection_resource(
-        circuit_reference_signs_with_limits(&repeated, limits(exact_bytes - 1))
+        circuit_reference_signs(&repeated, &limits(exact_bytes - 1))
             .expect_err("reject the first excess byte"),
     );
     assert_eq!(error.kind(), DetectionResourceKind::CompiledBytes);

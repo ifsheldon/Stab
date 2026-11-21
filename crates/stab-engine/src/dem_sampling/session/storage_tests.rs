@@ -32,13 +32,13 @@ fn plan(detectors: usize, observables: usize, errors: usize) -> DemSamplingPlan 
     if observables > 0 {
         text.push_str(&format!("logical_observable L{}\n", observables - 1));
     }
-    DemSamplingCompiler::new()
+    DemSamplingCompiler::default()
         .compile(&DetectorErrorModel::from_dem_str(&text).expect("parse storage DEM"))
         .expect("compile storage DEM")
 }
 
 fn budget(bytes: u128) -> DemSamplerLimits {
-    DemSamplerLimits::default().with_memory_budget(MemoryBudget::from_bytes(
+    DemSamplerLimits::new(MemoryBudget::from_bytes(
         u64::try_from(bytes).expect("test budget fits u64"),
     ))
 }
@@ -133,14 +133,22 @@ fn session_storage_admits_the_exact_budget_and_rejects_the_first_excess_byte_bef
         }
     );
     model
-        .session_with_limits(RandomPolicy::Seeded(Seed::new(1)), budget(exact))
+        .session(&crate::DemSamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(1)),
+            memory_budget: Some(budget(exact).memory_budget()),
+            ..Default::default()
+        })
         .expect("open a session at the exact budget");
 
     let mut rejected = None;
     let allocated = allocation_counter::measure(|| {
         rejected = Some(
             model
-                .session_with_limits(RandomPolicy::Seeded(Seed::new(1)), budget(exact - 1))
+                .session(&crate::DemSamplingSessionOptions {
+                    random: RandomPolicy::Seeded(Seed::new(1)),
+                    memory_budget: Some(budget(exact - 1).memory_budget()),
+                    ..Default::default()
+                })
                 .expect_err("reject the first excess byte before allocation"),
         );
     });

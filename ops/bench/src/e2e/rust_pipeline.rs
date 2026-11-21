@@ -9,7 +9,8 @@ use stab_analysis::{
 };
 use stab_decoder::{DecodeBatchStatus, DecoderInputBatchView, decode_batch};
 use stab_engine::{
-    MeasurementToDetectionCompiler, RandomPolicy, SamplingCompiler, Seed, ShotCount,
+    MeasurementToDetectionCompiler, RandomPolicy, SamplingCompiler, SamplingSessionOptions, Seed,
+    ShotCount,
 };
 use stab_model::{Cancellation, Probability};
 use stab_records::{
@@ -58,10 +59,10 @@ pub(super) fn execute(
         .map_err(|source| source.to_string())?;
     let mut decoder =
         ExactMlDecoderSession::try_compile_model(&model).map_err(|source| source.to_string())?;
-    let sampling_plan = SamplingCompiler::new()
+    let sampling_plan = SamplingCompiler::default()
         .compile(circuit)
         .map_err(|source| source.to_string())?;
-    let detection_plan = MeasurementToDetectionCompiler::new()
+    let detection_plan = MeasurementToDetectionCompiler::default()
         .compile(circuit)
         .map_err(|source| source.to_string())?;
     if detection_plan.detector_width() != decoder.layout().detector_width()
@@ -70,10 +71,13 @@ pub(super) fn execute(
         return Err("compiled sampling and decoder layouts disagree".to_string());
     }
     let mut sampling = sampling_plan
-        .session(RandomPolicy::Seeded(Seed::new(seed)))
+        .session(&SamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(seed)),
+            ..SamplingSessionOptions::default()
+        })
         .map_err(|source| source.to_string())?;
     let mut conversion = detection_plan
-        .session()
+        .session(&Default::default())
         .map_err(|source| source.to_string())?;
     let mut report = PipelineReport::default();
     let mut sink = LogicalFailureSink::new(&mut decoder, &mut report)?;

@@ -12,6 +12,26 @@ use super::test_support::{
 use super::*;
 
 use crate::ReferenceSampleMode;
+
+/// Compiles a default detection-sampling plan, which validates the circuit for sampling.
+fn validate_detection_sampling_circuit(
+    circuit: &Circuit,
+) -> Result<DetectionSamplingPlan, DetectionCompileError> {
+    DetectionSamplingCompiler::default().compile(circuit)
+}
+
+/// The measurement count of `circuit`'s default detection conversion.
+fn measurement_record_count(circuit: &Circuit) -> DetectionResult<usize> {
+    Ok(
+        ConversionPlan::from_circuit_with_limits(circuit, DetectionConversionLimits::default())?
+            .measurement_count,
+    )
+}
+
+/// The detector plus observable width of `circuit`'s default detection conversion.
+fn detection_record_width(circuit: &Circuit) -> DetectionResult<usize> {
+    super::detection_record_width(circuit, &DetectionConversionLimits::default())
+}
 use stab_model::CircuitItem;
 
 #[test]

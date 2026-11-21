@@ -4,9 +4,8 @@ use stab_model::{Cancellation, Cancelled};
 use stab_records::DetectionSink;
 
 use super::{
-    DetectionExecutionError, DetectionRunError, DetectionRunProgress, DetectionRunStatus,
-    DetectionRunSummary, DirectDetectionState, DirectDetectorFramePlan, MeasurementToDetectionPlan,
-    detection_plane_view,
+    DetectionExecutionError, DirectDetectionState, DirectDetectorFramePlan,
+    MeasurementToDetectionPlan, detection_plane_view,
 };
 use crate::detection::conversion_window::WindowedConversion;
 use crate::detection::frame::{
@@ -15,14 +14,17 @@ use crate::detection::frame::{
 };
 use crate::sampling::session_cancellation;
 use crate::work_poll::WorkPoll;
-use crate::{LaneWidth, RandomPolicy, ShotCount, SinkFailurePhase};
+use crate::{
+    LaneWidth, RandomPolicy, RunError, RunProgress, RunStatus, RunSummary, ShotCount,
+    SinkFailurePhase,
+};
 
 pub(super) fn run_direct<Sink>(
     direct: &DirectDetectorFramePlan,
     state: &mut DirectDetectionState,
     shots: ShotCount,
     sink: &mut Sink,
-) -> Result<DetectionRunSummary, DetectionRunError<Sink::Error>>
+) -> Result<RunSummary, RunError<DetectionExecutionError, Sink::Error>>
 where
     Sink: DetectionSink,
 {
@@ -63,12 +65,10 @@ where
              committed,
              attempted,
          }| {
-            let progress = DetectionRunProgress::new(committed, attempted);
+            let progress = RunProgress::new(committed, attempted);
             match error {
-                DetectionDeliveryError::Engine(source) => {
-                    DetectionRunError::Engine { source, progress }
-                }
-                DetectionDeliveryError::Sink(source) => DetectionRunError::Sink {
+                DetectionDeliveryError::Engine(source) => RunError::Engine { source, progress },
+                DetectionDeliveryError::Sink(source) => RunError::Sink {
                     phase: SinkFailurePhase::WriteBatch,
                     source,
                     progress,
@@ -77,22 +77,23 @@ where
         },
     )?;
     if let Err(source) = sink.finish() {
-        return Err(DetectionRunError::Sink {
+        return Err(RunError::Sink {
             phase: SinkFailurePhase::Finish,
             source,
-            progress: DetectionRunProgress::new(outcome.committed, 0),
+            progress: RunProgress::new(outcome.committed, 0),
         });
     }
-    Ok(DetectionRunSummary {
-        status: if outcome.completed {
-            DetectionRunStatus::Completed
-        } else {
-            DetectionRunStatus::Cancelled
-        },
-        requested_shots: shots,
-        committed_shots: ShotCount::new(outcome.committed),
-        total_committed_shots: ShotCount::new(outcome.committed),
-    })
+    let status = if outcome.completed {
+        RunStatus::Completed
+    } else {
+        RunStatus::Cancelled
+    };
+    Ok(RunSummary::new(
+        status,
+        shots,
+        outcome.committed,
+        outcome.committed,
+    ))
 }
 
 enum DetectionDeliveryError<SinkError> {

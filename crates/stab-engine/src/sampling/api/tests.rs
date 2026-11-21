@@ -102,11 +102,14 @@ fn executable_contract_identity_changes_plan_fingerprint() {
 #[test]
 fn counter_overflow_rejects_before_work_without_poisoning() {
     let circuit = Circuit::from_stim_str("M 0\n").expect("parse circuit");
-    let plan = SamplingCompiler::new()
+    let plan = SamplingCompiler::default()
         .compile(&circuit)
         .expect("compile plan");
     let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(1)))
+        .session(&SamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(1)),
+            ..Default::default()
+        })
         .expect("construct session");
     session.total_committed_shots = u64::MAX;
     let mut sink = MeasurementCodecSink::try_new(RecordFormat::ZeroOne, MeasurementWidth::new(1))
@@ -125,11 +128,14 @@ fn counter_overflow_rejects_before_work_without_poisoning() {
 #[test]
 fn internal_batch_invariant_failure_poisons_with_exact_progress() {
     let circuit = Circuit::from_stim_str("H 0\nM 0\n").expect("parse circuit");
-    let plan = SamplingCompiler::new()
+    let plan = SamplingCompiler::default()
         .compile(&circuit)
         .expect("compile plan");
     let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(2)))
+        .session(&SamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(2)),
+            ..Default::default()
+        })
         .expect("construct session");
     // Frame state sized for a two-measurement program cannot record this plan's one measurement.
     let other = crate::detection::frame::CircuitProgram::compile(
@@ -148,7 +154,7 @@ fn internal_batch_invariant_failure_poisons_with_exact_progress() {
         Err(RunError::Engine {
             source: SamplingExecutionError::InternalInvariant { .. },
             progress,
-        }) if progress == SamplingRunProgress::new(0, 1)
+        }) if progress == RunProgress::new(0, 1)
     );
     assert!(session.is_poisoned());
     assert_matches!(
@@ -156,7 +162,7 @@ fn internal_batch_invariant_failure_poisons_with_exact_progress() {
         Err(RunError::Engine {
             source: SamplingExecutionError::SessionPoisoned,
             progress,
-        }) if progress == SamplingRunProgress::new(0, 0)
+        }) if progress == RunProgress::new(0, 0)
     );
 }
 
@@ -164,21 +170,23 @@ fn internal_batch_invariant_failure_poisons_with_exact_progress() {
 fn pauli_frame_preserves_reference_modes_and_seeded_partitions() {
     let circuit = Circuit::from_stim_str("X 9\nM 9\nR 9\nH 9\nX_ERROR(0.25) 9\nM 9\n")
         .expect("parse fixture");
-    let plan = SamplingCompiler::new()
+    let plan = SamplingCompiler::default()
         .compile(&circuit)
         .expect("compile fixture");
 
     let mut with_reference = plan
-        .session_with_reference_mode(
-            RandomPolicy::Seeded(Seed::new(43)),
-            ReferenceSampleMode::UseReferenceSample,
-        )
+        .session(&SamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(43)),
+            reference_sample_mode: ReferenceSampleMode::UseReferenceSample,
+            ..Default::default()
+        })
         .expect("construct reference session");
     let mut without_reference = plan
-        .session_with_reference_mode(
-            RandomPolicy::Seeded(Seed::new(43)),
-            ReferenceSampleMode::SkipReferenceSample,
-        )
+        .session(&SamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(43)),
+            reference_sample_mode: ReferenceSampleMode::SkipReferenceSample,
+            ..Default::default()
+        })
         .expect("construct skip-reference session");
     let mut physical = RecordSink::default();
     let mut deviations = RecordSink::default();
@@ -210,11 +218,12 @@ fn pauli_frame_preserves_reference_modes_and_seeded_partitions() {
     let mut streams = Vec::new();
     for &lane_width in LaneWidth::ALL {
         let session = || {
-            plan.session_with_lane_width(
-                RandomPolicy::Seeded(Seed::new(47)),
-                ReferenceSampleMode::UseReferenceSample,
+            plan.session(&SamplingSessionOptions {
+                random: RandomPolicy::Seeded(Seed::new(47)),
+                reference_sample_mode: ReferenceSampleMode::UseReferenceSample,
                 lane_width,
-            )
+                ..Default::default()
+            })
             .expect("construct session")
         };
         let mut combined_session = session();
@@ -248,18 +257,19 @@ fn deterministic_sampling_is_identical_at_every_lane_width_and_shot_count() {
     let circuit =
         Circuit::from_stim_str("X 0\nM 0\nH 5\nMR 0\nRX 2\nMX 2\nX 3\nCX 3 4\nM 3 4\nMPP X2*Z3\n")
             .expect("parse fixture");
-    let plan = SamplingCompiler::new()
+    let plan = SamplingCompiler::default()
         .compile(&circuit)
         .expect("compile fixture");
     let expected = [true, true, false, true, true, true];
     for shots in [1_u64, 63, 64, 65, 255, 256, 257, 1000] {
         for &lane_width in LaneWidth::ALL {
             let mut session = plan
-                .session_with_lane_width(
-                    RandomPolicy::Seeded(Seed::new(shots)),
-                    ReferenceSampleMode::UseReferenceSample,
+                .session(&SamplingSessionOptions {
+                    random: RandomPolicy::Seeded(Seed::new(shots)),
+                    reference_sample_mode: ReferenceSampleMode::UseReferenceSample,
                     lane_width,
-                )
+                    ..Default::default()
+                })
                 .expect("construct session");
             let mut sink = RecordSink::default();
             session
@@ -283,11 +293,14 @@ fn warmed_session_allocation_does_not_scale_with_shot_count() {
         "SWAP 0 1\nMZZ 0 1\n",
     ] {
         let circuit = Circuit::from_stim_str(source).expect("parse fixture");
-        let plan = SamplingCompiler::new()
+        let plan = SamplingCompiler::default()
             .compile(&circuit)
             .expect("compile fixture");
         let mut session = plan
-            .session(RandomPolicy::Seeded(Seed::new(47)))
+            .session(&SamplingSessionOptions {
+                random: RandomPolicy::Seeded(Seed::new(47)),
+                ..Default::default()
+            })
             .expect("construct session");
         let mut sink = DigestSink::default();
         session
@@ -358,7 +371,7 @@ fn former_direct_z_circuits_keep_their_analytic_outcome_distribution() {
     ];
     for (index, (source, probability, skip)) in cases.into_iter().enumerate() {
         let circuit = Circuit::from_stim_str(source).expect("parse single-measurement fixture");
-        let plan = SamplingCompiler::new()
+        let plan = SamplingCompiler::default()
             .compile(&circuit)
             .expect("compile single-measurement fixture");
         let mode = if skip {
@@ -367,7 +380,11 @@ fn former_direct_z_circuits_keep_their_analytic_outcome_distribution() {
             ReferenceSampleMode::UseReferenceSample
         };
         let mut session = plan
-            .session_with_reference_mode(RandomPolicy::Seeded(Seed::new(index as u64 + 11)), mode)
+            .session(&SamplingSessionOptions {
+                random: RandomPolicy::Seeded(Seed::new(index as u64 + 11)),
+                reference_sample_mode: mode,
+                ..Default::default()
+            })
             .expect("construct session");
         let mut sink = RecordSink::default();
         session
@@ -403,7 +420,9 @@ fn plan_qubit_count_matches_the_circuit_simulated_qubit_count() {
         "",
     ] {
         let circuit = Circuit::from_stim_str(text).expect("parse circuit");
-        let plan = SamplingCompiler::new().compile(&circuit).expect("compile");
+        let plan = SamplingCompiler::default()
+            .compile(&circuit)
+            .expect("compile");
         assert_eq!(
             plan.qubit_count(),
             circuit.simulated_qubit_count(),

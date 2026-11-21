@@ -97,7 +97,7 @@ impl ReferenceSampleTree {
     pub fn from_circuit_reference_sample(
         circuit: &Circuit,
     ) -> Result<Self, ReferenceSampleTreeError> {
-        let prefix_bits = SamplingCompiler::new()
+        let prefix_bits = SamplingCompiler::default()
             .compile(circuit)?
             .try_reference_sample()?;
         Self::try_new(prefix_bits, Vec::new(), 1)

@@ -3,9 +3,10 @@ use std::path::{Path, PathBuf};
 
 use clap::Args;
 use stab_engine::{
-    DemReplayBatchStatus, DemReplayRecordStore, DemReplayRetention, DemReplaySession,
-    DemReplayStoreState, DemReplayTransaction, DemSamplerLimits, DemSamplingCompiler,
-    DemSamplingPlan, DemSamplingRunError, DemSamplingSession, RandomPolicy, Seed, ShotCount,
+    DemReplayRecordStore, DemReplayRetention, DemReplaySession, DemReplaySessionOptions,
+    DemReplayStoreState, DemReplayTransaction, DemSamplingCompiler, DemSamplingExecutionError,
+    DemSamplingPlan, DemSamplingSession, DemSamplingSessionOptions, RandomPolicy, RunError,
+    RunStatus, Seed, ShotCount,
 };
 use stab_records::{
     DemSampleBatchView, DemSampleSink, FormatError, FormatErrorCode as RecordFormatErrorCode,
@@ -152,10 +153,12 @@ where
     };
     let (dem, dem_hold) = ledger.parse_dem(input_bytes)?;
     let compile = ledger.stage();
-    let plan = DemSamplingCompiler::new()
-        .limits(DemSamplerLimits::new(compile.get()))
-        .compile(&dem)
-        .map_err(|error| compile.refusal(error))?;
+    let plan = DemSamplingCompiler {
+        memory_budget: compile.get(),
+        ..DemSamplingCompiler::default()
+    }
+    .compile(&dem)
+    .map_err(|error| compile.refusal(error))?;
     drop(dem);
     ledger.release(dem_hold);
     let _plan_hold = ledger.hold(plan.retained_bytes());
@@ -168,7 +171,10 @@ where
         replay_reader = Some((reader, ledger.hold(reader.bytes)));
     }
     let session_stage = ledger.stage();
-    let limits = DemSamplerLimits::new(session_stage.get());
+    let replay_options = DemReplaySessionOptions {
+        memory_budget: Some(session_stage.get()),
+        ..DemReplaySessionOptions::default()
+    };
     let record_bytes = replay_reader
         .as_ref()
         .map_or(0, |(reader, _)| reader.text_record_bytes);
@@ -185,7 +191,7 @@ where
             plan.error_count(),
             args.shots,
         )? {
-            let mut store = plan.replay_record_store(&limits, shots);
+            let mut store = plan.replay_record_store(&replay_options, shots);
             delivery = validate_replay_input(
                 replay_input,
                 args.replay_err_in_format,
@@ -224,13 +230,17 @@ where
         SampleDemExecution::Replay {
             input,
             session: plan
-                .replay_session_with_limits(shots, limits)
+                .replay_session(&replay_options, shots)
                 .map_err(|error| session_stage.refusal(error))?,
         }
     } else {
         SampleDemExecution::Sample(
-            plan.session_with_limits(dem_random_policy(args.seed), limits)
-                .map_err(|error| session_stage.refusal(error))?,
+            plan.session(&DemSamplingSessionOptions {
+                random: dem_random_policy(args.seed),
+                memory_budget: Some(session_stage.get()),
+                ..DemSamplingSessionOptions::default()
+            })
+            .map_err(|error| session_stage.refusal(error))?,
         )
     };
     let mut outputs = io.activate()?;
@@ -252,7 +262,7 @@ where
             let mut transaction = session
                 .start_transaction(&mut sink)
                 .map_err(map_dem_run_error)?;
-            let mut status = DemReplayBatchStatus::Accepted;
+            let mut status = RunStatus::Completed;
             if let Some(retained) = &retained {
                 status = transaction
                     .write_retained(retained)
@@ -261,7 +271,7 @@ where
             // A store that kept every record is the whole replay: the input is never read again,
             // which is what lets a pipe replay without a rewind.
             if let ReplayDelivery::FromInput(resume) = delivery
-                && status.is_accepted()
+                && status.is_completed()
                 && resume.records < args.shots
             {
                 ReplayInput::new(
@@ -362,7 +372,10 @@ impl ReplayReaderStorage {
         format: RecordFormat,
         stage: StageBudget,
     ) -> Result<Self, CliError> {
-        let limits = DemSamplerLimits::new(stage.get());
+        let options = DemReplaySessionOptions {
+            memory_budget: Some(stage.get()),
+            ..DemReplaySessionOptions::default()
+        };
         let saturating = |bytes: u128| u64::try_from(bytes).unwrap_or(u64::MAX);
         // PTB64 replays read whole groups as bit planes and never request a shot-major batch.
         let batch_records = if format == RecordFormat::Ptb64 {
@@ -373,7 +386,7 @@ impl ReplayReaderStorage {
         let fixed =
             saturating(RecordStreamStorage::new(format, plan.error_count(), batch_records).bytes());
         let free = plan
-            .admit_replay_input(&limits, fixed)
+            .admit_replay_input(&options, fixed)
             .map_err(|error| stage.refusal(error))?;
         if matches!(
             format,
@@ -393,7 +406,7 @@ impl ReplayReaderStorage {
         let bytes = fixed.saturating_add(saturating(RecordStreamStorage::text_transport_bytes(
             text_record_bytes,
         )));
-        plan.admit_replay_input(&limits, bytes)
+        plan.admit_replay_input(&options, bytes)
             .map_err(|error| stage.refusal(error))?;
         Ok(Self {
             text_record_bytes,
@@ -402,10 +415,10 @@ impl ReplayReaderStorage {
     }
 }
 
-fn map_dem_run_error(error: DemSamplingRunError<CliError>) -> CliError {
+fn map_dem_run_error(error: RunError<DemSamplingExecutionError, CliError>) -> CliError {
     match error {
-        DemSamplingRunError::Engine { source, .. } => CliError::from(source),
-        DemSamplingRunError::Sink { source, .. } => source,
+        RunError::Engine { source, .. } => CliError::from(source),
+        RunError::Sink { source, .. } => source,
     }
 }
 

@@ -2,10 +2,8 @@ use std::fmt;
 
 use stab_records::{DetectionSink, MeasurementBatchView, MeasurementSink};
 
-use super::{
-    DetectionExecutionError, DetectionRunError, DetectionRunProgress, DetectionRunStatus,
-    DetectionRunSummary, MeasurementToDetectionSession,
-};
+use super::{DetectionExecutionError, MeasurementToDetectionSession};
+use crate::{RunError, RunProgress, RunStatus, RunSummary};
 
 /// One short-lived conversion transaction bound to exactly one detection sink.
 pub struct MeasurementToDetectionTransaction<'session, 'sink, Sink> {
@@ -51,11 +49,11 @@ where
         &mut self,
         measurements: MeasurementBatchView<'_>,
         sweeps: Option<MeasurementBatchView<'_>>,
-    ) -> Result<DetectionRunSummary, DetectionRunError<Sink::Error>> {
+    ) -> Result<RunSummary, RunError<DetectionExecutionError, Sink::Error>> {
         if self.finished {
-            return Err(DetectionRunError::Engine {
+            return Err(RunError::Engine {
                 source: DetectionExecutionError::DeliveryFinished,
-                progress: DetectionRunProgress::new(self.committed_shots, 0),
+                progress: RunProgress::new(self.committed_shots, 0),
             });
         }
         let summary = self.session.write_batch_with_progress(
@@ -67,23 +65,23 @@ where
         self.committed_shots = self
             .committed_shots
             .checked_add(summary.committed_shots().get())
-            .ok_or_else(|| DetectionRunError::Engine {
+            .ok_or_else(|| RunError::Engine {
                 source: DetectionExecutionError::ShotCounterOverflow,
-                progress: DetectionRunProgress::new(self.committed_shots, 0),
+                progress: RunProgress::new(self.committed_shots, 0),
             })?;
         Ok(summary)
     }
 
     /// Finalizes this delivery exactly once.
-    pub fn finish(mut self) -> Result<(), DetectionRunError<Sink::Error>> {
+    pub fn finish(mut self) -> Result<(), RunError<DetectionExecutionError, Sink::Error>> {
         self.finish_once()
     }
 
-    fn finish_once(&mut self) -> Result<(), DetectionRunError<Sink::Error>> {
+    fn finish_once(&mut self) -> Result<(), RunError<DetectionExecutionError, Sink::Error>> {
         if self.finished {
-            return Err(DetectionRunError::Engine {
+            return Err(RunError::Engine {
                 source: DetectionExecutionError::DeliveryFinished,
-                progress: DetectionRunProgress::new(self.committed_shots, 0),
+                progress: RunProgress::new(self.committed_shots, 0),
             });
         }
         self.finished = true;
@@ -97,17 +95,14 @@ impl<Sink> MeasurementSink for MeasurementToDetectionTransaction<'_, '_, Sink>
 where
     Sink: DetectionSink,
 {
-    type Error = DetectionRunError<Sink::Error>;
+    type Error = RunError<DetectionExecutionError, Sink::Error>;
 
     fn write_batch(&mut self, batch: MeasurementBatchView<'_>) -> Result<(), Self::Error> {
         let summary = self.write_batch_with_sweep(batch, None)?;
-        if summary.status() == DetectionRunStatus::Cancelled {
-            return Err(DetectionRunError::Engine {
+        if summary.status() == RunStatus::Cancelled {
+            return Err(RunError::Engine {
                 source: DetectionExecutionError::CancelledComposition,
-                progress: DetectionRunProgress::new(
-                    self.committed_shots,
-                    summary.requested_shots().get(),
-                ),
+                progress: RunProgress::new(self.committed_shots, summary.requested_shots().get()),
             });
         }
         Ok(())

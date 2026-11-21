@@ -8,9 +8,9 @@ use std::assert_matches;
 use std::convert::Infallible;
 
 use stab_engine::{
-    DetectionCompileError, DetectionError, DetectionRunStatus, DetectionSamplingCompiler,
-    LaneWidth, MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode, SamplingCompiler,
-    SamplingRunStatus, Seed, ShotCount,
+    DetectionCompileError, DetectionError, DetectionSamplingCompiler,
+    DetectionSamplingSessionOptions, LaneWidth, MeasurementToDetectionCompiler, RandomPolicy,
+    ReferenceSampleMode, RunStatus, SamplingCompiler, SamplingSessionOptions, Seed, ShotCount,
 };
 use stab_model::Circuit;
 use stab_records::{
@@ -62,21 +62,22 @@ fn sample_at(
     reference_mode: ReferenceSampleMode,
     lane_width: LaneWidth,
 ) -> Vec<Vec<bool>> {
-    let plan = SamplingCompiler::new()
+    let plan = SamplingCompiler::default()
         .compile(&circuit(source))
         .expect("compile sampling fixture");
     let mut session = plan
-        .session_with_lane_width(
-            RandomPolicy::Seeded(Seed::new(SEED)),
-            reference_mode,
+        .session(&SamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(SEED)),
+            reference_sample_mode: reference_mode,
             lane_width,
-        )
+            ..Default::default()
+        })
         .expect("create sampling session");
     let mut sink = MeasurementCollector::default();
     let summary = session
         .run(ShotCount::new(shots), &mut sink)
         .expect("sample fixture");
-    assert_eq!(summary.status(), SamplingRunStatus::Completed);
+    assert_eq!(summary.status(), RunStatus::Completed);
     assert_eq!(summary.committed_shots(), ShotCount::new(shots));
     sink.records
 }
@@ -130,17 +131,21 @@ fn detect(source: &str, shots: u64) -> DetectionCollector {
 }
 
 fn detect_at(source: &str, shots: u64, lane_width: LaneWidth) -> DetectionCollector {
-    let plan = DetectionSamplingCompiler::new()
+    let plan = DetectionSamplingCompiler::default()
         .compile(&circuit(source))
         .expect("compile detection fixture");
     let mut session = plan
-        .session_with_lane_width(RandomPolicy::Seeded(Seed::new(SEED)), lane_width)
+        .session(&DetectionSamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(SEED)),
+            lane_width,
+            ..Default::default()
+        })
         .expect("create detection session");
     let mut sink = DetectionCollector::default();
     let summary = session
         .run(ShotCount::new(shots), &mut sink)
         .expect("sample detection fixture");
-    assert_eq!(summary.status(), DetectionRunStatus::Completed);
+    assert_eq!(summary.status(), RunStatus::Completed);
     assert_eq!(summary.committed_shots(), ShotCount::new(shots));
     sink
 }
@@ -583,13 +588,15 @@ fn detection_sweep_feedback_and_folded_conversion_contract() {
              OBSERVABLE_INCLUDE(5) rec[-1]\n\
          }\n",
     );
-    let plan = MeasurementToDetectionCompiler::new()
+    let plan = MeasurementToDetectionCompiler::default()
         .compile(&sweep_circuit)
         .expect("compile sweep conversion");
     let measurements = PackedShotBatch::from_records(&[vec![false; 18], vec![false; 18]], 18)
         .expect("pack measurements");
 
-    let mut omitted_session = plan.session().expect("create omitted-sweep session");
+    let mut omitted_session = plan
+        .session(&Default::default())
+        .expect("create omitted-sweep session");
     let mut omitted = DetectionCollector::default();
     omitted_session
         .run(
@@ -603,7 +610,9 @@ fn detection_sweep_feedback_and_folded_conversion_contract() {
 
     let sweeps = PackedShotBatch::from_records(&[vec![false; 6], vec![true; 6]], 6)
         .expect("pack sweep records");
-    let mut explicit_session = plan.session().expect("create explicit-sweep session");
+    let mut explicit_session = plan
+        .session(&Default::default())
+        .expect("create explicit-sweep session");
     let mut explicit = DetectionCollector::default();
     explicit_session
         .run(
@@ -642,12 +651,14 @@ fn detection_sweep_feedback_and_folded_conversion_contract() {
         ReferenceSampleMode::UseReferenceSample,
         ReferenceSampleMode::SkipReferenceSample,
     ] {
-        let plan = MeasurementToDetectionCompiler::new()
-            .reference_sample_mode(mode)
-            .compile(&pauli_circuit)
-            .expect("compile sweep Pauli-observable conversion");
+        let plan = MeasurementToDetectionCompiler {
+            reference_sample_mode: mode,
+            ..MeasurementToDetectionCompiler::default()
+        }
+        .compile(&pauli_circuit)
+        .expect("compile sweep Pauli-observable conversion");
         let mut session = plan
-            .session()
+            .session(&Default::default())
             .expect("create sweep Pauli-observable session");
         let mut output = DetectionCollector::default();
         session
@@ -686,13 +697,15 @@ fn detection_sweep_feedback_and_folded_conversion_contract() {
             let conversion_source = format!(
                 "R 0 2\n{preparation}\n{deterministic_flip}M 0\nDETECTOR rec[-1]\n{gate}\n{measurement}\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) Z2\n"
             );
-            let plan = MeasurementToDetectionCompiler::new()
+            let plan = MeasurementToDetectionCompiler::default()
                 .compile(&circuit(&conversion_source))
                 .expect("compile feedback conversion");
             let measurements =
                 PackedShotBatch::from_records(&[vec![active, active], vec![active, !active]], 2)
                     .expect("pack feedback measurements");
-            let mut session = plan.session().expect("create feedback conversion session");
+            let mut session = plan
+                .session(&Default::default())
+                .expect("create feedback conversion session");
             let mut converted = DetectionCollector::default();
             session
                 .run(
@@ -719,8 +732,10 @@ fn detection_sweep_feedback_and_folded_conversion_contract() {
     // change turns a sweep-controlled Pauli into a measured flip. Each row flips its last
     // record exactly when the sweep bit is set, as pinned Stim v1.16.0 `m2d
     // --skip_reference_sample --append_observables` prints for all-zero measurements.
-    let skip_reference = MeasurementToDetectionCompiler::new()
-        .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample);
+    let skip_reference = MeasurementToDetectionCompiler {
+        reference_sample_mode: ReferenceSampleMode::SkipReferenceSample,
+        ..MeasurementToDetectionCompiler::default()
+    };
     let collapse_sweeps =
         PackedShotBatch::from_records(&[vec![false], vec![true]], 1).expect("pack collapse sweeps");
     for (source, width) in [
@@ -745,7 +760,9 @@ fn detection_sweep_feedback_and_folded_conversion_contract() {
             .expect("compile collapse conversion");
         let measurements = PackedShotBatch::from_records(&vec![vec![false; width]; 2], width)
             .expect("pack collapse measurements");
-        let mut session = plan.session().expect("create collapse conversion session");
+        let mut session = plan
+            .session(&Default::default())
+            .expect("create collapse conversion session");
         let mut output = DetectionCollector::default();
         session
             .run(
@@ -764,7 +781,7 @@ fn detection_sweep_feedback_and_folded_conversion_contract() {
     }
 
     // The reported reproduction with the reference sample: pinned Stim prints 1, 0, 1, 0.
-    let reported = MeasurementToDetectionCompiler::new()
+    let reported = MeasurementToDetectionCompiler::default()
         .compile(&circuit("CZ sweep[0] 0\nM 0\nH 0\nM 0\nDETECTOR rec[-1]\n"))
         .expect("compile reported collapse conversion");
     let measurements = PackedShotBatch::from_records(
@@ -779,7 +796,9 @@ fn detection_sweep_feedback_and_folded_conversion_contract() {
     .expect("pack reported measurements");
     let sweeps =
         PackedShotBatch::from_records(&vec![vec![true]; 4], 1).expect("pack reported sweeps");
-    let mut session = reported.session().expect("create reported session");
+    let mut session = reported
+        .session(&Default::default())
+        .expect("create reported session");
     let mut output = DetectionCollector::default();
     session
         .run(
@@ -804,7 +823,7 @@ fn detection_sweep_feedback_and_folded_conversion_contract() {
              OBSERVABLE_INCLUDE(0) rec[-1]\n\
          }\n",
     );
-    let folded_plan = MeasurementToDetectionCompiler::new()
+    let folded_plan = MeasurementToDetectionCompiler::default()
         .compile(&folded_feedback)
         .expect("compile folded feedback conversion");
     let folded_measurements = PackedShotBatch::from_records(
@@ -816,7 +835,7 @@ fn detection_sweep_feedback_and_folded_conversion_contract() {
     )
     .expect("pack folded feedback measurements");
     let mut folded_session = folded_plan
-        .session()
+        .session(&Default::default())
         .expect("create folded feedback session");
     let mut folded_output = DetectionCollector::default();
     folded_session
@@ -845,14 +864,16 @@ fn detection_sweep_feedback_and_folded_conversion_contract() {
          M 1\n\
          DETECTOR rec[-1]\n",
     );
-    let noop_plan = MeasurementToDetectionCompiler::new()
+    let noop_plan = MeasurementToDetectionCompiler::default()
         .compile(&classical_cz)
         .expect("compile all-classical CZ conversion");
     let noop_measurements = PackedShotBatch::from_records(&[vec![true, true, false]], 3)
         .expect("pack no-op measurements");
     let noop_sweeps =
         PackedShotBatch::from_records(&[vec![true, true]], 2).expect("pack no-op sweeps");
-    let mut noop_session = noop_plan.session().expect("create no-op session");
+    let mut noop_session = noop_plan
+        .session(&Default::default())
+        .expect("create no-op session");
     let mut noop_output = DetectionCollector::default();
     noop_session
         .run(
@@ -871,10 +892,12 @@ fn detection_sweep_feedback_and_folded_conversion_contract() {
              }\n\
          }\n",
     );
-    let error = MeasurementToDetectionCompiler::new()
-        .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample)
-        .compile(&invalid_nested_reference)
-        .expect_err("a lookback available only after a later iteration must reject");
+    let error = MeasurementToDetectionCompiler {
+        reference_sample_mode: ReferenceSampleMode::SkipReferenceSample,
+        ..MeasurementToDetectionCompiler::default()
+    }
+    .compile(&invalid_nested_reference)
+    .expect_err("a lookback available only after a later iteration must reject");
     assert_matches!(
         error,
         DetectionCompileError::InvalidCircuit(

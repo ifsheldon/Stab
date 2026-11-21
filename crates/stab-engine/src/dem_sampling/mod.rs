@@ -11,13 +11,12 @@ mod replay_store;
 mod session;
 
 pub use error::{DemError, DemResourceKind, DemResourceLimitError};
-pub use limits::DemSamplerLimits;
+pub(crate) use limits::DemSamplerLimits;
+pub use limits::{DemReplaySessionOptions, DemSamplingSessionOptions};
 pub use plan::{DemSamplingCompiler, DemSamplingPlan};
 pub use replay_store::{DemReplayRecordStore, DemReplayRetention, DemReplayStoreState};
 pub use session::{
-    DemReplayBatchStatus, DemReplaySession, DemReplayTransaction, DemSamplingExecutionError,
-    DemSamplingRunError, DemSamplingRunProgress, DemSamplingRunStatus, DemSamplingRunSummary,
-    DemSamplingSession,
+    DemReplaySession, DemReplayTransaction, DemSamplingExecutionError, DemSamplingSession,
 };
 
 pub(crate) use error::DemResult;

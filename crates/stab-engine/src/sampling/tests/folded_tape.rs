@@ -9,7 +9,9 @@ use stab_records::{DetectionBatchView, DetectionSink};
 
 use super::reference_differential::RandomCliffordEmitter;
 use super::*;
-use crate::{DetectionSamplingCompiler, detection::frame::ProgramOptions};
+use crate::{
+    DetectionSamplingCompiler, DetectionSamplingSessionOptions, detection::frame::ProgramOptions,
+};
 
 #[derive(Default)]
 struct DetectionBits {
@@ -81,11 +83,14 @@ fn general_stream(plan: &SamplingPlan, seed: u64) -> Vec<bool> {
 }
 
 fn detection_stream(circuit: &Circuit, seed: u64) -> Vec<bool> {
-    let plan = DetectionSamplingCompiler::new()
+    let plan = DetectionSamplingCompiler::default()
         .compile(circuit)
         .expect("compile detection plan");
     let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(seed)))
+        .session(&DetectionSamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(seed)),
+            ..Default::default()
+        })
         .expect("detection session");
     let mut sink = DetectionBits::default();
     session
@@ -142,10 +147,10 @@ fn folded_and_unrolled_repeats_execute_identically_on_every_program_walker() {
             assert!(folded_program.entry_count() < unrolled_program.entry_count());
         }
 
-        let folded_plan = SamplingCompiler::new()
+        let folded_plan = SamplingCompiler::default()
             .compile(&folded_circuit)
             .expect("compile folded plan");
-        let unrolled_plan = SamplingCompiler::new()
+        let unrolled_plan = SamplingCompiler::default()
             .compile(&unrolled_circuit)
             .expect("compile unrolled plan");
         let seed = 0xE3 + case as u64;

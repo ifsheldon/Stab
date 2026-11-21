@@ -31,10 +31,12 @@ impl Admissions {
 /// program's admitted size.
 fn smallest_compile_budget(circuit: &Circuit) -> u64 {
     let compiles = |bytes: u64| {
-        SamplingCompiler::new()
-            .memory_budget(MemoryBudget::from_bytes(bytes))
-            .compile(circuit)
-            .is_ok()
+        SamplingCompiler {
+            memory_budget: MemoryBudget::from_bytes(bytes),
+            ..SamplingCompiler::default()
+        }
+        .compile(circuit)
+        .is_ok()
     };
     let (mut refused, mut admitted) = (0_u64, 1_u64 << 32);
     assert!(compiles(admitted), "fixture compiles under 4 GiB");
@@ -138,7 +140,9 @@ fn held_plans_and_inlined_feedback_reduce_the_budget_of_later_stages() {
     let (parsed, parsed_bytes) =
         Circuit::from_stim_bytes_admitted(wide_session_circuit.as_bytes(), ParseLimits::default())
             .expect("parse");
-    let sample_plan = SamplingCompiler::new().compile(&parsed).expect("compile");
+    let sample_plan = SamplingCompiler::default()
+        .compile(&parsed)
+        .expect("compile");
     let plan_bytes = sample_plan.retained_bytes();
     // 64 shots uses a 64-lane materializing session (`8 * (2 * 1 + 20000) = 160,016` bytes).
     let session_bytes = 8 * (2 + 20_000);
@@ -184,7 +188,7 @@ fn held_plans_and_inlined_feedback_reduce_the_budget_of_later_stages() {
         ParseLimits::default(),
     )
     .expect("parse DEM");
-    let dem_plan = stab_engine::DemSamplingCompiler::new()
+    let dem_plan = stab_engine::DemSamplingCompiler::default()
         .compile(&dem)
         .expect("compile DEM");
     let dem_plan_bytes = dem_plan.retained_bytes();
@@ -226,11 +230,13 @@ fn held_plans_and_inlined_feedback_reduce_the_budget_of_later_stages() {
         .expect("inline");
     let inlined_bytes = inlined.admitted_bytes();
     assert!(inlined_bytes > fb_parsed_bytes * 2);
-    let m2d_plan_bytes = stab_engine::MeasurementToDetectionCompiler::new()
-        .reference_sample_mode(stab_engine::ReferenceSampleMode::SkipReferenceSample)
-        .compile(&inlined)
-        .expect("compile m2d")
-        .retained_bytes();
+    let m2d_plan_bytes = stab_engine::MeasurementToDetectionCompiler {
+        reference_sample_mode: stab_engine::ReferenceSampleMode::SkipReferenceSample,
+        ..stab_engine::MeasurementToDetectionCompiler::default()
+    }
+    .compile(&inlined)
+    .expect("compile m2d")
+    .retained_bytes();
     let m2d_budget = inlined_bytes + m2d_plan_bytes - 1;
     assert!(fb_parsed_bytes + m2d_plan_bytes < m2d_budget);
     let m2d_json = run(
@@ -275,7 +281,7 @@ fn detect_admits_its_output_encoders_and_file_buffers_before_its_session() {
     let text = "R 0 1 999\nX_ERROR(0.25) 0 1\nM 0 1\nDETECTOR rec[-1]\nDETECTOR rec[-2]\n\
                 OBSERVABLE_INCLUDE(0) rec[-1]\n";
     let circuit = Circuit::from_stim_str(text).expect("parse");
-    let plan_bytes = DetectionSamplingCompiler::new()
+    let plan_bytes = DetectionSamplingCompiler::default()
         .compile(&circuit)
         .expect("compile")
         .retained_bytes();

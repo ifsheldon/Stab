@@ -857,7 +857,7 @@ impl ConversionPlan {
     }
 
     fn admit_bytes(&self, bytes: u64) -> DetectionResult<()> {
-        let budget = self.limits.memory_budget();
+        let budget = self.limits.memory_budget;
         if !budget.admits(u128::from(bytes)) {
             return Err(ResourceLimitError::detection_compiled_bytes(bytes, budget).into());
         }
@@ -936,7 +936,7 @@ impl ConversionPlan {
             &mut record.detectors,
             &mut record.observables,
             &mut cursor,
-            self.limits.cancellation(),
+            &self.limits.cancellation,
         )?;
         if cursor.measurement != self.measurement_count || cursor.detector != self.detector_count {
             return Err(DetectionError::invalid_sampler_compilation(format!(

@@ -444,6 +444,36 @@ Refusals that were misreported are now typed:
 - A budget refusal raised while a sample run is writing reports `resource-limit-exceeded` instead of `sampling-execution-failed`.
 - The JSON `span` of a refusal that has no source position is `null` instead of an empty span at byte zero.
 
+## Engine Session Options And Shared Run Types
+
+Each engine plan has one session constructor and one streaming entry that take an options value, and the run types are defined once.
+Earlier sections of this guide that name a removed constructor or per-family run type describe the intermediate API.
+
+| Removed | Replacement |
+| --- | --- |
+| `SamplingPlan::{session_with_reference_mode, session_with_lane_width, session_with_budget}` and `session(random)` | `SamplingPlan::session(&SamplingSessionOptions { random, reference_sample_mode, lane_width, memory_budget })` |
+| `SamplingPlan::streaming_run_with_budget` and the positional `streaming_run` | `SamplingPlan::streaming_run(&SamplingSessionOptions, shots)` |
+| `DetectionSamplingPlan::{session_with_lane_width, session_with_budget, streaming_run_with_budget}` | `session(&DetectionSamplingSessionOptions)` and `streaming_run(&DetectionSamplingSessionOptions, shots)` |
+| `MeasurementToDetectionPlan::session_with_budget` | `session(&MeasurementToDetectionSessionOptions)` |
+| `DemSamplingPlan::{session_with_limits, replay_session_with_limits}` | `session(&DemSamplingSessionOptions)` and `replay_session(&DemReplaySessionOptions, shots)` |
+| `DemSamplingPlan::limits()` and the public `DemSamplerLimits` | The compiler's fields and the session options |
+| Builder methods and `new()` on `SamplingCompiler`, `DetectionSamplingCompiler`, `MeasurementToDetectionCompiler`, `DemSamplingCompiler`, and `DetectionConversionLimits` | Public fields with `Default` and struct-update syntax |
+| `measurement_record_count` and `_with_limits` | A plan's `measurement_width()` |
+| `validate_detection_sampling_circuit` and `_with_limits` | `DetectionSamplingCompiler::default().compile(circuit)` |
+| `detection_record_width_with_limits`, `circuit_reference_signs_with_limits` | `detection_record_width(c, &DetectionConversionLimits)`, `circuit_reference_signs(c, &DetectionConversionLimits)` |
+| `circuit_reference_sample` and `CircuitReferenceSampleError` | `SamplingCompiler::default().compile(c)?.try_reference_sample()` |
+| `count_determined_measurements` and `CountDeterminedMeasurementsError` | The plan's `try_count_determined_measurements` |
+| `sample_if_circuit_has_stabilizer_flows_with_options` | `sample_if_circuit_has_stabilizer_flows(c, flows, samples, random, &SampledFlowOptions)` |
+| `SamplingRunProgress`, `DetectionRunProgress`, `DemSamplingRunProgress` | `RunProgress` |
+| `SamplingRunStatus`, `DetectionRunStatus`, `DemSamplingRunStatus`, `DemReplayBatchStatus` | `RunStatus::{Completed, Cancelled}`; `DemReplayBatchStatus::Accepted` is `Completed` |
+| `SamplingRunSummary`, `DetectionRunSummary`, `DemSamplingRunSummary` | `RunSummary` |
+| `RunError<S>`, `DetectionRunError<S>`, `DemSamplingRunError<S>` | `RunError<E, S>`, where `E` is the family's execution error |
+
+In every session options type, a `memory_budget` or `cancellation` of `None` inherits the plan's value.
+`RandomPolicy` implements `Default` as `Entropy`.
+The decoder's `DecodeBatchStatus` is unchanged.
+No command output or random stream changes.
+
 ## One Function Per Analysis Operation
 
 Every `stab-analysis` operation is one function that takes its options by reference; the `_with_options`, `_with_limits`, and `_with_budget` twins are removed, and callers of a former plain form pass `&Default::default()`.

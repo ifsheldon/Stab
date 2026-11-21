@@ -526,7 +526,7 @@ fn piped_replay_input_matches_a_file_when_the_store_keeps_every_record() {
 /// while the same records from a file replay under the same budget.
 #[test]
 fn piped_replay_input_the_budget_cannot_retain_fails_before_creating_outputs() {
-    use stab_engine::{DemSamplerLimits, DemSamplingCompiler, ShotCount};
+    use stab_engine::{DemReplaySessionOptions, DemSamplingCompiler, ShotCount};
     use stab_model::{DetectorErrorModel, MemoryBudget, ParseLimits};
 
     const DEM: &str = "repeat 64 {\n    error(0.5) D0 L0\n    shift_detectors 1\n}\n";
@@ -534,12 +534,17 @@ fn piped_replay_input_the_budget_cannot_retain_fails_before_creating_outputs() {
     let (model, _) =
         DetectorErrorModel::from_dem_bytes_admitted(DEM.as_bytes(), ParseLimits::default())
             .expect("parse");
-    let plan = DemSamplingCompiler::new().compile(&model).expect("compile");
+    let plan = DemSamplingCompiler::default()
+        .compile(&model)
+        .expect("compile");
     // The smallest whole-command budget whose store retains anything; the CLI's own holds leave
     // the store less than this, so one byte below it the store keeps nothing.
     let retains = |bytes: u64| {
         plan.replay_record_store(
-            &DemSamplerLimits::new(MemoryBudget::from_bytes(bytes)),
+            &DemReplaySessionOptions {
+                memory_budget: Some(MemoryBudget::from_bytes(bytes)),
+                ..Default::default()
+            },
             ShotCount::new(SHOTS),
         )
         .state()

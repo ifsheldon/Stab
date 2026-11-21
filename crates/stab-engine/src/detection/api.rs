@@ -21,73 +21,63 @@ use super::frame::{
 use super::{DetectionConversionLimits, PreparedMeasurementToDetection};
 use crate::sampling::{session_cancellation, session_cancellation_slot};
 use crate::work_poll::{WORD_OP_UNITS, WorkPoll};
-use crate::{LaneWidth, RandomPolicy, ReferenceSampleMode, ShotCount, SinkFailurePhase};
+use crate::{
+    LaneWidth, ReferenceSampleMode, RunError, RunProgress, RunStatus, RunSummary, ShotCount,
+    SinkFailurePhase,
+};
 
 mod contracts;
 mod delivery;
 mod execution;
+mod options;
 mod streaming;
 
-pub use contracts::{
-    DetectionCompileError, DetectionExecutionError, DetectionRunError, DetectionRunProgress,
-    DetectionRunStatus, DetectionRunSummary,
-};
+pub use contracts::{DetectionCompileError, DetectionExecutionError};
 pub use delivery::MeasurementToDetectionTransaction;
 use execution::{
     conversion_session_storage_bytes, detection_rng, invariant_error, run_direct,
     validate_conversion_session_storage, validate_direct_session_storage,
 };
+pub use options::{DetectionSamplingSessionOptions, MeasurementToDetectionSessionOptions};
 pub use streaming::StreamingDetectionRun;
 
 use crate::MAX_BATCH_SHOTS;
 
-/// Builder for immutable measurement-to-detection conversion plans.
-#[derive(Clone, Debug, Eq, PartialEq)]
+/// Options of an immutable measurement-to-detection conversion plan, and the compiler that
+/// builds it.
+///
+/// The memory budget bounds the compiled conversion, including one byte per record bit of
+/// every record the plan's consumers hold, its packed reference sample, and, unless a
+/// session's options override it, each session's reusable storage. The cancellation signal is
+/// polled while the reference sample is computed and by every session of the plan.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MeasurementToDetectionCompiler {
-    limits: DetectionConversionLimits,
-    reference_mode: ReferenceSampleMode,
+    /// Whether conversion is relative to the circuit's reference sample.
+    pub reference_sample_mode: ReferenceSampleMode,
+    /// Budget for the compiled conversion and, by default, for each session's storage.
+    pub memory_budget: MemoryBudget,
+    /// Signal polled while compiling and by every session of the plan.
+    pub cancellation: Cancellation,
 }
 
 impl MeasurementToDetectionCompiler {
-    pub fn new() -> Self {
-        Self {
-            limits: DetectionConversionLimits::default(),
-            reference_mode: ReferenceSampleMode::UseReferenceSample,
-        }
-    }
-
-    #[must_use]
-    pub fn limits(mut self, limits: DetectionConversionLimits) -> Self {
-        self.limits = limits;
-        self
-    }
-
-    #[must_use]
-    pub const fn reference_sample_mode(mut self, mode: ReferenceSampleMode) -> Self {
-        self.reference_mode = mode;
-        self
-    }
-
     pub fn compile(
         &self,
         circuit: &Circuit,
     ) -> Result<MeasurementToDetectionPlan, DetectionCompileError> {
         let converter = PreparedMeasurementToDetection::compile_with_limits(
             circuit,
-            self.reference_mode,
-            self.limits.clone(),
+            self.reference_sample_mode,
+            DetectionConversionLimits {
+                memory_budget: self.memory_budget,
+                cancellation: self.cancellation.clone(),
+            },
         )?;
         let retained_bytes = converter.compiled_bytes()?;
         Ok(MeasurementToDetectionPlan::from_converter(
             converter,
             retained_bytes,
         ))
-    }
-}
-
-impl Default for MeasurementToDetectionCompiler {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -147,16 +137,15 @@ impl MeasurementToDetectionPlan {
         ObservableWidth::new(self.inner.converter.observable_count())
     }
 
-    pub fn session(&self) -> Result<MeasurementToDetectionSession, DetectionExecutionError> {
-        self.session_with_budget(self.inner.converter.plan.limits.memory_budget())
-    }
-
-    /// Creates a conversion session, admitting its reusable storage against `memory_budget`
-    /// instead of the plan's compile budget.
-    pub fn session_with_budget(
+    /// Creates a conversion session, admitting its reusable storage against the options'
+    /// memory budget, or the plan's when the options leave it unset.
+    pub fn session(
         &self,
-        memory_budget: MemoryBudget,
+        options: &MeasurementToDetectionSessionOptions,
     ) -> Result<MeasurementToDetectionSession, DetectionExecutionError> {
+        let memory_budget = options
+            .memory_budget
+            .unwrap_or(self.inner.converter.plan.limits.memory_budget);
         MeasurementToDetectionSession::new(self.clone(), memory_budget)
     }
 }
@@ -280,7 +269,7 @@ impl MeasurementToDetectionSession {
         let storage = if converter.has_sweep_correction() {
             ConversionStorage::Planes(ConversionPlanes::try_new(
                 converter,
-                converter.plan.limits.cancellation(),
+                &converter.plan.limits.cancellation,
             )?)
         } else {
             ConversionStorage::Windowed(
@@ -290,7 +279,7 @@ impl MeasurementToDetectionSession {
         };
         Ok(Self {
             storage,
-            cancellation: session_cancellation_slot(converter.plan.limits.cancellation()),
+            cancellation: session_cancellation_slot(&converter.plan.limits.cancellation),
             plan,
             total_committed_shots: 0,
             poisoned: false,
@@ -301,7 +290,7 @@ impl MeasurementToDetectionSession {
 
     /// The signal this session polls before and while converting a batch.
     ///
-    /// It is the signal of the compiler's [`DetectionConversionLimits`] when that one is
+    /// It is the signal of [`MeasurementToDetectionCompiler::cancellation`] when that one is
     /// cancellable, and otherwise a session-local signal created by the first call. Conversion is
     /// deterministic, so a batch cancelled before or during conversion is rejected whole and the
     /// session stays resumable.
@@ -351,36 +340,36 @@ impl MeasurementToDetectionSession {
         sweeps: Option<MeasurementBatchView<'_>>,
         sink: &mut Sink,
         committed_shots: u64,
-    ) -> Result<DetectionRunSummary, DetectionRunError<Sink::Error>>
+    ) -> Result<RunSummary, RunError<DetectionExecutionError, Sink::Error>>
     where
         Sink: DetectionSink,
     {
         let shots = self
             .validate_request(measurements, sweeps)
-            .map_err(|source| DetectionRunError::Engine {
+            .map_err(|source| RunError::Engine {
                 source,
-                progress: DetectionRunProgress::new(committed_shots, 0),
+                progress: RunProgress::new(committed_shots, 0),
             })?;
         if shots.get() == 0 {
-            return Ok(self.summary(DetectionRunStatus::Completed, shots, 0));
+            return Ok(self.summary(RunStatus::Completed, shots, 0));
         }
         if session_cancellation(&self.cancellation).is_cancelled() {
-            return Ok(self.summary(DetectionRunStatus::Cancelled, shots, 0));
+            return Ok(self.summary(RunStatus::Cancelled, shots, 0));
         }
-        let shot_count = usize::try_from(shots.get()).map_err(|_| DetectionRunError::Engine {
+        let shot_count = usize::try_from(shots.get()).map_err(|_| RunError::Engine {
             source: DetectionExecutionError::InternalInvariant {
                 message: "bounded conversion batch did not fit usize".to_owned(),
             },
-            progress: DetectionRunProgress::new(committed_shots, shots.get()),
+            progress: RunProgress::new(committed_shots, shots.get()),
         })?;
         if let Err(source) = self.fill_batch(measurements, sweeps, shot_count) {
             if matches!(source, DetectionExecutionError::Cancelled(_)) {
-                return Ok(self.summary(DetectionRunStatus::Cancelled, shots, 0));
+                return Ok(self.summary(RunStatus::Cancelled, shots, 0));
             }
             self.poisoned = true;
-            return Err(DetectionRunError::Engine {
+            return Err(RunError::Engine {
                 source,
-                progress: DetectionRunProgress::new(committed_shots, shots.get()),
+                progress: RunProgress::new(committed_shots, shots.get()),
             });
         }
         let view = match &self.storage {
@@ -397,22 +386,22 @@ impl MeasurementToDetectionSession {
             Ok(batch) => batch,
             Err(source) => {
                 self.poisoned = true;
-                return Err(DetectionRunError::Engine {
+                return Err(RunError::Engine {
                     source,
-                    progress: DetectionRunProgress::new(committed_shots, shots.get()),
+                    progress: RunProgress::new(committed_shots, shots.get()),
                 });
             }
         };
         if let Err(source) = sink.write_batch(batch) {
             self.poisoned = true;
-            return Err(DetectionRunError::Sink {
+            return Err(RunError::Sink {
                 phase: SinkFailurePhase::WriteBatch,
                 source,
-                progress: DetectionRunProgress::new(committed_shots, shots.get()),
+                progress: RunProgress::new(committed_shots, shots.get()),
             });
         }
         self.total_committed_shots += shots.get();
-        Ok(self.summary(DetectionRunStatus::Completed, shots, shots.get()))
+        Ok(self.summary(RunStatus::Completed, shots, shots.get()))
     }
 
     /// Converts one bounded batch and owns the supplied sink's complete non-empty lifecycle.
@@ -422,22 +411,22 @@ impl MeasurementToDetectionSession {
         measurements: MeasurementBatchView<'_>,
         sweeps: Option<MeasurementBatchView<'_>>,
         sink: &mut Sink,
-    ) -> Result<DetectionRunSummary, DetectionRunError<Sink::Error>>
+    ) -> Result<RunSummary, RunError<DetectionExecutionError, Sink::Error>>
     where
         Sink: DetectionSink,
     {
         let requested = ShotCount::new(u64::try_from(measurements.shot_count()).map_err(|_| {
-            DetectionRunError::Engine {
+            RunError::Engine {
                 source: DetectionExecutionError::ShotCounterOverflow,
-                progress: DetectionRunProgress::new(0, 0),
+                progress: RunProgress::new(0, 0),
             }
         })?);
-        let mut delivery =
-            self.start_transaction(sink)
-                .map_err(|source| DetectionRunError::Engine {
-                    source,
-                    progress: DetectionRunProgress::new(0, 0),
-                })?;
+        let mut delivery = self
+            .start_transaction(sink)
+            .map_err(|source| RunError::Engine {
+                source,
+                progress: RunProgress::new(0, 0),
+            })?;
         let summary = delivery.write_batch_with_sweep(measurements, sweeps)?;
         if requested.get() == 0 {
             return Ok(summary);
@@ -450,22 +439,22 @@ impl MeasurementToDetectionSession {
         &mut self,
         sink: &mut Sink,
         committed_shots: u64,
-    ) -> Result<(), DetectionRunError<Sink::Error>>
+    ) -> Result<(), RunError<DetectionExecutionError, Sink::Error>>
     where
         Sink: DetectionSink,
     {
         if self.poisoned {
-            return Err(DetectionRunError::Engine {
+            return Err(RunError::Engine {
                 source: DetectionExecutionError::SessionPoisoned,
-                progress: DetectionRunProgress::new(committed_shots, 0),
+                progress: RunProgress::new(committed_shots, 0),
             });
         }
         if let Err(source) = sink.finish() {
             self.poisoned = true;
-            return Err(DetectionRunError::Sink {
+            return Err(RunError::Sink {
                 phase: SinkFailurePhase::Finish,
                 source,
-                progress: DetectionRunProgress::new(committed_shots, 0),
+                progress: RunProgress::new(committed_shots, 0),
             });
         }
         Ok(())
@@ -585,16 +574,16 @@ impl MeasurementToDetectionSession {
 
     const fn summary(
         &self,
-        status: DetectionRunStatus,
+        status: RunStatus,
         requested_shots: ShotCount,
         committed_shots: u64,
-    ) -> DetectionRunSummary {
-        DetectionRunSummary {
+    ) -> RunSummary {
+        RunSummary::new(
             status,
             requested_shots,
-            committed_shots: ShotCount::new(committed_shots),
-            total_committed_shots: ShotCount::new(self.total_committed_shots),
-        }
+            committed_shots,
+            self.total_committed_shots,
+        )
     }
 }
 
@@ -666,34 +655,32 @@ fn copy_batch_into_frame_planes(
     Ok(())
 }
 
-/// Builder for immutable circuit detection-sampling plans.
-#[derive(Clone, Debug, Eq, PartialEq)]
+/// Options of an immutable circuit detection-sampling plan, and the compiler that builds it.
+///
+/// The memory budget bounds the compiled plan and, unless a session's options override it,
+/// each session's reusable storage. The cancellation signal is polled while compiling and by
+/// every session and streaming run of the plan.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DetectionSamplingCompiler {
-    limits: DetectionConversionLimits,
+    /// Budget for the compiled plan and, by default, for each session's storage.
+    pub memory_budget: MemoryBudget,
+    /// Signal polled while compiling and by every session of the plan.
+    pub cancellation: Cancellation,
 }
 
 impl DetectionSamplingCompiler {
-    pub fn new() -> Self {
-        Self {
-            limits: DetectionConversionLimits::default(),
-        }
-    }
-
-    #[must_use]
-    pub fn limits(mut self, limits: DetectionConversionLimits) -> Self {
-        self.limits = limits;
-        self
-    }
-
     pub fn compile(
         &self,
         circuit: &Circuit,
     ) -> Result<DetectionSamplingPlan, DetectionCompileError> {
-        self.limits
-            .cancellation()
-            .check()
-            .map_err(DetectionError::from)?;
-        let direct = DirectDetectorFramePlan::compile(circuit, self.limits.clone())?;
+        self.cancellation.check().map_err(DetectionError::from)?;
+        let direct = DirectDetectorFramePlan::compile(
+            circuit,
+            DetectionConversionLimits {
+                memory_budget: self.memory_budget,
+                cancellation: self.cancellation.clone(),
+            },
+        )?;
         let retained_bytes = direct.compiled_bytes()?;
         Ok(DetectionSamplingPlan {
             inner: Arc::new(DetectionSamplingPlanInner {
@@ -701,12 +688,6 @@ impl DetectionSamplingCompiler {
                 retained_bytes,
             }),
         })
-    }
-}
-
-impl Default for DetectionSamplingCompiler {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -750,35 +731,18 @@ impl DetectionSamplingPlan {
         ObservableWidth::new(self.inner.direct.observable_count())
     }
 
+    /// Creates a reusable session.
+    ///
+    /// Session storage is admitted at the options' lane width against the options' memory
+    /// budget, or the plan's when the options leave it unset.
     pub fn session(
         &self,
-        random_policy: RandomPolicy,
+        options: &DetectionSamplingSessionOptions,
     ) -> Result<DetectionSamplingSession, DetectionExecutionError> {
-        self.session_with_lane_width(random_policy, LaneWidth::default())
-    }
-
-    /// Creates a session whose frame batches sample `lane_width` shots at a time.
-    ///
-    /// The seeded stream is a function of this plan, the seed, and `lane_width`; the default
-    /// width reproduces [`Self::session`]. Session storage is admitted at this width against the
-    /// compiler's memory budget.
-    pub fn session_with_lane_width(
-        &self,
-        random_policy: RandomPolicy,
-        lane_width: LaneWidth,
-    ) -> Result<DetectionSamplingSession, DetectionExecutionError> {
-        self.session_with_budget(random_policy, lane_width, self.inner.direct.memory_budget())
-    }
-
-    /// Creates a session like [`Self::session_with_lane_width`], admitting its storage against
-    /// `memory_budget` instead of the compiler's memory budget.
-    pub fn session_with_budget(
-        &self,
-        random_policy: RandomPolicy,
-        lane_width: LaneWidth,
-        memory_budget: MemoryBudget,
-    ) -> Result<DetectionSamplingSession, DetectionExecutionError> {
-        DetectionSamplingSession::new(self.clone(), random_policy, lane_width, memory_budget)
+        let memory_budget = options
+            .memory_budget
+            .unwrap_or_else(|| self.inner.direct.memory_budget());
+        DetectionSamplingSession::new(self.clone(), options, memory_budget)
     }
 }
 
@@ -812,14 +776,13 @@ impl fmt::Debug for DetectionSamplingSession {
 impl DetectionSamplingSession {
     fn new(
         plan: DetectionSamplingPlan,
-        random_policy: RandomPolicy,
-        lane_width: LaneWidth,
+        options: &DetectionSamplingSessionOptions,
         memory_budget: MemoryBudget,
     ) -> Result<Self, DetectionExecutionError> {
-        validate_direct_session_storage(&plan.inner.direct, lane_width, memory_budget)?;
+        validate_direct_session_storage(&plan.inner.direct, options.lane_width, memory_budget)?;
         let state = DirectDetectionState {
-            rng: detection_rng(random_policy),
-            frame: LaneFrameBatch::for_detection(&plan.inner.direct, lane_width)
+            rng: detection_rng(options.random),
+            frame: LaneFrameBatch::for_detection(&plan.inner.direct, options.lane_width)
                 .map_err(DetectionExecutionError::Conversion)?,
             pending: PendingLanes::default(),
             cancellation: session_cancellation_slot(plan.inner.direct.cancellation()),
@@ -835,9 +798,9 @@ impl DetectionSamplingSession {
 
     /// The signal this session polls between and inside batches.
     ///
-    /// It is the signal of the compiler's [`DetectionConversionLimits`] when that one is
+    /// It is the signal of [`DetectionSamplingCompiler::cancellation`] when that one is
     /// cancellable, and otherwise a session-local signal created by the first call.
-    /// Cancellation, observed before or inside a batch, returns [`DetectionRunStatus::Cancelled`]
+    /// Cancellation, observed before or inside a batch, returns [`RunStatus::Cancelled`]
     /// with the sink finalized and leaves the session resumable: a batch it interrupts is
     /// discarded with the random stream rewound, so a later run continues the seeded stream
     /// exactly where the delivered shots end.
@@ -870,14 +833,14 @@ impl DetectionSamplingSession {
         &mut self,
         shots: ShotCount,
         sink: &mut Sink,
-    ) -> Result<DetectionRunSummary, DetectionRunError<Sink::Error>>
+    ) -> Result<RunSummary, RunError<DetectionExecutionError, Sink::Error>>
     where
         Sink: DetectionSink,
     {
         if self.is_poisoned() {
-            return Err(DetectionRunError::Engine {
+            return Err(RunError::Engine {
                 source: DetectionExecutionError::SessionPoisoned,
-                progress: DetectionRunProgress::new(0, 0),
+                progress: RunProgress::new(0, 0),
             });
         }
         if self
@@ -885,13 +848,13 @@ impl DetectionSamplingSession {
             .checked_add(shots.get())
             .is_none()
         {
-            return Err(DetectionRunError::Engine {
+            return Err(RunError::Engine {
                 source: DetectionExecutionError::ShotCounterOverflow,
-                progress: DetectionRunProgress::new(0, 0),
+                progress: RunProgress::new(0, 0),
             });
         }
         if shots.get() == 0 {
-            return Ok(self.summary(DetectionRunStatus::Completed, shots, 0));
+            return Ok(self.summary(RunStatus::Completed, shots, 0));
         }
 
         let result = run_direct(&self.plan.inner.direct, &mut self.state, shots, sink);
@@ -899,18 +862,18 @@ impl DetectionSamplingSession {
         match result {
             Ok(summary) => {
                 self.total_committed_shots += summary.committed_shots().get();
-                Ok(DetectionRunSummary {
-                    status: summary.status(),
-                    requested_shots: shots,
-                    committed_shots: summary.committed_shots(),
-                    total_committed_shots: ShotCount::new(self.total_committed_shots),
-                })
+                Ok(RunSummary::new(
+                    summary.status(),
+                    shots,
+                    summary.committed_shots().get(),
+                    self.total_committed_shots,
+                ))
             }
             Err(error) => {
                 self.total_committed_shots += error.progress().committed_shots().get();
                 if matches!(
                     error,
-                    DetectionRunError::Engine {
+                    RunError::Engine {
                         source: DetectionExecutionError::ShotCounterOverflow,
                         ..
                     }
@@ -925,16 +888,16 @@ impl DetectionSamplingSession {
 
     const fn summary(
         &self,
-        status: DetectionRunStatus,
+        status: RunStatus,
         requested_shots: ShotCount,
         committed_shots: u64,
-    ) -> DetectionRunSummary {
-        DetectionRunSummary {
+    ) -> RunSummary {
+        RunSummary::new(
             status,
             requested_shots,
-            committed_shots: ShotCount::new(committed_shots),
-            total_committed_shots: ShotCount::new(self.total_committed_shots),
-        }
+            committed_shots,
+            self.total_committed_shots,
+        )
     }
 }
 

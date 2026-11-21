@@ -20,15 +20,17 @@ use stab_model::Circuit;
 
 fn reference(text: &str, policy: ReferenceSampleLoopPolicy) -> String {
     let circuit = Circuit::from_stim_str(text).expect("test circuit should parse");
-    SamplingCompiler::new()
-        .reference_sample_loop_policy(policy)
-        .compile(&circuit)
-        .expect("compile sampler")
-        .try_reference_sample()
-        .expect("reference sample")
-        .into_iter()
-        .map(|bit| if bit { '1' } else { '0' })
-        .collect()
+    SamplingCompiler {
+        reference_sample_loop_policy: policy,
+        ..SamplingCompiler::default()
+    }
+    .compile(&circuit)
+    .expect("compile sampler")
+    .try_reference_sample()
+    .expect("reference sample")
+    .into_iter()
+    .map(|bit| if bit { '1' } else { '0' })
+    .collect()
 }
 
 #[test]

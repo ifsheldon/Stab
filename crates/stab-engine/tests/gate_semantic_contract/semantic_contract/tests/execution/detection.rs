@@ -4,8 +4,9 @@ use std::error::Error;
 use crate::{
     Circuit, DetectionBatchView, DetectionSink, MeasurementBatchView,
     execution::{
-        DetectionRunError, DetectionSamplingCompiler, MeasurementToDetectionCompiler, RandomPolicy,
-        ReferenceSampleMode, Seed, ShotCount,
+        DetectionExecutionError, DetectionSamplingCompiler, DetectionSamplingSessionOptions,
+        MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode, RunError, Seed,
+        ShotCount,
     },
 };
 use stab_records::{BitIndex, PackedShotBatch, ShotIndex};
@@ -78,10 +79,12 @@ pub(super) fn convert_detection_records(
         ))
         .into());
     }
-    let plan = MeasurementToDetectionCompiler::new()
-        .reference_sample_mode(reference_mode)
-        .compile(circuit)?;
-    let mut session = plan.session()?;
+    let plan = MeasurementToDetectionCompiler {
+        reference_sample_mode: reference_mode,
+        ..MeasurementToDetectionCompiler::default()
+    }
+    .compile(circuit)?;
+    let mut session = plan.session(&Default::default())?;
     let mut sink = DetectionCollector::default();
     for (chunk_index, measurement_records) in measurements.chunks(64).enumerate() {
         let measurement_batch =
@@ -123,12 +126,15 @@ pub(super) fn collect_detection_samples(
     shots: usize,
     seed: Option<u64>,
 ) -> TestResult<DetectionOutput> {
-    let plan = DetectionSamplingCompiler::new().compile(circuit)?;
+    let plan = DetectionSamplingCompiler::default().compile(circuit)?;
     let random_policy = seed.map_or(RandomPolicy::Entropy, |seed| {
         RandomPolicy::Seeded(Seed::new(seed))
     });
-    let mut session =
-        plan.session_with_lane_width(random_policy, super::super::session_lane_width())?;
+    let mut session = plan.session(&DetectionSamplingSessionOptions {
+        random: random_policy,
+        lane_width: super::super::session_lane_width(),
+        ..Default::default()
+    })?;
     let mut sink = DetectionCollector::default();
     session
         .run(ShotCount::new(u64::try_from(shots)?), &mut sink)
@@ -140,9 +146,9 @@ pub(super) fn collect_detection_samples(
     })
 }
 
-fn map_detection_run_error(error: DetectionRunError<Infallible>) -> Box<dyn Error> {
+fn map_detection_run_error(error: RunError<DetectionExecutionError, Infallible>) -> Box<dyn Error> {
     match error {
-        DetectionRunError::Engine { source, .. } => Box::new(source),
-        DetectionRunError::Sink { source, .. } => match source {},
+        RunError::Engine { source, .. } => Box::new(source),
+        RunError::Sink { source, .. } => match source {},
     }
 }

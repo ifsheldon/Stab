@@ -12,8 +12,8 @@ use stab_records::{BitIndex, MeasurementBatchView, MeasurementSink, ShotIndex};
 use thiserror::Error;
 
 use crate::{
-    LaneWidth, RandomPolicy, ReferenceSampleMode, RunError, SamplingCompiler,
-    SamplingExecutionError, SamplingRunStatus, Seed, ShotCount,
+    RandomPolicy, RunError, RunStatus, SamplingCompiler, SamplingExecutionError,
+    SamplingSessionOptions, Seed, ShotCount,
 };
 
 const SAMPLED_FLOW_SAMPLE_WORD_WIDTH: u64 = 256;
@@ -60,7 +60,9 @@ impl SampledFlowError {
 
 type SampledFlowResult<T> = Result<T, SampledFlowError>;
 
-/// Resource and cancellation policy of [`sample_if_circuit_has_stabilizer_flows_with_options`].
+/// Resource and cancellation policy of [`sample_if_circuit_has_stabilizer_flows`].
+///
+/// The default admits each check against [`MemoryBudget::DEFAULT`] and is not cancellable.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SampledFlowOptions {
     /// Budget that admits, for each queried flow, its augmented noiseless witness circuit, the
@@ -83,36 +85,17 @@ pub struct SampledFlowOptions {
 /// rounded up to 256 to match Stim's `MAX_BITWORD_WIDTH` confidence behavior on the public Python
 /// path.
 ///
-/// Admits its storage against [`MemoryBudget::DEFAULT`] and is not cancellable; see
-/// [`sample_if_circuit_has_stabilizer_flows_with_options`].
+/// A check that the options' budget cannot admit fails with the typed admission error of the
+/// stage that refused it: [`crate::SamplingCompileError::CompiledBytesLimit`] for the augmented
+/// witness circuit or its compiled plan, or [`SamplingExecutionError::SessionStorageLimit`] for
+/// the witness simulator or the sampling session. Observed cancellation fails with
+/// [`SampledFlowError::Cancelled`] rather than returning a verdict from partial samples.
 pub fn sample_if_circuit_has_stabilizer_flows(
     circuit: &Circuit,
     flows: &[Flow],
     sample_count: ShotCount,
     random_policy: RandomPolicy,
-) -> SampledFlowResult<Vec<bool>> {
-    sample_if_circuit_has_stabilizer_flows_with_options(
-        circuit,
-        flows,
-        sample_count,
-        random_policy,
-        SampledFlowOptions::default(),
-    )
-}
-
-/// [`sample_if_circuit_has_stabilizer_flows`] under a caller's memory budget and cancellation.
-///
-/// A check that the budget cannot admit fails with the typed admission error of the stage that
-/// refused it: [`crate::SamplingCompileError::CompiledBytesLimit`] for the augmented witness
-/// circuit or its compiled plan, or [`SamplingExecutionError::SessionStorageLimit`] for the
-/// witness simulator or the sampling session. Observed cancellation fails with
-/// [`SampledFlowError::Cancelled`] rather than returning a verdict from partial samples.
-pub fn sample_if_circuit_has_stabilizer_flows_with_options(
-    circuit: &Circuit,
-    flows: &[Flow],
-    sample_count: ShotCount,
-    random_policy: RandomPolicy,
-    options: SampledFlowOptions,
+    options: &SampledFlowOptions,
 ) -> SampledFlowResult<Vec<bool>> {
     options.cancellation.check()?;
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
@@ -132,7 +115,7 @@ pub fn sample_if_circuit_has_stabilizer_flows_with_options(
                 measurement_count,
                 sample_count,
                 sampled_flow_random_policy(random_policy, flow_index),
-                &options,
+                options,
             )
         })
         .collect()
@@ -171,22 +154,24 @@ fn sample_if_noiseless_circuit_has_stabilizer_flow(
             .bytes()
             .saturating_sub(augmented_bytes),
     );
-    let plan = SamplingCompiler::new()
-        .memory_budget(compile_budget)
-        .cancellation(options.cancellation.clone())
-        .compile(&augmented)
-        .map_err(|error| match error {
-            crate::SamplingCompileError::CompiledBytesLimit { exceeded } => {
-                crate::SamplingCompileError::CompiledBytesLimit {
-                    exceeded: MemoryBudgetExceeded::new(
-                        exceeded.required().saturating_add(augmented_bytes),
-                        options.memory_budget,
-                    ),
-                }
-                .into()
+    let plan = SamplingCompiler {
+        memory_budget: compile_budget,
+        cancellation: options.cancellation.clone(),
+        ..SamplingCompiler::default()
+    }
+    .compile(&augmented)
+    .map_err(|error| match error {
+        crate::SamplingCompileError::CompiledBytesLimit { exceeded } => {
+            crate::SamplingCompileError::CompiledBytesLimit {
+                exceeded: MemoryBudgetExceeded::new(
+                    exceeded.required().saturating_add(augmented_bytes),
+                    options.memory_budget,
+                ),
             }
-            other => SampledFlowError::from(other),
-        })?;
+            .into()
+        }
+        other => SampledFlowError::from(other),
+    })?;
     drop(augmented);
 
     let plan_bytes = plan.retained_bytes();
@@ -215,12 +200,11 @@ fn sample_if_noiseless_circuit_has_stabilizer_flow(
     .map_err(map_session_refusal)?;
     let witness_index = measurement_count;
     let mut session = plan
-        .session_with_budget(
-            random_policy,
-            ReferenceSampleMode::UseReferenceSample,
-            LaneWidth::default(),
-            session_budget,
-        )
+        .session(&SamplingSessionOptions {
+            random: random_policy,
+            memory_budget: Some(session_budget),
+            ..SamplingSessionOptions::default()
+        })
         .map_err(map_session_refusal)?;
     let mut sink = SampledFlowWitnessSink {
         witness_index,
@@ -229,7 +213,7 @@ fn sample_if_noiseless_circuit_has_stabilizer_flow(
     let summary = session
         .run(sample_count, &mut sink)
         .map_err(sampled_flow_run_error)?;
-    if summary.status() == SamplingRunStatus::Cancelled {
+    if summary.status() == RunStatus::Cancelled {
         // A cancelled run saw only some samples, so its verdict could pass a false flow.
         options.cancellation.check()?;
         return Err(SampledFlowError::invalid_flow(
@@ -265,7 +249,9 @@ impl MeasurementSink for SampledFlowWitnessSink {
     }
 }
 
-fn sampled_flow_run_error(error: RunError<SamplingExecutionError>) -> SampledFlowError {
+fn sampled_flow_run_error(
+    error: RunError<SamplingExecutionError, SamplingExecutionError>,
+) -> SampledFlowError {
     match error {
         RunError::Engine { source, .. } | RunError::Sink { source, .. } => source.into(),
     }

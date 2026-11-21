@@ -7,48 +7,43 @@ mod detection;
 mod fingerprint;
 mod lane_width;
 mod reference_sample_tree;
+mod run;
 mod sampled_flow;
 mod sampling;
 mod sampling_estimate;
 mod work_poll;
 
 pub use dem_sampling::{
-    DEM_SAMPLING_COMPILATION_DESCRIPTOR, DemError, DemReplayBatchStatus, DemReplayRecordStore,
-    DemReplayRetention, DemReplaySession, DemReplayStoreState, DemReplayTransaction,
-    DemResourceKind, DemResourceLimitError, DemSamplerLimits, DemSamplingCompiler,
-    DemSamplingExecutionError, DemSamplingPlan, DemSamplingRunError, DemSamplingRunProgress,
-    DemSamplingRunStatus, DemSamplingRunSummary, DemSamplingSession,
+    DEM_SAMPLING_COMPILATION_DESCRIPTOR, DemError, DemReplayRecordStore, DemReplayRetention,
+    DemReplaySession, DemReplaySessionOptions, DemReplayStoreState, DemReplayTransaction,
+    DemResourceKind, DemResourceLimitError, DemSamplingCompiler, DemSamplingExecutionError,
+    DemSamplingPlan, DemSamplingSession, DemSamplingSessionOptions,
 };
 pub use descriptor::CompilationDescriptor;
 pub(crate) use detection::DetectionRecordBuffer;
 pub use detection::{
     CircuitReferenceSigns, DETECTION_SAMPLING_COMPILATION_DESCRIPTOR, DetectionCompileError,
     DetectionConversionLimits, DetectionError, DetectionExecutionError, DetectionResourceKind,
-    DetectionResourceLimitError, DetectionRunError, DetectionRunProgress, DetectionRunStatus,
-    DetectionRunSummary, DetectionSamplingCompiler, DetectionSamplingPlan,
-    DetectionSamplingSession, MEASUREMENT_TO_DETECTION_COMPILATION_DESCRIPTOR,
-    MeasurementToDetectionCompiler, MeasurementToDetectionPlan, MeasurementToDetectionSession,
-    MeasurementToDetectionTransaction, StreamingDetectionRun, circuit_reference_signs,
-    circuit_reference_signs_with_limits, detection_record_width,
-    detection_record_width_with_limits, measurement_record_count,
-    measurement_record_count_with_limits, validate_detection_sampling_circuit,
-    validate_detection_sampling_circuit_with_limits,
+    DetectionResourceLimitError, DetectionSamplingCompiler, DetectionSamplingPlan,
+    DetectionSamplingSession, DetectionSamplingSessionOptions,
+    MEASUREMENT_TO_DETECTION_COMPILATION_DESCRIPTOR, MeasurementToDetectionCompiler,
+    MeasurementToDetectionPlan, MeasurementToDetectionSession,
+    MeasurementToDetectionSessionOptions, MeasurementToDetectionTransaction, StreamingDetectionRun,
+    circuit_reference_signs, detection_record_width,
 };
 pub use fingerprint::{CompilationOperation, CompilationRequestFingerprint};
 pub use lane_width::LaneWidth;
 pub use reference_sample_tree::{ReferenceSampleTree, ReferenceSampleTreeError};
+pub use run::{RunError, RunProgress, RunStatus, RunSummary, SinkFailurePhase};
 pub use sampled_flow::{
     SampledFlowError, SampledFlowOptions, sample_if_circuit_has_stabilizer_flows,
-    sample_if_circuit_has_stabilizer_flows_with_options,
 };
 pub use sampling::COMPILATION_DESCRIPTOR;
 pub use sampling::{
-    CircuitReferenceSampleError, CountDeterminedMeasurementsError, InitialState, PlanFingerprint,
-    RandomPolicy, ReferenceSample, ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError,
-    SamplingBackend, SamplingCompileError, SamplingCompiler, SamplingExecutionError, SamplingPlan,
-    SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession, Seed, ShotCount,
-    SinkFailurePhase, StreamingSamplingRun, SweepRecord, circuit_reference_sample,
-    count_determined_measurements,
+    InitialState, PlanFingerprint, RandomPolicy, ReferenceSample, ReferenceSampleLoopPolicy,
+    ReferenceSampleMode, SamplingBackend, SamplingCompileError, SamplingCompiler,
+    SamplingExecutionError, SamplingPlan, SamplingSession, SamplingSessionOptions, Seed, ShotCount,
+    StreamingSamplingRun, SweepRecord,
 };
 pub use sampling_estimate::estimate_sampling_request;
 

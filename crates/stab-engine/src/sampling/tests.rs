@@ -21,6 +21,25 @@ mod folded_tape;
 mod reference_differential;
 mod stored_expectations;
 
+/// A failure of [`count_determined_measurements`], from compiling the plan or from counting.
+#[derive(Debug, thiserror::Error)]
+enum CountDeterminedMeasurementsError {
+    #[error(transparent)]
+    Compile(#[from] SamplingCompileError),
+    #[error(transparent)]
+    Execution(#[from] SamplingExecutionError),
+}
+
+/// Counts the determined measurements of `circuit`'s default-compiled plan.
+fn count_determined_measurements(
+    circuit: &Circuit,
+    initial_state: InitialState,
+) -> Result<u64, CountDeterminedMeasurementsError> {
+    Ok(SamplingCompiler::default()
+        .compile(circuit)?
+        .try_count_determined_measurements(initial_state)?)
+}
+
 /// The sample's bits in measurement order, for comparison with flag-list expectations.
 fn bits(sample: &ReferenceSample) -> Vec<bool> {
     sample.iter().collect()
@@ -33,7 +52,7 @@ struct TestSampler {
 
 impl TestSampler {
     fn compile(circuit: &Circuit) -> Result<Self, SamplingCompileError> {
-        SamplingCompiler::new()
+        SamplingCompiler::default()
             .compile(circuit)
             .map(|plan| Self { plan })
     }
@@ -58,7 +77,11 @@ impl TestSampler {
         };
         let mut session = self
             .plan
-            .session_with_reference_mode(random_policy, reference_mode)
+            .session(&SamplingSessionOptions {
+                random: random_policy,
+                reference_sample_mode: reference_mode,
+                ..Default::default()
+            })
             .expect("construct sampling session");
         let mut sink = RecordSink::default();
         session
@@ -116,7 +139,7 @@ fn reference_simulator_matches_generator_baseline_on_noisy_surface_and_feedback(
     .with_after_reset_flip_probability(probability)
     .with_after_clifford_depolarization(probability);
     let generated = params.generate().expect("generate surface circuit");
-    let plan = SamplingCompiler::new()
+    let plan = SamplingCompiler::default()
         .compile(generated.circuit())
         .expect("compile generated surface circuit");
     assert_eq!(
@@ -129,7 +152,7 @@ fn reference_simulator_matches_generator_baseline_on_noisy_surface_and_feedback(
             .expect("generator-list reference")
     );
 
-    let feedback = SamplingCompiler::new()
+    let feedback = SamplingCompiler::default()
         .compile(
             &Circuit::from_stim_str("H 0\nCX 0 1\nM !0\nCX rec[-1] 1\nM 1\nMR !1\nM 1\n")
                 .expect("parse feedback circuit"),
@@ -178,14 +201,18 @@ fn reference_with_stats(plan: &SamplingPlan) -> (Vec<bool>, ReferenceExecutionSt
 fn reference_loop_policy_reuses_only_proven_invariant_work() {
     let invariant = Circuit::from_stim_str("REPEAT 512 {\n    H 0\n    M 0\n    R 0\n}\n")
         .expect("parse invariant loop");
-    let folded = SamplingCompiler::new()
-        .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Fold)
-        .compile(&invariant)
-        .expect("compile folded reference plan");
-    let iterated = SamplingCompiler::new()
-        .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Iterate)
-        .compile(&invariant)
-        .expect("compile iterative reference plan");
+    let folded = SamplingCompiler {
+        reference_sample_loop_policy: ReferenceSampleLoopPolicy::Fold,
+        ..SamplingCompiler::default()
+    }
+    .compile(&invariant)
+    .expect("compile folded reference plan");
+    let iterated = SamplingCompiler {
+        reference_sample_loop_policy: ReferenceSampleLoopPolicy::Iterate,
+        ..SamplingCompiler::default()
+    }
+    .compile(&invariant)
+    .expect("compile iterative reference plan");
     let (folded_output, folded_stats) = reference_with_stats(&folded);
     let (iterated_output, iterated_stats) = reference_with_stats(&iterated);
 
@@ -196,10 +223,12 @@ fn reference_loop_policy_reuses_only_proven_invariant_work() {
     assert_eq!(folded_stats.reused_operation_dispatches, 1_533);
     assert_eq!(iterated_stats, ReferenceExecutionStats::default());
     assert_ne!(
-        SamplingCompiler::new().plan_fingerprint(&invariant),
-        SamplingCompiler::new()
-            .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Iterate)
-            .plan_fingerprint(&invariant)
+        SamplingCompiler::default().plan_fingerprint(&invariant),
+        SamplingCompiler {
+            reference_sample_loop_policy: ReferenceSampleLoopPolicy::Iterate,
+            ..SamplingCompiler::default()
+        }
+        .plan_fingerprint(&invariant)
     );
 
     for source in [
@@ -207,13 +236,15 @@ fn reference_loop_policy_reuses_only_proven_invariant_work() {
         "M 0\nREPEAT 128 {\n    CX rec[-1] 0\n    M 0\n}\n",
     ] {
         let circuit = Circuit::from_stim_str(source).expect("parse non-foldable loop");
-        let folded = SamplingCompiler::new()
+        let folded = SamplingCompiler::default()
             .compile(&circuit)
             .expect("compile non-foldable loop");
-        let iterated = SamplingCompiler::new()
-            .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Iterate)
-            .compile(&circuit)
-            .expect("compile iterative non-foldable loop");
+        let iterated = SamplingCompiler {
+            reference_sample_loop_policy: ReferenceSampleLoopPolicy::Iterate,
+            ..SamplingCompiler::default()
+        }
+        .compile(&circuit)
+        .expect("compile iterative non-foldable loop");
         let (folded_output, folded_stats) = reference_with_stats(&folded);
         let (iterated_output, _) = reference_with_stats(&iterated);
         assert_eq!(folded_output, iterated_output, "{source}");
@@ -225,10 +256,10 @@ fn reference_loop_policy_reuses_only_proven_invariant_work() {
         .expect("parse narrow fold-profitability circuit");
     let wide = Circuit::from_stim_str(&format!("REPEAT 2 {{\n{body}}}\nM 127\n"))
         .expect("parse wide fold-profitability circuit");
-    let narrow = SamplingCompiler::new()
+    let narrow = SamplingCompiler::default()
         .compile(&narrow)
         .expect("compile narrow fold-profitability circuit");
-    let wide = SamplingCompiler::new()
+    let wide = SamplingCompiler::default()
         .compile(&wide)
         .expect("compile wide fold-profitability circuit");
     assert!(narrow.inner.has_reference_state_snapshot_candidate());
@@ -238,7 +269,7 @@ fn reference_loop_policy_reuses_only_proven_invariant_work() {
 
 #[test]
 fn reference_snapshot_storage_is_limited_to_fold_candidates() {
-    let ordinary = SamplingCompiler::new()
+    let ordinary = SamplingCompiler::default()
         .compile(&Circuit::from_stim_str("H 0\nM 0\n").expect("parse ordinary reference"))
         .expect("compile ordinary reference");
     assert!(!ordinary.inner.has_reference_state_snapshot_candidate());
@@ -254,13 +285,15 @@ fn reference_snapshot_storage_is_limited_to_fold_candidates() {
 
     let repeated = Circuit::from_stim_str("REPEAT 512 {\n    H 0\n    M 0\n    R 0\n}\n")
         .expect("parse reusable reference repeat");
-    let folded = SamplingCompiler::new()
+    let folded = SamplingCompiler::default()
         .compile(&repeated)
         .expect("compile folded reference repeat");
-    let iterated = SamplingCompiler::new()
-        .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Iterate)
-        .compile(&repeated)
-        .expect("compile iterated reference repeat");
+    let iterated = SamplingCompiler {
+        reference_sample_loop_policy: ReferenceSampleLoopPolicy::Iterate,
+        ..SamplingCompiler::default()
+    }
+    .compile(&repeated)
+    .expect("compile iterated reference repeat");
 
     assert!(folded.inner.has_reference_state_snapshot_candidate());
     assert!(folded.inner.uses_reference_state_snapshot());
@@ -307,13 +340,15 @@ fn reference_snapshot_storage_is_limited_to_fold_candidates() {
         fallback_qubits - 1
     ))
     .expect("parse snapshot-fallback circuit");
-    let fallback_folded = SamplingCompiler::new()
+    let fallback_folded = SamplingCompiler::default()
         .compile(&fallback_circuit)
         .expect("compile snapshot-fallback circuit");
-    let fallback_iterated = SamplingCompiler::new()
-        .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Iterate)
-        .compile(&fallback_circuit)
-        .expect("compile explicit-iteration fallback circuit");
+    let fallback_iterated = SamplingCompiler {
+        reference_sample_loop_policy: ReferenceSampleLoopPolicy::Iterate,
+        ..SamplingCompiler::default()
+    }
+    .compile(&fallback_circuit)
+    .expect("compile explicit-iteration fallback circuit");
     assert!(
         fallback_folded
             .inner
@@ -336,7 +371,7 @@ fn expanded_sampling_work_is_not_capped_and_zero_width_repeats_are_constant_work
         "REPEAT 1000000000000 {\n    REPEAT 1000000000000 {\n        H 0\n    }\n    M 0\n}\n",
     ] {
         let circuit = Circuit::from_stim_str(text).expect("parse uncapped expanded work");
-        SamplingCompiler::new()
+        SamplingCompiler::default()
             .compile(&circuit)
             .expect("expanded work is not a resource limit");
     }
@@ -355,10 +390,12 @@ fn expanded_sampling_work_is_not_capped_and_zero_width_repeats_are_constant_work
 fn compiled_program_bytes_are_admitted_against_the_budget_before_materialization() {
     let circuit = Circuit::from_stim_str("REPEAT 3 {\n    H 0 1\n    CX 0 1\n    M 0 1\n}\n")
         .expect("parse program-budget fixture");
-    let error = SamplingCompiler::new()
-        .memory_budget(MemoryBudget::from_bytes(0))
-        .compile(&circuit)
-        .expect_err("the program exceeds a zero budget");
+    let error = SamplingCompiler {
+        memory_budget: MemoryBudget::from_bytes(0),
+        ..SamplingCompiler::default()
+    }
+    .compile(&circuit)
+    .expect_err("the program exceeds a zero budget");
     let SamplingCompileError::CompiledBytesLimit { exceeded } = error.clone() else {
         panic!("expected a typed compiled-bytes refusal, got {error:?}");
     };
@@ -468,7 +505,7 @@ fn reset_and_measure_reset_use_their_measurement_basis() {
 #[test]
 fn sweep_records_are_width_checked_and_all_false_reuses_the_cached_sample() {
     let compile = |text: &str| {
-        SamplingCompiler::new()
+        SamplingCompiler::default()
             .compile(&Circuit::from_stim_str(text).expect("parse sweep circuit"))
             .expect("compile sweep circuit")
     };
@@ -514,7 +551,7 @@ fn active_feedback_crosses_inner_and_outer_repeat_boundaries() {
         .expect("unroll nested sweep feedback");
     for (sweep, expected) in [(false, vec![false; 4]), (true, vec![true; 4])] {
         let reference = |circuit: &Circuit| {
-            let plan = SamplingCompiler::new()
+            let plan = SamplingCompiler::default()
                 .compile(circuit)
                 .expect("compile sweep feedback");
             let sweep = SweepRecord::try_for_plan(&plan, BitVec::from_bits([sweep]))
@@ -554,7 +591,7 @@ fn active_feedback_crosses_inner_and_outer_repeat_boundaries() {
             "rec[-4]",
         ),
     ] {
-        let error = SamplingCompiler::new()
+        let error = SamplingCompiler::default()
             .compile(&Circuit::from_stim_str(source).expect("parse invalid nested feedback"))
             .expect_err("first unavailable nested lookback must fail");
         assert!(error.to_string().contains(missing), "{error}");

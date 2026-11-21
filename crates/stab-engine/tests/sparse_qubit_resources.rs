@@ -7,7 +7,7 @@ use std::assert_matches;
 
 use stab_engine::{
     DetectionSamplingCompiler, InitialState, MeasurementToDetectionCompiler, RandomPolicy,
-    ReferenceSampleMode, SamplingCompiler, SamplingExecutionError, Seed,
+    ReferenceSampleMode, SamplingCompiler, SamplingExecutionError, SamplingSessionOptions, Seed,
 };
 use stab_model::Circuit;
 
@@ -34,7 +34,7 @@ fn assert_storage_limit(error: SamplingExecutionError) {
 #[test]
 fn maximum_id_sampling_work_is_rejected_before_allocation() {
     let circuit = sparse_single_measurement_circuit();
-    let plan = SamplingCompiler::new()
+    let plan = SamplingCompiler::default()
         .compile(&circuit)
         .expect("compilation retains only the sparse target list");
 
@@ -53,8 +53,12 @@ fn maximum_id_sampling_work_is_rejected_before_allocation() {
         ReferenceSampleMode::SkipReferenceSample,
     ] {
         assert_storage_limit(
-            plan.session_with_reference_mode(RandomPolicy::Seeded(Seed::new(1)), mode)
-                .expect_err("the frame session must reject its frame storage"),
+            plan.session(&SamplingSessionOptions {
+                random: RandomPolicy::Seeded(Seed::new(1)),
+                reference_sample_mode: mode,
+                ..Default::default()
+            })
+            .expect_err("the frame session must reject its frame storage"),
         );
     }
 }
@@ -62,23 +66,27 @@ fn maximum_id_sampling_work_is_rejected_before_allocation() {
 #[test]
 fn maximum_id_detection_compilation_stays_constant_storage() {
     let circuit = sparse_single_measurement_circuit();
-    let conversion = MeasurementToDetectionCompiler::new()
-        .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample)
-        .compile(&circuit)
-        .expect("compile sparse skip-reference converter");
+    let conversion = MeasurementToDetectionCompiler {
+        reference_sample_mode: ReferenceSampleMode::SkipReferenceSample,
+        ..MeasurementToDetectionCompiler::default()
+    }
+    .compile(&circuit)
+    .expect("compile sparse skip-reference converter");
     assert_eq!(conversion.measurement_width().get(), 1);
     assert_eq!(conversion.detector_width().get(), 1);
 
-    let error = MeasurementToDetectionCompiler::new()
-        .reference_sample_mode(ReferenceSampleMode::UseReferenceSample)
-        .compile(&circuit)
-        .expect_err("the reference sample must reject quadratic storage");
+    let error = MeasurementToDetectionCompiler {
+        reference_sample_mode: ReferenceSampleMode::UseReferenceSample,
+        ..MeasurementToDetectionCompiler::default()
+    }
+    .compile(&circuit)
+    .expect_err("the reference sample must reject quadratic storage");
     assert!(
         error.to_string().contains("1073741824-byte memory budget"),
         "{error}"
     );
 
-    let plan = DetectionSamplingCompiler::new()
+    let plan = DetectionSamplingCompiler::default()
         .compile(&circuit)
         .expect("compile sparse detector sampler");
     assert_eq!(plan.measurement_width().get(), 1);
@@ -93,7 +101,7 @@ fn sparse_reference_simulator_work_is_rejected_before_allocation() {
          M {OVER_LIMIT_QUBIT}\n"
     ))
     .expect("parse sparse over-limit circuit");
-    let plan = SamplingCompiler::new()
+    let plan = SamplingCompiler::default()
         .compile(&circuit)
         .expect("compile sparse over-limit plan");
 

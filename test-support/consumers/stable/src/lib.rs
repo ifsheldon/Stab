@@ -40,7 +40,7 @@ pub fn exercise_stable_components(
         return Err(std::io::Error::other("typed target view changed the measured qubit").into());
     }
     let stripped = circuit_without_tags(&circuit);
-    let compiler = SamplingCompiler::new();
+    let compiler = SamplingCompiler::default();
     let _plan = compiler.compile(&stripped)?;
     let _identity = compiler.plan_fingerprint(&stripped);
 

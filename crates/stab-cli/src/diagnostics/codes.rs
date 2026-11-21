@@ -68,7 +68,10 @@ pub(super) fn cli_error_code(error: &CliError) -> &'static str {
     }
 }
 
-fn sample_run_error_code(error: &RunError<std::io::Error>, writes_path: bool) -> &'static str {
+fn sample_run_error_code(
+    error: &RunError<SamplingExecutionError, std::io::Error>,
+    writes_path: bool,
+) -> &'static str {
     match error {
         RunError::Engine { .. } => "sampling-execution-failed",
         RunError::Sink { .. } if writes_path => "path-write-failed",

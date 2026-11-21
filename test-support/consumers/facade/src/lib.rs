@@ -3,7 +3,9 @@
 use std::convert::Infallible;
 use std::error::Error;
 
-use stab_core::execution::{RandomPolicy, SamplingCompiler, Seed, ShotCount};
+use stab_core::execution::{
+    RandomPolicy, SamplingCompiler, SamplingSessionOptions, Seed, ShotCount,
+};
 use stab_core::{
     BitIndex, Circuit, CliffordString, DecoderLayout, DetectorWidth, MeasurementBatchView,
     MeasurementSink, ObservableWidth, ShotIndex, SingleQubitClifford,
@@ -46,8 +48,11 @@ pub fn exercise_facade_namespaces() -> Result<(usize, usize, usize, usize), Box<
         stab_core::decoder::DecoderLayout::new(DetectorWidth::new(1), ObservableWidth::new(0));
     let _: DecoderLayout = decoder_layout;
 
-    let plan = SamplingCompiler::new().compile(&circuit)?;
-    let mut session = plan.session(RandomPolicy::Seeded(Seed::new(7)))?;
+    let plan = SamplingCompiler::default().compile(&circuit)?;
+    let mut session = plan.session(&SamplingSessionOptions {
+        random: RandomPolicy::Seeded(Seed::new(7)),
+        ..SamplingSessionOptions::default()
+    })?;
     let mut sink = CountingSink::default();
     session.run(ShotCount::new(3), &mut sink)?;
 

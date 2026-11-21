@@ -9,7 +9,8 @@ use stab_analysis::{
 };
 use stab_decoder::{DecodeBatchError, DecodeBatchStatus, DecoderInputBatchView, decode_batch};
 use stab_engine::{
-    MeasurementToDetectionCompiler, RandomPolicy, SamplingCompiler, Seed, ShotCount,
+    MeasurementToDetectionCompiler, RandomPolicy, SamplingCompiler, SamplingSessionOptions, Seed,
+    ShotCount,
 };
 use stab_model::{Cancellation, Probability};
 use stab_records::{
@@ -67,10 +68,10 @@ fn run_experiment(partitions: &[u64]) -> ExperimentReport {
         .expect("lower detector-error model");
 
     let mut decoder = ExactMlDecoderSession::try_compile_model(&model).expect("compile decoder");
-    let sampling_plan = SamplingCompiler::new()
+    let sampling_plan = SamplingCompiler::default()
         .compile(circuit)
         .expect("compile sampling");
-    let detection_plan = MeasurementToDetectionCompiler::new()
+    let detection_plan = MeasurementToDetectionCompiler::default()
         .compile(circuit)
         .expect("compile measurement conversion");
     assert_eq!(
@@ -83,9 +84,14 @@ fn run_experiment(partitions: &[u64]) -> ExperimentReport {
     );
 
     let mut sampling = sampling_plan
-        .session(RandomPolicy::Seeded(Seed::new(EXPERIMENT_SEED)))
+        .session(&SamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(EXPERIMENT_SEED)),
+            ..Default::default()
+        })
         .expect("sampling session");
-    let mut conversion = detection_plan.session().expect("conversion session");
+    let mut conversion = detection_plan
+        .session(&Default::default())
+        .expect("conversion session");
     let mut report = ExperimentReport::default();
 
     for &shots in partitions {

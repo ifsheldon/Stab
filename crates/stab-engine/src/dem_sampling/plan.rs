@@ -7,43 +7,28 @@ use stab_records::{DetectorWidth, ObservableWidth, SampledErrorWidth};
 
 use super::bit_plane::{SampledErrorPlanes, sample_into_planes};
 use super::buffers::try_false_vec;
+use super::limits::{DemReplaySessionOptions, DemSamplerLimits, DemSamplingSessionOptions};
 use super::program::{DemCompileMeter, DemPoll, DemSampleBlock, compile_block, usize_from_u64};
 use super::replay::{ErrorRecordBits, apply_error_record, reset_detection_record};
 use super::session::{DemReplaySession, DemSamplingExecutionError, DemSamplingSession};
-use super::{DemError, DemResult, DemSamplerLimits};
-use crate::{DetectionRecordBuffer, RandomPolicy, ShotCount};
+use super::{DemError, DemResult};
+use crate::{DetectionRecordBuffer, ShotCount};
 
-/// Compiler for immutable detector-error-model sampling plans.
+/// Options of an immutable detector-error-model sampling plan, and the compiler that builds it.
+///
+/// The plan keeps the memory budget and cancellation signal, and every session and replay
+/// session of the plan runs under them unless its own options override them.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DemSamplingCompiler {
-    limits: DemSamplerLimits,
+    /// Budget for the lowered program and, by default, for each session's storage.
+    pub memory_budget: MemoryBudget,
+    /// Signal polled while compiling and, by default, by every session of the plan.
+    pub cancellation: Cancellation,
 }
 
 impl DemSamplingCompiler {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    #[must_use]
-    pub fn limits(mut self, limits: DemSamplerLimits) -> Self {
-        self.limits = limits;
-        self
-    }
-
-    #[must_use]
-    pub fn memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
-        self.limits = self.limits.with_memory_budget(memory_budget);
-        self
-    }
-
-    #[must_use]
-    pub fn cancellation(mut self, cancellation: Cancellation) -> Self {
-        self.limits = self.limits.with_cancellation(cancellation);
-        self
-    }
-
     pub fn compile(&self, model: &DetectorErrorModel) -> DemResult<DemSamplingPlan> {
-        self.limits.cancellation().check()?;
+        self.cancellation.check()?;
         let traversal = FoldedDemTraversal::new(model)?;
         let repeat_depth = traversal.root().summary().max_repeat_depth();
         let limit = RepeatNestingLimit::HARD_MAX;
@@ -52,8 +37,7 @@ impl DemSamplingCompiler {
                 "DEM repeat nesting exceeds current limit {limit}, got {repeat_depth}"
             )));
         }
-        let mut meter =
-            DemCompileMeter::new(self.limits.memory_budget(), self.limits.cancellation());
+        let mut meter = DemCompileMeter::new(self.memory_budget, &self.cancellation);
         let operations = compile_block(traversal.root(), &mut meter)?;
         let detector_count = usize_from_u64(
             traversal.root().summary().detector_count()?,
@@ -69,7 +53,10 @@ impl DemSamplingCompiler {
                 observable_count,
                 operations,
                 retained_bytes: meter.retained_bytes(),
-                limits: self.limits.clone(),
+                limits: DemSamplerLimits {
+                    memory_budget: self.memory_budget,
+                    cancellation: self.cancellation.clone(),
+                },
             }),
         })
     }
@@ -78,9 +65,8 @@ impl DemSamplingCompiler {
 /// Immutable, shareable lowered detector-error-model sampling program.
 ///
 /// The plan keeps the memory budget and cancellation signal it was compiled with, and
-/// [`Self::session`] and [`Self::replay_session`] run under them; the `_with_limits` forms take
-/// other limits instead. Two plans are equal when they lower the same program, whatever limits
-/// they carry.
+/// [`Self::session`] and [`Self::replay_session`] run under them unless their options override
+/// them. Two plans are equal when they lower the same program, whatever limits they carry.
 #[derive(Clone)]
 pub struct DemSamplingPlan {
     pub(super) inner: Arc<DemSamplingPlanInner>,
@@ -136,44 +122,24 @@ impl DemSamplingPlan {
         self.inner.retained_bytes
     }
 
-    /// The memory budget and cancellation signal the plan was compiled with, which its default
-    /// sessions inherit.
-    pub fn limits(&self) -> &DemSamplerLimits {
-        &self.inner.limits
-    }
-
-    /// Creates a sampling session under the plan's compile limits.
+    /// Creates a sampling session.
     pub fn session(
         &self,
-        random_policy: RandomPolicy,
+        options: &DemSamplingSessionOptions,
     ) -> Result<DemSamplingSession, DemSamplingExecutionError> {
-        self.session_with_limits(random_policy, self.inner.limits.clone())
+        let limits =
+            DemSamplerLimits::resolve(self, options.memory_budget, options.cancellation.as_ref());
+        DemSamplingSession::new(self.clone(), options.random, limits)
     }
 
-    pub fn session_with_limits(
-        &self,
-        random_policy: RandomPolicy,
-        limits: DemSamplerLimits,
-    ) -> Result<DemSamplingSession, DemSamplingExecutionError> {
-        DemSamplingSession::new(self.clone(), random_policy, limits)
-    }
-
-    /// Creates owned mutable state for one incremental sampled-error replay, under the plan's
-    /// compile limits.
+    /// Creates owned mutable state for one incremental replay of `expected_shots` sampled-error
+    /// records.
     pub fn replay_session(
         &self,
+        options: &DemReplaySessionOptions,
         expected_shots: ShotCount,
     ) -> Result<DemReplaySession, DemSamplingExecutionError> {
-        self.replay_session_with_limits(expected_shots, self.inner.limits.clone())
-    }
-
-    /// Creates an owned replay session under explicit caller-selected resource limits.
-    pub fn replay_session_with_limits(
-        &self,
-        expected_shots: ShotCount,
-        limits: DemSamplerLimits,
-    ) -> Result<DemReplaySession, DemSamplingExecutionError> {
-        DemReplaySession::new(self.clone(), expected_shots, limits)
+        DemReplaySession::new(self.clone(), expected_shots, replay_limits(self, options))
     }
 
     /// Validates that a replay of `shots` shots is representable, without constructing a
@@ -313,4 +279,12 @@ pub(super) struct DemSamplingPlanInner {
     pub(super) operations: DemSampleBlock,
     pub(super) retained_bytes: u64,
     pub(super) limits: DemSamplerLimits,
+}
+
+/// The limits a replay session created with `options` runs under.
+pub(super) fn replay_limits(
+    plan: &DemSamplingPlan,
+    options: &DemReplaySessionOptions,
+) -> DemSamplerLimits {
+    DemSamplerLimits::resolve(plan, options.memory_budget, options.cancellation.as_ref())
 }

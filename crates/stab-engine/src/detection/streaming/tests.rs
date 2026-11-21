@@ -16,8 +16,8 @@ use stab_records::{
 
 use crate::detection::frame::with_window_planes;
 use crate::{
-    DetectionConversionLimits, DetectionSamplingCompiler, LaneWidth, RandomPolicy,
-    ReferenceSampleMode, SamplingCompiler, Seed, ShotCount,
+    DetectionSamplingCompiler, DetectionSamplingSessionOptions, LaneWidth, RandomPolicy,
+    ReferenceSampleMode, SamplingCompiler, SamplingSessionOptions, Seed, ShotCount,
 };
 
 #[derive(Default)]
@@ -130,10 +130,10 @@ fn streaming_runs_match_materializing_sessions_across_window_boundaries() {
         for case in 0..6_u64 {
             let text = random_circuit(&mut rng);
             let circuit = Circuit::from_stim_str(&text).expect("generated circuit parses");
-            let sampling = SamplingCompiler::new()
+            let sampling = SamplingCompiler::default()
                 .compile(&circuit)
                 .expect("compile sampling plan");
-            let detection = DetectionSamplingCompiler::new()
+            let detection = DetectionSamplingCompiler::default()
                 .compile(&circuit)
                 .expect("compile detection plan");
             assert!(
@@ -150,13 +150,26 @@ fn streaming_runs_match_materializing_sessions_across_window_boundaries() {
                     ] {
                         let mut expected = Records::default();
                         sampling
-                            .session_with_lane_width(policy, mode, lane_width)
+                            .session(&SamplingSessionOptions {
+                                random: policy,
+                                reference_sample_mode: mode,
+                                lane_width,
+                                ..Default::default()
+                            })
                             .expect("materializing session")
                             .run(shots, &mut expected)
                             .expect("materializing run");
                         let mut streamed = Records::default();
                         sampling
-                            .streaming_run(policy, mode, lane_width, shots)
+                            .streaming_run(
+                                &SamplingSessionOptions {
+                                    random: policy,
+                                    reference_sample_mode: mode,
+                                    lane_width,
+                                    ..Default::default()
+                                },
+                                shots,
+                            )
                             .expect("streaming run")
                             .run(&mut streamed)
                             .expect("streaming run delivers");
@@ -167,13 +180,24 @@ fn streaming_runs_match_materializing_sessions_across_window_boundaries() {
                     }
                     let mut expected = Records::default();
                     detection
-                        .session_with_lane_width(policy, lane_width)
+                        .session(&DetectionSamplingSessionOptions {
+                            random: policy,
+                            lane_width,
+                            ..Default::default()
+                        })
                         .expect("materializing detection session")
                         .run(shots, &mut expected)
                         .expect("materializing detection run");
                     let mut streamed = Records::default();
                     detection
-                        .streaming_run(policy, lane_width, shots)
+                        .streaming_run(
+                            &DetectionSamplingSessionOptions {
+                                random: policy,
+                                lane_width,
+                                ..Default::default()
+                            },
+                            shots,
+                        )
                         .expect("streaming detection run")
                         .run(&mut streamed)
                         .expect("streaming detection run delivers");
@@ -197,10 +221,10 @@ fn streaming_transposes_whole_groups_and_partial_tiles_like_materializing_sessio
          DETECTOR rec[-1] rec[-2]\n    DETECTOR rec[-3]\n}\nOBSERVABLE_INCLUDE(0) rec[-2]\n",
     )
     .expect("parse wide record circuit");
-    let sampling = SamplingCompiler::new()
+    let sampling = SamplingCompiler::default()
         .compile(&circuit)
         .expect("compile sampling plan");
-    let detection = DetectionSamplingCompiler::new()
+    let detection = DetectionSamplingCompiler::default()
         .compile(&circuit)
         .expect("compile detection plan");
     for lane_width in LaneWidth::ALL.iter().copied() {
@@ -210,20 +234,24 @@ fn streaming_transposes_whole_groups_and_partial_tiles_like_materializing_sessio
             let shots = ShotCount::new(shots);
             let mut expected = Records::default();
             sampling
-                .session_with_lane_width(
-                    policy,
-                    ReferenceSampleMode::UseReferenceSample,
+                .session(&SamplingSessionOptions {
+                    random: policy,
+                    reference_sample_mode: ReferenceSampleMode::UseReferenceSample,
                     lane_width,
-                )
+                    ..Default::default()
+                })
                 .expect("materializing session")
                 .run(shots, &mut expected)
                 .expect("materializing run");
             let mut streamed = Records::default();
             sampling
                 .streaming_run(
-                    policy,
-                    ReferenceSampleMode::UseReferenceSample,
-                    lane_width,
+                    &SamplingSessionOptions {
+                        random: policy,
+                        reference_sample_mode: ReferenceSampleMode::UseReferenceSample,
+                        lane_width,
+                        ..Default::default()
+                    },
                     shots,
                 )
                 .expect("streaming run")
@@ -235,13 +263,24 @@ fn streaming_transposes_whole_groups_and_partial_tiles_like_materializing_sessio
             );
             let mut expected = Records::default();
             detection
-                .session_with_lane_width(policy, lane_width)
+                .session(&DetectionSamplingSessionOptions {
+                    random: policy,
+                    lane_width,
+                    ..Default::default()
+                })
                 .expect("materializing detection session")
                 .run(shots, &mut expected)
                 .expect("materializing detection run");
             let mut streamed = Records::default();
             detection
-                .streaming_run(policy, lane_width, shots)
+                .streaming_run(
+                    &DetectionSamplingSessionOptions {
+                        random: policy,
+                        lane_width,
+                        ..Default::default()
+                    },
+                    shots,
+                )
                 .expect("streaming detection run")
                 .run(&mut streamed)
                 .expect("streaming detection run delivers");
@@ -264,14 +303,18 @@ fn single_shot_streaming_admission_does_not_scale_with_lane_width() {
     .expect("parse wide record circuit");
     // Two million measurement planes cost 16 MB at 64 lanes and 64 MB at 256 lanes.
     let budget = MemoryBudget::from_bytes(8 << 20);
-    let sampling = SamplingCompiler::new()
-        .memory_budget(budget)
-        .compile(&circuit)
-        .expect("compile sampling plan");
-    let detection = DetectionSamplingCompiler::new()
-        .limits(DetectionConversionLimits::new(budget))
-        .compile(&circuit)
-        .expect("compile detection plan");
+    let sampling = SamplingCompiler {
+        memory_budget: budget,
+        ..SamplingCompiler::default()
+    }
+    .compile(&circuit)
+    .expect("compile sampling plan");
+    let detection = DetectionSamplingCompiler {
+        memory_budget: budget,
+        ..DetectionSamplingCompiler::default()
+    }
+    .compile(&circuit)
+    .expect("compile detection plan");
     let policy = RandomPolicy::Seeded(Seed::new(3));
     for lane_width in LaneWidth::ALL.iter().copied() {
         for mode in [
@@ -280,13 +323,26 @@ fn single_shot_streaming_admission_does_not_scale_with_lane_width() {
         ] {
             assert!(
                 sampling
-                    .session_with_lane_width(policy, mode, lane_width)
+                    .session(&SamplingSessionOptions {
+                        random: policy,
+                        reference_sample_mode: mode,
+                        lane_width,
+                        ..Default::default()
+                    })
                     .is_err(),
                 "a materializing session stores every plane at {lane_width:?}"
             );
             let mut streamed = Records::default();
             sampling
-                .streaming_run(policy, mode, lane_width, ShotCount::new(1))
+                .streaming_run(
+                    &SamplingSessionOptions {
+                        random: policy,
+                        reference_sample_mode: mode,
+                        lane_width,
+                        ..Default::default()
+                    },
+                    ShotCount::new(1),
+                )
                 .expect("one streamed shot fits the budget")
                 .run(&mut streamed)
                 .expect("streaming run delivers");
@@ -295,13 +351,24 @@ fn single_shot_streaming_admission_does_not_scale_with_lane_width() {
         }
         assert!(
             detection
-                .session_with_lane_width(policy, lane_width)
+                .session(&DetectionSamplingSessionOptions {
+                    random: policy,
+                    lane_width,
+                    ..Default::default()
+                })
                 .is_err(),
             "a materializing detection session stores every plane at {lane_width:?}"
         );
         let mut streamed = Records::default();
         detection
-            .streaming_run(policy, lane_width, ShotCount::new(1))
+            .streaming_run(
+                &DetectionSamplingSessionOptions {
+                    random: policy,
+                    lane_width,
+                    ..Default::default()
+                },
+                ShotCount::new(1),
+            )
             .expect("one streamed detection shot fits the budget")
             .run(&mut streamed)
             .expect("streaming detection run delivers");
@@ -334,10 +401,10 @@ fn streaming_run_creation_polls_while_zeroing_its_records() {
     use crate::{DetectionExecutionError, SamplingExecutionError};
 
     let circuit = Circuit::from_stim_str(WIDE_RECORDS).expect("fixture parses");
-    let sampling = SamplingCompiler::new()
+    let sampling = SamplingCompiler::default()
         .compile(&circuit)
         .expect("compile sampling plan");
-    let detection = DetectionSamplingCompiler::new()
+    let detection = DetectionSamplingCompiler::default()
         .compile(&circuit)
         .expect("compile detection plan");
     let policy = RandomPolicy::Seeded(Seed::new(11));
@@ -348,26 +415,58 @@ fn streaming_run_creation_polls_while_zeroing_its_records() {
 
     let mut expected = Records::default();
     sampling
-        .streaming_run(policy, mode, lane_width, shots)
+        .streaming_run(
+            &SamplingSessionOptions {
+                random: policy,
+                reference_sample_mode: mode,
+                lane_width,
+                ..Default::default()
+            },
+            shots,
+        )
         .expect("streaming run")
         .run(&mut expected)
         .expect("streaming run delivers");
     let mut expected_detection = Records::default();
     detection
-        .streaming_run(policy, lane_width, shots)
+        .streaming_run(
+            &DetectionSamplingSessionOptions {
+                random: policy,
+                lane_width,
+                ..Default::default()
+            },
+            shots,
+        )
         .expect("streaming detection run")
         .run(&mut expected_detection)
         .expect("streaming detection run delivers");
 
     test_hook::with_units_per_poll(CREATION_UNITS_PER_POLL, || {
-        let (created, polls) =
-            test_hook::count_polls(|| sampling.streaming_run(policy, mode, lane_width, shots));
+        let (created, polls) = test_hook::count_polls(|| {
+            sampling.streaming_run(
+                &SamplingSessionOptions {
+                    random: policy,
+                    reference_sample_mode: mode,
+                    lane_width,
+                    ..Default::default()
+                },
+                shots,
+            )
+        });
         drop(created.expect("counted streaming run"));
         // 16384 words at 4 units each, one poll per 512 units.
         assert!(polls >= 100, "zeroing the records polled {polls} times");
         let (interrupted, fired) = test_hook::cancel_at_poll(polls / 2, || {
             sampling
-                .streaming_run(policy, mode, lane_width, shots)
+                .streaming_run(
+                    &SamplingSessionOptions {
+                        random: policy,
+                        reference_sample_mode: mode,
+                        lane_width,
+                        ..Default::default()
+                    },
+                    shots,
+                )
                 .map(drop)
         });
         assert!(fired);
@@ -377,21 +476,46 @@ fn streaming_run_creation_polls_while_zeroing_its_records() {
         );
         let mut retried = Records::default();
         sampling
-            .streaming_run(policy, mode, lane_width, shots)
+            .streaming_run(
+                &SamplingSessionOptions {
+                    random: policy,
+                    reference_sample_mode: mode,
+                    lane_width,
+                    ..Default::default()
+                },
+                shots,
+            )
             .expect("streaming run after cancellation")
             .run(&mut retried)
             .expect("retried run delivers");
         assert!(retried.0 == expected.0, "retried streaming run diverged");
 
-        let (created, polls) =
-            test_hook::count_polls(|| detection.streaming_run(policy, lane_width, shots));
+        let (created, polls) = test_hook::count_polls(|| {
+            detection.streaming_run(
+                &DetectionSamplingSessionOptions {
+                    random: policy,
+                    lane_width,
+                    ..Default::default()
+                },
+                shots,
+            )
+        });
         drop(created.expect("counted streaming detection run"));
         assert!(
             polls >= 50,
             "zeroing the detection records polled {polls} times"
         );
         let (interrupted, fired) = test_hook::cancel_at_poll(polls / 2, || {
-            detection.streaming_run(policy, lane_width, shots).map(drop)
+            detection
+                .streaming_run(
+                    &DetectionSamplingSessionOptions {
+                        random: policy,
+                        lane_width,
+                        ..Default::default()
+                    },
+                    shots,
+                )
+                .map(drop)
         });
         assert!(fired);
         assert!(
@@ -400,7 +524,14 @@ fn streaming_run_creation_polls_while_zeroing_its_records() {
         );
         let mut retried = Records::default();
         detection
-            .streaming_run(policy, lane_width, shots)
+            .streaming_run(
+                &DetectionSamplingSessionOptions {
+                    random: policy,
+                    lane_width,
+                    ..Default::default()
+                },
+                shots,
+            )
             .expect("streaming detection run after cancellation")
             .run(&mut retried)
             .expect("retried detection run delivers");
@@ -420,10 +551,10 @@ fn windowed_conversion_polls_while_zeroing_its_records() {
     use stab_records::PackedShotBatch;
 
     use crate::work_poll::test_hook;
-    use crate::{DetectionRunStatus, MAX_BATCH_SHOTS, MeasurementToDetectionCompiler};
+    use crate::{MAX_BATCH_SHOTS, MeasurementToDetectionCompiler, RunStatus};
 
     let circuit = Circuit::from_stim_str(WIDE_RECORDS).expect("fixture parses");
-    let plan = MeasurementToDetectionCompiler::new()
+    let plan = MeasurementToDetectionCompiler::default()
         .compile(&circuit)
         .expect("compile conversion plan");
     let mut rng = SmallRng::seed_from_u64(7);
@@ -434,13 +565,17 @@ fn windowed_conversion_polls_while_zeroing_its_records() {
     let input = || stab_records::MeasurementBatchView::new(measurements.view());
 
     let mut expected = Records::default();
-    let mut uninterrupted = plan.session().expect("conversion session");
+    let mut uninterrupted = plan
+        .session(&Default::default())
+        .expect("conversion session");
     uninterrupted
         .run(input(), None, &mut expected)
         .expect("convert a batch");
 
     test_hook::with_units_per_poll(CREATION_UNITS_PER_POLL, || {
-        let mut counted = plan.session().expect("conversion session");
+        let mut counted = plan
+            .session(&Default::default())
+            .expect("conversion session");
         let (first, first_polls) =
             test_hook::count_polls(|| counted.run(input(), None, &mut Records::default()));
         first.expect("first batch");
@@ -453,13 +588,15 @@ fn windowed_conversion_polls_while_zeroing_its_records() {
             "zeroing polled {first_polls} - {later_polls} times"
         );
 
-        let mut session = plan.session().expect("conversion session");
+        let mut session = plan
+            .session(&Default::default())
+            .expect("conversion session");
         let mut delivered = Records::default();
         let (interrupted, fired) =
             test_hook::cancel_at_poll(1, || session.run(input(), None, &mut delivered));
         assert!(fired);
         let summary = interrupted.expect("cancellation is a status, not an error");
-        assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
+        assert_eq!(summary.status(), RunStatus::Cancelled);
         assert!(delivered.0.is_empty());
         assert!(!session.is_poisoned());
         session
@@ -479,13 +616,12 @@ fn sweep_corrected_conversion_polls_its_full_width_passes() {
 
     use crate::work_poll::test_hook;
     use crate::{
-        DetectionExecutionError, DetectionRunStatus, MAX_BATCH_SHOTS,
-        MeasurementToDetectionCompiler,
+        DetectionExecutionError, MAX_BATCH_SHOTS, MeasurementToDetectionCompiler, RunStatus,
     };
 
     let circuit =
         Circuit::from_stim_str(&format!("CX sweep[0] 0\n{WIDE_RECORDS}")).expect("fixture parses");
-    let plan = MeasurementToDetectionCompiler::new()
+    let plan = MeasurementToDetectionCompiler::default()
         .compile(&circuit)
         .expect("compile conversion plan");
     let mut rng = SmallRng::seed_from_u64(9);
@@ -496,36 +632,40 @@ fn sweep_corrected_conversion_polls_its_full_width_passes() {
     let input = || stab_records::MeasurementBatchView::new(measurements.view());
 
     let mut expected = Records::default();
-    plan.session()
+    plan.session(&Default::default())
         .expect("conversion session")
         .run(input(), None, &mut expected)
         .expect("convert a batch");
 
     test_hook::with_units_per_poll(CREATION_UNITS_PER_POLL, || {
-        let (created, polls) = test_hook::count_polls(|| plan.session());
+        let (created, polls) = test_hook::count_polls(|| plan.session(&Default::default()));
         drop(created.expect("counted conversion session"));
         // 6144 frame planes at 16 units and 4096 column words at 4 units, one poll per 512.
         assert!(polls >= 200, "zeroing the planes polled {polls} times");
         let (interrupted, fired) =
-            test_hook::cancel_at_poll(polls / 2, || plan.session().map(drop));
+            test_hook::cancel_at_poll(polls / 2, || plan.session(&Default::default()).map(drop));
         assert!(fired);
         assert!(
             matches!(interrupted, Err(DetectionExecutionError::Cancelled(_))),
             "{interrupted:?}"
         );
 
-        let mut counted = plan.session().expect("conversion session");
+        let mut counted = plan
+            .session(&Default::default())
+            .expect("conversion session");
         let (first, batch_polls) =
             test_hook::count_polls(|| counted.run(input(), None, &mut Records::default()));
         first.expect("counted batch");
         for fire_at in [1, batch_polls / 2] {
-            let mut session = plan.session().expect("conversion session");
+            let mut session = plan
+                .session(&Default::default())
+                .expect("conversion session");
             let mut delivered = Records::default();
             let (interrupted, fired) =
                 test_hook::cancel_at_poll(fire_at, || session.run(input(), None, &mut delivered));
             assert!(fired);
             let summary = interrupted.expect("cancellation is a status, not an error");
-            assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
+            assert_eq!(summary.status(), RunStatus::Cancelled);
             assert!(delivered.0.is_empty());
             assert!(!session.is_poisoned());
             session

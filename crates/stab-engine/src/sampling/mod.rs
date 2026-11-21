@@ -2,7 +2,7 @@
 use rand::Rng;
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
-use stab_model::{Circuit, MemoryBudget, MemoryBudgetExceeded, ModelDialect};
+use stab_model::{Circuit, MemoryBudget, ModelDialect};
 use stab_records::MeasurementWidth;
 
 #[cfg(test)]
@@ -32,9 +32,8 @@ mod stabilizer_frame;
 
 pub use api::{
     InitialState, PlanFingerprint, RandomPolicy, ReferenceSampleLoopPolicy, ReferenceSampleMode,
-    RunError, SamplingBackend, SamplingCompileError, SamplingCompiler, SamplingExecutionError,
-    SamplingPlan, SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession,
-    Seed, ShotCount, SinkFailurePhase, StreamingSamplingRun,
+    SamplingBackend, SamplingCompileError, SamplingCompiler, SamplingExecutionError, SamplingPlan,
+    SamplingSession, SamplingSessionOptions, Seed, ShotCount, StreamingSamplingRun,
 };
 pub(crate) use api::{session_cancellation, session_cancellation_slot};
 pub(crate) use local_tableau::LocalTableauTransform;
@@ -207,62 +206,6 @@ fn sampling_compile_error(error: DetectionError) -> SamplingCompileError {
         }
         DetectionError::Cancelled(cancelled) => SamplingCompileError::Cancelled(cancelled),
     }
-}
-
-impl CountDeterminedMeasurementsError {
-    /// The memory-budget refusal of compilation or execution, if this error is one.
-    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
-        match self {
-            Self::Compile(error) => error.memory_budget_exceeded(),
-            Self::Execution(error) => error.memory_budget_exceeded(),
-        }
-    }
-}
-
-impl CircuitReferenceSampleError {
-    /// The memory-budget refusal of compilation or execution, if this error is one.
-    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
-        match self {
-            Self::Compile(error) => error.memory_budget_exceeded(),
-            Self::Execution(error) => error.memory_budget_exceeded(),
-        }
-    }
-}
-
-/// Error from [`count_determined_measurements`], covering compilation and bounded execution.
-#[derive(Debug, thiserror::Error)]
-pub enum CountDeterminedMeasurementsError {
-    #[error(transparent)]
-    Compile(#[from] SamplingCompileError),
-    #[error(transparent)]
-    Execution(#[from] SamplingExecutionError),
-}
-
-/// Error from computing a circuit's deterministic all-zero-sweep reference sample.
-#[derive(Debug, thiserror::Error)]
-pub enum CircuitReferenceSampleError {
-    #[error(transparent)]
-    Compile(#[from] SamplingCompileError),
-    #[error(transparent)]
-    Execution(#[from] SamplingExecutionError),
-}
-
-/// Computes a circuit's deterministic reference sample with every sweep bit set to false.
-pub fn circuit_reference_sample(
-    circuit: &Circuit,
-) -> Result<ReferenceSample, CircuitReferenceSampleError> {
-    Ok(SamplingCompiler::new()
-        .compile(circuit)?
-        .try_reference_sample()?)
-}
-
-pub fn count_determined_measurements(
-    circuit: &Circuit,
-    initial_state: InitialState,
-) -> Result<u64, CountDeterminedMeasurementsError> {
-    Ok(SamplingCompiler::new()
-        .compile(circuit)?
-        .try_count_determined_measurements(initial_state)?)
 }
 
 fn sampler_rng(seed: Option<u64>) -> SmallRng {

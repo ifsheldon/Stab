@@ -8,10 +8,11 @@ use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
 
 use stab_engine::{
-    DetectionCompileError, DetectionConversionLimits, DetectionExecutionError, DetectionRunError,
-    DetectionSamplingCompiler, InitialState, MeasurementToDetectionCompiler, RandomPolicy,
-    ReferenceSampleMode, SamplingCompileError, SamplingCompiler, SamplingExecutionError,
-    SamplingPlan, Seed, ShotCount,
+    DetectionCompileError, DetectionConversionLimits, DetectionExecutionError,
+    DetectionSamplingCompiler, DetectionSamplingSessionOptions, InitialState,
+    MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode, RunError,
+    SamplingCompileError, SamplingCompiler, SamplingExecutionError, SamplingPlan,
+    SamplingSessionOptions, Seed, ShotCount,
 };
 use stab_model::Circuit;
 use stab_records::{
@@ -26,7 +27,7 @@ pub(super) struct SamplingFixture {
 
 impl SamplingFixture {
     pub(super) fn compile(circuit: &Circuit) -> Result<Self, SamplingCompileError> {
-        SamplingCompiler::new()
+        SamplingCompiler::default()
             .compile(circuit)
             .map(|plan| Self { plan })
     }
@@ -74,7 +75,11 @@ impl SamplingFixture {
         };
         let mut session = self
             .plan
-            .session_with_reference_mode(random_policy, reference_mode)
+            .session(&SamplingSessionOptions {
+                random: random_policy,
+                reference_sample_mode: reference_mode,
+                ..Default::default()
+            })
             .expect("construct sampling fixture session");
         let mut sink = MeasurementCollector::default();
         session
@@ -173,15 +178,17 @@ pub(super) fn convert_detection_records(
     sweeps: Option<&[Vec<bool>]>,
     reference_mode: ReferenceSampleMode,
 ) -> Result<DetectionOutput, DetectionFixtureError> {
-    let plan = MeasurementToDetectionCompiler::new()
-        .reference_sample_mode(reference_mode)
-        .compile(circuit)?;
+    let plan = MeasurementToDetectionCompiler {
+        reference_sample_mode: reference_mode,
+        ..MeasurementToDetectionCompiler::default()
+    }
+    .compile(circuit)?;
     let measurement_batch =
         PackedShotBatch::from_records(measurements, plan.measurement_width().get())?;
     let sweep_batch = sweeps
         .map(|records| PackedShotBatch::from_records(records, plan.sweep_width().get()))
         .transpose()?;
-    let mut session = plan.session()?;
+    let mut session = plan.session(&Default::default())?;
     let mut sink = DetectionCollector::default();
     session
         .run(
@@ -213,13 +220,18 @@ pub(super) fn sample_detections_with_limits(
     seed: Option<u64>,
     limits: DetectionConversionLimits,
 ) -> Result<DetectionOutput, DetectionFixtureError> {
-    let plan = DetectionSamplingCompiler::new()
-        .limits(limits)
-        .compile(circuit)?;
+    let plan = DetectionSamplingCompiler {
+        memory_budget: limits.memory_budget,
+        cancellation: limits.cancellation,
+    }
+    .compile(circuit)?;
     let random_policy = seed.map_or(RandomPolicy::Entropy, |seed| {
         RandomPolicy::Seeded(Seed::new(seed))
     });
-    let mut session = plan.session(random_policy)?;
+    let mut session = plan.session(&DetectionSamplingSessionOptions {
+        random: random_policy,
+        ..Default::default()
+    })?;
     let mut sink = DetectionCollector::default();
     let shots = u64::try_from(shots)
         .map(ShotCount::new)
@@ -271,9 +283,11 @@ impl DetectionSink for DetectionCollector {
     }
 }
 
-fn map_detection_run_error(error: DetectionRunError<Infallible>) -> DetectionFixtureError {
+fn map_detection_run_error(
+    error: RunError<DetectionExecutionError, Infallible>,
+) -> DetectionFixtureError {
     match error {
-        DetectionRunError::Engine { source, .. } => source.into(),
-        DetectionRunError::Sink { source, .. } => match source {},
+        RunError::Engine { source, .. } => source.into(),
+        RunError::Sink { source, .. } => match source {},
     }
 }

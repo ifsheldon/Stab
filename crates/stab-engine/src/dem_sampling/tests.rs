@@ -124,12 +124,15 @@ fn seeded_partitioning_and_replay_preserve_exact_dem_streams() {
         "error(0.25) D0\nshift_detectors 1\nrepeat 2 {\n    error(0.25) D0\n    shift_detectors 1\n}\nerror(0) D0\n",
     ] {
         let model = DetectorErrorModel::from_dem_str(dem_text).expect("parse DEM");
-        let plan = DemSamplingCompiler::new()
+        let plan = DemSamplingCompiler::default()
             .compile(&model)
             .expect("compile DEM sampler");
 
         let mut whole = plan
-            .session(RandomPolicy::Seeded(Seed::new(7)))
+            .session(&DemSamplingSessionOptions {
+                random: RandomPolicy::Seeded(Seed::new(7)),
+                ..Default::default()
+            })
             .expect("whole session");
         let mut whole_sink = CollectingSink::default();
         whole
@@ -137,7 +140,10 @@ fn seeded_partitioning_and_replay_preserve_exact_dem_streams() {
             .expect("whole run");
 
         let mut partitioned = plan
-            .session(RandomPolicy::Seeded(Seed::new(7)))
+            .session(&DemSamplingSessionOptions {
+                random: RandomPolicy::Seeded(Seed::new(7)),
+                ..Default::default()
+            })
             .expect("partitioned session");
         let mut partitioned_sink = CollectingSink::default();
         partitioned
@@ -151,7 +157,7 @@ fn seeded_partitioning_and_replay_preserve_exact_dem_streams() {
         assert_eq!(partitioned_sink.error_records, whole_sink.error_records);
 
         let mut replay = plan
-            .replay_session(ShotCount::new(65))
+            .replay_session(&Default::default(), ShotCount::new(65))
             .expect("replay session");
         let mut replay_sink = CollectingSink::default();
         replay
@@ -184,7 +190,10 @@ fn execution_failure_preserves_first_error_progress_and_poisons_session() {
         }),
     };
     let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(3)))
+        .session(&DemSamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(3)),
+            ..Default::default()
+        })
         .expect("construct malformed-program test session");
     let mut sink = CollectingSink::default();
     let error = session
@@ -272,7 +281,7 @@ fn error_locator_replay_matches_the_sequential_walk() {
         let mut text = String::new();
         write_random_dem_block(&mut rng, 0, &mut text);
         let model = DetectorErrorModel::from_dem_str(&text).expect("parse random DEM");
-        let plan = DemSamplingCompiler::new()
+        let plan = DemSamplingCompiler::default()
             .compile(&model)
             .expect("compile random DEM");
         let error_count = plan.error_count();
@@ -345,7 +354,7 @@ fn error_major_replay_matches_the_sequential_walk() {
         let mut text = String::new();
         write_random_dem_block(&mut rng, 0, &mut text);
         let model = DetectorErrorModel::from_dem_str(&text).expect("parse random DEM");
-        let plan = DemSamplingCompiler::new()
+        let plan = DemSamplingCompiler::default()
             .compile(&model)
             .expect("compile random DEM");
         let width = plan.error_count();
@@ -398,7 +407,7 @@ fn error_major_replay_matches_the_sequential_walk() {
 fn replay_packed(
     plan: &DemSamplingPlan,
     records: &[Vec<bool>],
-    limits: &DemSamplerLimits,
+    limits: &DemReplaySessionOptions,
     retain: bool,
 ) -> (CollectingSink, bool) {
     let width = plan.error_count();
@@ -413,9 +422,7 @@ fn replay_packed(
             store.try_retain(batch.view()).expect("retain batch");
         }
     }
-    let mut session = plan
-        .replay_session_with_limits(shots, limits.clone())
-        .expect("replay session");
+    let mut session = plan.replay_session(limits, shots).expect("replay session");
     let mut sink = CollectingSink::default();
     let mut transaction = session.start_transaction(&mut sink).expect("transaction");
     let retained = retain && store.state() == DemReplayStoreState::Retaining;
@@ -440,13 +447,13 @@ fn retained_and_bit_plane_replay_records_replay_like_packed_deliveries() {
         let mut text = String::new();
         write_random_dem_block(&mut rng, 0, &mut text);
         let model = DetectorErrorModel::from_dem_str(&text).expect("parse random DEM");
-        let plan = DemSamplingCompiler::new()
+        let plan = DemSamplingCompiler::default()
             .compile(&model)
             .expect("compile random DEM");
         for (shots, density) in [(0, 0.5), (1, 1.0), (64, 0.4), (130, 0.02), (130, 0.0)] {
             let records = random_records(&mut rng, shots, plan.error_count(), density);
             let expected = reference_records(&plan, &records);
-            let limits = DemSamplerLimits::default();
+            let limits = DemReplaySessionOptions::default();
             let (packed, _) = replay_packed(&plan, &records, &limits, false);
             let (stored, retained) = replay_packed(&plan, &records, &limits, true);
             retained_runs += usize::from(retained);
@@ -455,7 +462,7 @@ fn retained_and_bit_plane_replay_records_replay_like_packed_deliveries() {
             let shot_count = ShotCount::new(records.len() as u64);
             let mut plane_store = plan.replay_record_store(&limits, shot_count);
             let mut plane_session = plan
-                .replay_session_with_limits(shot_count, limits.clone())
+                .replay_session(&limits, shot_count)
                 .expect("plane replay session");
             let mut plane_direct = CollectingSink::default();
             let mut tx = plane_session
@@ -515,7 +522,7 @@ fn retained_and_bit_plane_replay_records_replay_like_packed_deliveries() {
 fn replay_record_store_keeps_records_only_within_the_budget_a_session_leaves() {
     let model = DetectorErrorModel::from_dem_str("repeat 100 {\n    error(0.5) D0 D1\n}\n")
         .expect("parse DEM");
-    let plan = DemSamplingCompiler::new()
+    let plan = DemSamplingCompiler::default()
         .compile(&model)
         .expect("compile DEM");
     let shots = ShotCount::new(200);
@@ -523,7 +530,10 @@ fn replay_record_store_keeps_records_only_within_the_budget_a_session_leaves() {
     // store is released from the start and never holds records the session's budget cannot afford.
     let fits = |bytes: u64| {
         plan.replay_record_store(
-            &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(bytes)),
+            &DemReplaySessionOptions {
+                memory_budget: Some(stab_model::MemoryBudget::from_bytes(bytes)),
+                ..Default::default()
+            },
             shots,
         )
         .state()
@@ -539,9 +549,11 @@ fn replay_record_store_keeps_records_only_within_the_budget_a_session_leaves() {
         }
     }
     assert!(fits(sparse_min_budget) && !fits(sparse_min_budget - 1));
-    let session_only =
-        DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(sparse_min_budget - 1));
-    plan.replay_session_with_limits(shots, session_only)
+    let session_only = DemReplaySessionOptions {
+        memory_budget: Some(stab_model::MemoryBudget::from_bytes(sparse_min_budget - 1)),
+        ..Default::default()
+    };
+    plan.replay_session(&session_only, shots)
         .expect("a budget one byte short of the store still admits the session");
 
     let empty_records = vec![vec![false; plan.error_count()]; 200];
@@ -549,7 +561,10 @@ fn replay_record_store_keeps_records_only_within_the_budget_a_session_leaves() {
         stab_records::PackedShotBatch::from_records(&empty_records, plan.error_count())
             .expect("pack empty");
     let mut sparse_store = plan.replay_record_store(
-        &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(sparse_min_budget)),
+        &DemReplaySessionOptions {
+            memory_budget: Some(stab_model::MemoryBudget::from_bytes(sparse_min_budget)),
+            ..Default::default()
+        },
         shots,
     );
     assert_eq!(
@@ -572,7 +587,10 @@ fn replay_record_store_keeps_records_only_within_the_budget_a_session_leaves() {
     // At sparse_min_budget (201 * 8 = 1608 free bytes), dense error-major retention (4 * 808 =
     // 3232 bytes) does not fit and releases on the first batch.
     let mut dense_too_tight = plan.replay_record_store(
-        &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(sparse_min_budget)),
+        &DemReplaySessionOptions {
+            memory_budget: Some(stab_model::MemoryBudget::from_bytes(sparse_min_budget)),
+            ..Default::default()
+        },
         shots,
     );
     assert_eq!(
@@ -584,7 +602,10 @@ fn replay_record_store_keeps_records_only_within_the_budget_a_session_leaves() {
 
     let fits_dense = |bytes: u64| {
         let mut store = plan.replay_record_store(
-            &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(bytes)),
+            &DemReplaySessionOptions {
+                memory_budget: Some(stab_model::MemoryBudget::from_bytes(bytes)),
+                ..Default::default()
+            },
             shots,
         );
         store.try_retain(dense_batch.view()).expect("try dense") == DemReplayRetention::Retained
@@ -601,7 +622,10 @@ fn replay_record_store_keeps_records_only_within_the_budget_a_session_leaves() {
     }
     assert!(fits_dense(dense_budget) && !fits_dense(dense_budget - 1));
     let mut dense_store = plan.replay_record_store(
-        &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(dense_budget)),
+        &DemReplaySessionOptions {
+            memory_budget: Some(stab_model::MemoryBudget::from_bytes(dense_budget)),
+            ..Default::default()
+        },
         shots,
     );
     assert_eq!(
@@ -613,7 +637,10 @@ fn replay_record_store_keeps_records_only_within_the_budget_a_session_leaves() {
     assert_eq!(dense_store.shot_count(), 200);
 
     let mut released = plan.replay_record_store(
-        &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(sparse_min_budget - 1)),
+        &DemReplaySessionOptions {
+            memory_budget: Some(stab_model::MemoryBudget::from_bytes(sparse_min_budget - 1)),
+            ..Default::default()
+        },
         shots,
     );
     assert_eq!(
@@ -622,7 +649,9 @@ fn replay_record_store_keeps_records_only_within_the_budget_a_session_leaves() {
             .expect("offer to released store"),
         DemReplayRetention::Released
     );
-    let mut session = plan.replay_session(shots).expect("replay session");
+    let mut session = plan
+        .replay_session(&Default::default(), shots)
+        .expect("replay session");
     let mut sink = CollectingSink::default();
     let mut transaction = session.start_transaction(&mut sink).expect("transaction");
     assert!(
@@ -638,7 +667,7 @@ fn replay_record_store_keeps_records_only_within_the_budget_a_session_leaves() {
 fn sparse_replay_store_admits_u32_ordinals_exactly() {
     let model = DetectorErrorModel::from_dem_str("repeat 100 {\n    error(0.5) D0 D1\n}\n")
         .expect("parse DEM");
-    let plan = DemSamplingCompiler::new()
+    let plan = DemSamplingCompiler::default()
         .compile(&model)
         .expect("compile DEM");
     let shots = ShotCount::new(200);
@@ -649,7 +678,10 @@ fn sparse_replay_store_admits_u32_ordinals_exactly() {
         .expect("pack one-hit records");
     let store_at = |bytes: u64| {
         plan.replay_record_store(
-            &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(bytes)),
+            &DemReplaySessionOptions {
+                memory_budget: Some(stab_model::MemoryBudget::from_bytes(bytes)),
+                ..Default::default()
+            },
             shots,
         )
     };
@@ -688,7 +720,7 @@ fn sparse_replay_store_admits_u32_ordinals_exactly() {
 fn full_replay_store_keeps_its_whole_batch_prefix_for_a_resumed_replay() {
     let model = DetectorErrorModel::from_dem_str("repeat 100 {\n    error(0.5) D0 D1\n}\n")
         .expect("parse DEM");
-    let plan = DemSamplingCompiler::new()
+    let plan = DemSamplingCompiler::default()
         .compile(&model)
         .expect("compile DEM");
     let shots = ShotCount::new(200);
@@ -701,7 +733,10 @@ fn full_replay_store_keeps_its_whole_batch_prefix_for_a_resumed_replay() {
     };
     let store_at = |bytes: u64| {
         plan.replay_record_store(
-            &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(bytes)),
+            &DemReplaySessionOptions {
+                memory_budget: Some(stab_model::MemoryBudget::from_bytes(bytes)),
+                ..Default::default()
+            },
             shots,
         )
     };
@@ -740,7 +775,9 @@ fn full_replay_store_keeps_its_whole_batch_prefix_for_a_resumed_replay() {
         DemReplayRetention::Full
     );
 
-    let mut session = plan.replay_session(shots).expect("replay session");
+    let mut session = plan
+        .replay_session(&Default::default(), shots)
+        .expect("replay session");
     let mut sink = CollectingSink::default();
     let mut transaction = session.start_transaction(&mut sink).expect("transaction");
     transaction
@@ -762,20 +799,26 @@ fn compiler_admits_retained_bytes_and_honors_cancellation() {
         "error(0.2) D0 D1 L0\nrepeat 6 {\n    error(0.1) D2\n}\nrepeat 3 {\n    error(0.05) D0\n    shift_detectors 1\n}\n",
     )
     .expect("parse DEM");
-    let plan = DemSamplingCompiler::new().compile(&model).expect("compile");
+    let plan = DemSamplingCompiler::default()
+        .compile(&model)
+        .expect("compile");
     let exact = plan.retained_bytes();
     assert!(exact > 0);
 
-    let admitted = DemSamplingCompiler::new()
-        .memory_budget(stab_model::MemoryBudget::from_bytes(exact))
-        .compile(&model)
-        .expect("exact retained-bytes budget admits compilation");
+    let admitted = DemSamplingCompiler {
+        memory_budget: stab_model::MemoryBudget::from_bytes(exact),
+        ..DemSamplingCompiler::default()
+    }
+    .compile(&model)
+    .expect("exact retained-bytes budget admits compilation");
     assert_eq!(admitted, plan);
 
-    let refused = DemSamplingCompiler::new()
-        .memory_budget(stab_model::MemoryBudget::from_bytes(exact - 1))
-        .compile(&model)
-        .expect_err("one byte below retained_bytes is refused");
+    let refused = DemSamplingCompiler {
+        memory_budget: stab_model::MemoryBudget::from_bytes(exact - 1),
+        ..DemSamplingCompiler::default()
+    }
+    .compile(&model)
+    .expect_err("one byte below retained_bytes is refused");
     assert!(
         matches!(
             &refused,
@@ -790,10 +833,12 @@ fn compiler_admits_retained_bytes_and_honors_cancellation() {
 
     let cancelled = stab_model::Cancellation::new();
     cancelled.cancel();
-    let err = DemSamplingCompiler::new()
-        .cancellation(cancelled)
-        .compile(&model)
-        .expect_err("cancelled compile");
+    let err = DemSamplingCompiler {
+        cancellation: cancelled,
+        ..DemSamplingCompiler::default()
+    }
+    .compile(&model)
+    .expect_err("cancelled compile");
     assert!(matches!(err, super::DemError::Cancelled(_)));
 }
 
@@ -803,17 +848,19 @@ fn compiler_admits_retained_bytes_and_honors_cancellation() {
 fn plan_sessions_inherit_the_compiler_budget_and_cancellation() {
     let model =
         DetectorErrorModel::from_dem_str("error(0.5) D0\ndetector D99999\n").expect("parse DEM");
-    let compiled_bytes = DemSamplingCompiler::new()
+    let compiled_bytes = DemSamplingCompiler::default()
         .compile(&model)
         .expect("compile")
         .retained_bytes();
     // Admits the plan but not even a one-shot session, which keeps a byte per detector.
     let small = stab_model::MemoryBudget::from_bytes(compiled_bytes.max(1_000));
-    let plan = DemSamplingCompiler::new()
-        .memory_budget(small)
-        .compile(&model)
-        .expect("compile under a small budget");
-    assert_eq!(plan.limits().memory_budget(), small);
+    let plan = DemSamplingCompiler {
+        memory_budget: small,
+        ..DemSamplingCompiler::default()
+    }
+    .compile(&model)
+    .expect("compile under a small budget");
+    assert_eq!(plan.inner.limits.memory_budget(), small);
     let refused_by_budget = |error: &DemSamplingExecutionError| {
         matches!(
             error,
@@ -823,24 +870,31 @@ fn plan_sessions_inherit_the_compiler_budget_and_cancellation() {
         )
     };
     assert!(matches!(
-        plan.session(RandomPolicy::Seeded(Seed::new(1))),
+        plan.session(&DemSamplingSessionOptions { random: RandomPolicy::Seeded(Seed::new(1)), ..Default::default() }),
         Err(ref error) if refused_by_budget(error)
     ));
     assert!(matches!(
-        plan.replay_session(ShotCount::new(1)),
+        plan.replay_session(&Default::default(), ShotCount::new(1)),
         Err(ref error) if refused_by_budget(error)
     ));
 
     let model = DetectorErrorModel::from_dem_str("error(0.5) D0\n").expect("parse DEM");
     let cancellation = stab_model::Cancellation::new();
-    let plan = DemSamplingCompiler::new()
-        .cancellation(cancellation.clone())
-        .compile(&model)
-        .expect("compile before cancelling");
+    let plan = DemSamplingCompiler {
+        cancellation: cancellation.clone(),
+        ..DemSamplingCompiler::default()
+    }
+    .compile(&model)
+    .expect("compile before cancelling");
     let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(1)))
+        .session(&DemSamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(1)),
+            ..Default::default()
+        })
         .expect("session");
-    let mut replay = plan.replay_session(ShotCount::new(1)).expect("replay");
+    let mut replay = plan
+        .replay_session(&Default::default(), ShotCount::new(1))
+        .expect("replay");
     cancellation.cancel();
     let mut sink = CollectingSink::default();
     let summary = session
@@ -862,7 +916,7 @@ fn plan_sessions_inherit_the_compiler_budget_and_cancellation() {
 fn dense_replay_store_keeps_the_error_major_batches_its_budget_admits() {
     let model = DetectorErrorModel::from_dem_str("repeat 100 {\n    error(0.5) D0 D1\n}\n")
         .expect("parse DEM");
-    let plan = DemSamplingCompiler::new()
+    let plan = DemSamplingCompiler::default()
         .compile(&model)
         .expect("compile DEM");
     let shots = ShotCount::new(200);
@@ -873,7 +927,10 @@ fn dense_replay_store_keeps_the_error_major_batches_its_budget_admits() {
     };
     let store_at = |bytes: u64| {
         plan.replay_record_store(
-            &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(bytes)),
+            &DemReplaySessionOptions {
+                memory_budget: Some(stab_model::MemoryBudget::from_bytes(bytes)),
+                ..Default::default()
+            },
             shots,
         )
     };
@@ -902,7 +959,9 @@ fn dense_replay_store_keeps_the_error_major_batches_its_budget_admits() {
     );
     assert_eq!(store.shot_count(), 128);
 
-    let mut session = plan.replay_session(shots).expect("replay session");
+    let mut session = plan
+        .replay_session(&Default::default(), shots)
+        .expect("replay session");
     let mut sink = CollectingSink::default();
     let mut transaction = session.start_transaction(&mut sink).expect("transaction");
     transaction

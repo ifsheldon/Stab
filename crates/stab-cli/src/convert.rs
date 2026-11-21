@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 use clap::Args;
-use stab_engine::detection_record_width;
+use stab_engine::{DetectionConversionLimits, detection_record_width};
 use stab_model::{Circuit, DetectorErrorModel};
 use stab_records::{
     DetsLayout, DetsResultType, FormatError, FormatErrorCode, PackedShotBatch, PackedShotBatchView,
@@ -115,7 +115,7 @@ impl ConvertLayout {
         // Compiling the conversion plan still validates measurement-record targets and the
         // detection conversion limits before any count is trusted; the counts come from the
         // model, which agrees with the plan on every circuit the plan accepts.
-        detection_record_width(circuit)?;
+        detection_record_width(circuit, &DetectionConversionLimits::default())?;
         self.num_measurements = usize_from_u64(circuit.count_measurements()?, "measurement count")?;
         self.num_detectors = usize_from_u64(circuit.count_detectors()?, "detector count")?;
         self.num_observables = usize_from_u64(circuit.count_observables()?, "observable count")?;

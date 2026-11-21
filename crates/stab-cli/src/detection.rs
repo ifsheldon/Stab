@@ -4,10 +4,10 @@ use std::path::PathBuf;
 use clap::Args;
 use stab_analysis::{FeedbackInliningOptions, circuit_with_inlined_feedback};
 use stab_engine::{
-    DetectionConversionLimits, DetectionRunError, DetectionSamplingCompiler,
-    DetectionSamplingSession, LaneWidth, MeasurementToDetectionCompiler,
-    MeasurementToDetectionTransaction, RandomPolicy, ReferenceSampleMode, Seed, ShotCount,
-    StreamingDetectionRun,
+    DetectionExecutionError, DetectionSamplingCompiler, DetectionSamplingSession,
+    DetectionSamplingSessionOptions, LaneWidth, MeasurementToDetectionCompiler,
+    MeasurementToDetectionSessionOptions, MeasurementToDetectionTransaction, RandomPolicy,
+    ReferenceSampleMode, RunError, Seed, ShotCount, StreamingDetectionRun,
 };
 use stab_records::{
     ByteSpan, DetectionBatchView, DetectionSink, FormatError, FormatErrorCode,
@@ -266,10 +266,12 @@ where
     let (circuit, circuit_hold) = ledger.parse_circuit(input_bytes)?;
     let observable_mode = detect_observable_output_mode(&args);
     let compile = ledger.stage();
-    let plan = DetectionSamplingCompiler::new()
-        .limits(DetectionConversionLimits::new(compile.get()))
-        .compile(&circuit)
-        .map_err(|error| compile.refusal(error))?;
+    let plan = DetectionSamplingCompiler {
+        memory_budget: compile.get(),
+        ..DetectionSamplingCompiler::default()
+    }
+    .compile(&circuit)
+    .map_err(|error| compile.refusal(error))?;
     drop(circuit);
     ledger.release(circuit_hold);
     let _plan_hold = ledger.hold(plan.retained_bytes());
@@ -308,19 +310,15 @@ where
     .file_buffer(args.output.is_some())
     .file_buffer(args.obs_output.is_some());
     let (_output_hold, run) = admit_output_then_session(output, &mut ledger, |budget| {
+        let options = DetectionSamplingSessionOptions {
+            random: random_policy(args.seed),
+            lane_width,
+            memory_budget: Some(budget),
+        };
         let run = if streams {
-            DetectRun::Streaming(Box::new(plan.streaming_run_with_budget(
-                random_policy(args.seed),
-                lane_width,
-                shots,
-                budget,
-            )?))
+            DetectRun::Streaming(Box::new(plan.streaming_run(&options, shots)?))
         } else {
-            DetectRun::Session(Box::new(plan.session_with_budget(
-                random_policy(args.seed),
-                lane_width,
-                budget,
-            )?))
+            DetectRun::Session(Box::new(plan.session(&options)?))
         };
         Ok(run)
     })?;
@@ -410,17 +408,21 @@ where
     let observable_mode = observable_output_mode(args.append_observables);
     let sweep_input = io.take_input(FileRole::Sweep);
     let compile = ledger.stage();
-    let plan = MeasurementToDetectionCompiler::new()
-        .limits(DetectionConversionLimits::new(compile.get()))
-        .reference_sample_mode(reference_sample_mode(args.skip_reference_sample))
-        .compile(&circuit)
-        .map_err(|error| compile.refusal(error))?;
+    let plan = MeasurementToDetectionCompiler {
+        reference_sample_mode: reference_sample_mode(args.skip_reference_sample),
+        memory_budget: compile.get(),
+        ..MeasurementToDetectionCompiler::default()
+    }
+    .compile(&circuit)
+    .map_err(|error| compile.refusal(error))?;
     drop(circuit);
     ledger.release(circuit_hold);
     let _plan_hold = ledger.hold(plan.retained_bytes());
     let session_stage = ledger.stage();
     let mut session = plan
-        .session_with_budget(session_stage.get())
+        .session(&MeasurementToDetectionSessionOptions {
+            memory_budget: Some(session_stage.get()),
+        })
         .map_err(|error| session_stage.refusal(error))?;
     let _session_hold = ledger.hold(session.retained_bytes());
     // The text record cap predates the output storage hold and keeps its value, so record
@@ -632,10 +634,10 @@ where
     delivery.finish().map_err(map_detection_run_error)
 }
 
-fn map_detection_run_error(error: DetectionRunError<CliError>) -> CliError {
+fn map_detection_run_error(error: RunError<DetectionExecutionError, CliError>) -> CliError {
     match error {
-        DetectionRunError::Engine { source, .. } => CliError::from(source),
-        DetectionRunError::Sink { source, .. } => source,
+        RunError::Engine { source, .. } => CliError::from(source),
+        RunError::Sink { source, .. } => source,
     }
 }
 

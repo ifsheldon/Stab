@@ -11,8 +11,7 @@ use stab_engine::{
     DetectionCompileError, DetectionConversionLimits, DetectionError, DetectionResourceKind,
     DetectionResourceLimitError, DetectionSamplingCompiler, MeasurementToDetectionCompiler,
     MeasurementToDetectionPlan, PlanFingerprint, ReferenceSampleMode, SamplingCompiler,
-    SamplingPlan, detection_record_width_with_limits, measurement_record_count_with_limits,
-    validate_detection_sampling_circuit_with_limits,
+    SamplingPlan, detection_record_width,
 };
 use stab_model::{Circuit, MemoryBudget};
 use stab_records::{
@@ -27,10 +26,12 @@ fn compile_detection(
     circuit: &Circuit,
     limits: DetectionConversionLimits,
 ) -> Result<MeasurementToDetectionPlan, DetectionCompileError> {
-    MeasurementToDetectionCompiler::new()
-        .limits(limits.clone())
-        .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample)
-        .compile(circuit)
+    MeasurementToDetectionCompiler {
+        reference_sample_mode: ReferenceSampleMode::SkipReferenceSample,
+        memory_budget: limits.memory_budget,
+        cancellation: limits.cancellation,
+    }
+    .compile(circuit)
 }
 
 #[derive(Default)]
@@ -77,7 +78,10 @@ fn expect_detection_compile_resource(error: DetectionCompileError) -> DetectionR
 }
 
 fn budget(bytes: u64) -> DetectionConversionLimits {
-    DetectionConversionLimits::default().with_memory_budget(MemoryBudget::from_bytes(bytes))
+    DetectionConversionLimits {
+        memory_budget: MemoryBudget::from_bytes(bytes),
+        ..Default::default()
+    }
 }
 
 fn compact_detection_plan_bytes(circuit: &Circuit) -> u64 {
@@ -125,25 +129,20 @@ fn every_detection_entry_point_applies_the_caller_budget() {
     let circuit = circuit("M 0\nDETECTOR rec[-1]\n");
     let limits = budget(0);
 
-    for error in [
-        measurement_record_count_with_limits(&circuit, limits.clone())
-            .expect_err("measurement counting must apply the caller budget"),
-        detection_record_width_with_limits(&circuit, limits.clone())
-            .expect_err("detection-width counting must apply the caller budget"),
-        validate_detection_sampling_circuit_with_limits(&circuit, limits.clone())
-            .expect_err("frame validation must apply the caller budget"),
-    ] {
-        let resource = expect_detection_resource(error);
-        assert_eq!(resource.kind(), DetectionResourceKind::CompiledBytes);
-        assert_eq!(resource.limit(), 0);
-    }
+    let error = detection_record_width(&circuit, &limits)
+        .expect_err("detection-width counting must apply the caller budget");
+    let resource = expect_detection_resource(error);
+    assert_eq!(resource.kind(), DetectionResourceKind::CompiledBytes);
+    assert_eq!(resource.limit(), 0);
 
     for error in [
         compile_detection(&circuit, limits.clone()).expect_err("conversion compilation"),
-        DetectionSamplingCompiler::new()
-            .limits(limits.clone())
-            .compile(&circuit)
-            .expect_err("detection sampling compilation"),
+        DetectionSamplingCompiler {
+            memory_budget: limits.memory_budget,
+            cancellation: limits.cancellation.clone(),
+        }
+        .compile(&circuit)
+        .expect_err("detection sampling compilation"),
     ] {
         let resource = expect_detection_compile_resource(error);
         assert_eq!(resource.kind(), DetectionResourceKind::CompiledBytes);
@@ -163,7 +162,7 @@ fn record_width_is_charged_against_the_budget_and_converts_at_the_exact_budget()
     let plan_for_session =
         compile_detection(&circuit, DetectionConversionLimits::default()).expect("default budget");
     let mut session = plan_for_session
-        .session()
+        .session(&Default::default())
         .expect("create conversion session");
     let mut sink = DetectionWitnessSink::default();
     session
@@ -212,7 +211,7 @@ fn expanded_detection_work_is_not_capped() {
 
 #[test]
 fn a4_sampling_plan_fingerprint_contract() {
-    let compiler = SamplingCompiler::new();
+    let compiler = SamplingCompiler::default();
     let source = circuit("M 0\n");
     let fingerprint = compiler.plan_fingerprint(&source);
     let request = compiler.request_fingerprint(&source);

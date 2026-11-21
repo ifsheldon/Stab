@@ -7,8 +7,8 @@
 use std::assert_matches;
 
 use stab_engine::{
-    RandomPolicy, RunError, SamplingCompiler, SamplingExecutionError, SamplingPlan,
-    SamplingRunStatus, Seed, ShotCount, SinkFailurePhase,
+    RandomPolicy, RunError, RunStatus, SamplingCompiler, SamplingExecutionError, SamplingPlan,
+    SamplingSessionOptions, Seed, ShotCount, SinkFailurePhase,
 };
 use stab_model::Circuit;
 use stab_records::{BitIndex, MeasurementBatchView, MeasurementSink, ShotIndex};
@@ -72,20 +72,23 @@ impl MeasurementSink for ProbeSink {
 fn noisy_plan() -> SamplingPlan {
     let circuit = Circuit::from_stim_str("H 0\nM 0\nCX rec[-1] 1\nM(0.125) 1\n")
         .expect("parse noisy sampling circuit");
-    SamplingCompiler::new()
+    SamplingCompiler::default()
         .compile(&circuit)
         .expect("compile noisy sampling circuit")
 }
 
 fn clean_records(plan: &SamplingPlan, seed: u64, shots: u64) -> Vec<Vec<bool>> {
     let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(seed)))
+        .session(&SamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(seed)),
+            ..Default::default()
+        })
         .expect("construct control session");
     let mut sink = ProbeSink::default();
     let summary = session
         .run(ShotCount::new(shots), &mut sink)
         .expect("run control session");
-    assert_eq!(summary.status(), SamplingRunStatus::Completed);
+    assert_eq!(summary.status(), RunStatus::Completed);
     assert_eq!(summary.committed_shots(), ShotCount::new(shots));
     sink.records
 }
@@ -94,7 +97,10 @@ fn clean_records(plan: &SamplingPlan, seed: u64, shots: u64) -> Vec<Vec<bool>> {
 fn zero_shot_run_leaves_sink_and_random_stream_untouched() {
     let plan = noisy_plan();
     let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(29)))
+        .session(&SamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(29)),
+            ..Default::default()
+        })
         .expect("construct session");
     let mut empty_sink = ProbeSink::default();
 
@@ -102,7 +108,7 @@ fn zero_shot_run_leaves_sink_and_random_stream_untouched() {
         .run(ShotCount::new(0), &mut empty_sink)
         .expect("run zero shots");
 
-    assert_eq!(summary.status(), SamplingRunStatus::Completed);
+    assert_eq!(summary.status(), RunStatus::Completed);
     assert_eq!(summary.committed_shots(), ShotCount::new(0));
     assert_eq!(summary.total_committed_shots(), ShotCount::new(0));
     assert_eq!((empty_sink.write_calls, empty_sink.finish_calls), (0, 0));
@@ -120,7 +126,10 @@ fn cancellation_between_batches_preserves_the_resumable_random_stream() {
     let requested = 386_u64;
     let expected = clean_records(&plan, 31, requested);
     let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(31)))
+        .session(&SamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(31)),
+            ..Default::default()
+        })
         .expect("construct cancellable session");
     let cancellation = session.cancellation();
     let mut first = ProbeSink {
@@ -133,7 +142,7 @@ fn cancellation_between_batches_preserves_the_resumable_random_stream() {
         .expect("cancel after the first completed batch");
     let committed = summary.committed_shots().get();
 
-    assert_eq!(summary.status(), SamplingRunStatus::Cancelled);
+    assert_eq!(summary.status(), RunStatus::Cancelled);
     assert!((1..requested).contains(&committed));
     assert_eq!(
         first.records.len(),
@@ -148,7 +157,7 @@ fn cancellation_between_batches_preserves_the_resumable_random_stream() {
         .expect("resume the same session");
     first.records.extend(resumed.records);
 
-    assert_eq!(resumed_summary.status(), SamplingRunStatus::Completed);
+    assert_eq!(resumed_summary.status(), RunStatus::Completed);
     assert_eq!(
         resumed_summary.total_committed_shots(),
         ShotCount::new(requested)
@@ -161,7 +170,10 @@ fn cancellation_between_batches_preserves_the_resumable_random_stream() {
 fn pre_cancelled_run_finalizes_without_work_and_remains_resumable() {
     let plan = noisy_plan();
     let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(35)))
+        .session(&SamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(35)),
+            ..Default::default()
+        })
         .expect("construct cancellable session");
     let cancellation = session.cancellation();
     cancellation.cancel();
@@ -171,7 +183,7 @@ fn pre_cancelled_run_finalizes_without_work_and_remains_resumable() {
         .run(ShotCount::new(65), &mut cancelled_sink)
         .expect("run pre-cancelled request");
 
-    assert_eq!(summary.status(), SamplingRunStatus::Cancelled);
+    assert_eq!(summary.status(), RunStatus::Cancelled);
     assert_eq!(summary.committed_shots(), ShotCount::new(0));
     assert_eq!(summary.total_committed_shots(), ShotCount::new(0));
     assert_eq!(
@@ -192,7 +204,10 @@ fn pre_cancelled_run_finalizes_without_work_and_remains_resumable() {
 fn pre_cancelled_finish_failure_poisons_and_rejects_the_session() {
     let plan = noisy_plan();
     let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(36)))
+        .session(&SamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(36)),
+            ..Default::default()
+        })
         .expect("construct cancellable session");
     session.cancellation().cancel();
     let mut failing_sink = ProbeSink {
@@ -239,7 +254,10 @@ fn pre_cancelled_finish_failure_poisons_and_rejects_the_session() {
 fn mid_run_sink_failures_poison_after_committing_written_batches() {
     let plan = noisy_plan();
     let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(37)))
+        .session(&SamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(37)),
+            ..Default::default()
+        })
         .expect("construct write-failure session");
     let mut failing_sink = ProbeSink {
         fail_write_call: Some(2),
@@ -279,7 +297,10 @@ fn mid_run_sink_failures_poison_after_committing_written_batches() {
     );
 
     let mut finish_session = plan
-        .session(RandomPolicy::Seeded(Seed::new(41)))
+        .session(&SamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(41)),
+            ..Default::default()
+        })
         .expect("construct finish-failure session");
     let mut finish_sink = ProbeSink {
         fail_finish: true,

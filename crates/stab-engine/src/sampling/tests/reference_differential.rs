@@ -23,14 +23,18 @@ struct ReferencePaths {
 
 impl ReferencePaths {
     fn compute(circuit: &Circuit) -> Self {
-        let iterated_plan = SamplingCompiler::new()
-            .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Iterate)
-            .compile(circuit)
-            .expect("compile iterated reference plan");
-        let folded_plan = SamplingCompiler::new()
-            .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Fold)
-            .compile(circuit)
-            .expect("compile folded reference plan");
+        let iterated_plan = SamplingCompiler {
+            reference_sample_loop_policy: ReferenceSampleLoopPolicy::Iterate,
+            ..SamplingCompiler::default()
+        }
+        .compile(circuit)
+        .expect("compile iterated reference plan");
+        let folded_plan = SamplingCompiler {
+            reference_sample_loop_policy: ReferenceSampleLoopPolicy::Fold,
+            ..SamplingCompiler::default()
+        }
+        .compile(circuit)
+        .expect("compile folded reference plan");
         let baseline =
             super::super::api::compute_stabilizer_frame_reference_sample(&iterated_plan.inner)
                 .expect("iterated generator-list reference");
@@ -409,7 +413,7 @@ fn inverse_tableau_matches_generator_baseline_above_one_thousand_qubits() {
     }
     text.push('\n');
     let circuit = parse(&text);
-    let plan = SamplingCompiler::new()
+    let plan = SamplingCompiler::default()
         .compile(&circuit)
         .expect("compile wide circuit");
     assert_eq!(plan.qubit_count(), qubits);
@@ -532,7 +536,7 @@ fn reference_samples_satisfy_every_deterministic_detector_with_folded_and_nested
         let mut flat_reference = None;
         for variant in [text.clone(), nested] {
             let circuit = parse(&variant);
-            let plan = SamplingCompiler::new()
+            let plan = SamplingCompiler::default()
                 .compile(&circuit)
                 .expect("compile detector circuit");
             let reference = bits(&plan.try_reference_sample().expect("reference sample"));
@@ -544,7 +548,11 @@ fn reference_samples_satisfy_every_deterministic_detector_with_folded_and_nested
             );
             let expected = detector_parities(&circuit, &reference);
             assert!(!expected.is_empty(), "{variant}");
-            let signs = crate::circuit_reference_signs(&circuit).expect("reference signs");
+            let signs = crate::circuit_reference_signs(
+                &circuit,
+                &crate::DetectionConversionLimits::default(),
+            )
+            .expect("reference signs");
             assert_eq!(
                 signs.detector_signs().iter().collect::<Vec<_>>(),
                 expected,
@@ -613,14 +621,17 @@ fn sessions_share_the_plan_reference_instead_of_recomputing_it() {
     .expect("valid surface-code parameters")
     .with_before_measure_flip_probability(Probability::try_new(0.01).expect("probability"));
     let generated = params.generate().expect("generate surface circuit");
-    let plan = SamplingCompiler::new()
+    let plan = SamplingCompiler::default()
         .compile(generated.circuit())
         .expect("compile surface circuit");
 
     let runs_before = super::super::reference_run::reference_run_count();
     let sample = |plan: &SamplingPlan| {
         let mut session = plan
-            .session(RandomPolicy::Seeded(Seed::new(7)))
+            .session(&SamplingSessionOptions {
+                random: RandomPolicy::Seeded(Seed::new(7)),
+                ..Default::default()
+            })
             .expect("session");
         let mut sink = RecordSink::default();
         session.run(ShotCount::new(70), &mut sink).expect("run");

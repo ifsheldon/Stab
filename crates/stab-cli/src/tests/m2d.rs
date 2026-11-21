@@ -1,6 +1,8 @@
 //! `stab m2d` conversion, sweep, and format behavior beyond the pinned-Stim manifest rows.
 
-use stab_engine::{detection_record_width, measurement_record_count};
+use stab_engine::{
+    DetectionConversionLimits, MeasurementToDetectionCompiler, detection_record_width,
+};
 use stab_model::Circuit;
 use stab_records::{RecordFormat, read_records, write_records};
 
@@ -201,10 +203,10 @@ fn m2d_ignores_pauli_target_observable_annotations() {
 fn m2d_rejects_oversized_text_records() {
     let scratch = Scratch::new();
     let parsed = stab_model::Circuit::from_stim_str(SWEEP_CX).expect("parse SWEEP_CX");
-    let plan = stab_engine::MeasurementToDetectionCompiler::new()
+    let plan = stab_engine::MeasurementToDetectionCompiler::default()
         .compile(&parsed)
         .expect("compile SWEEP_CX");
-    let session = plan.session().expect("session");
+    let session = plan.session(&Default::default()).expect("session");
     let active_holds = plan.retained_bytes() + session.retained_bytes();
     let record_cap = usize::try_from((2 * 1024 * 1024 - active_holds - 1) / 2).expect("fits usize");
     let mut oversized = vec![b'0'; record_cap + 1];
@@ -269,8 +271,14 @@ fn m2d_converts_the_same_generated_measurements_in_text_and_bitpacked_formats() 
         assert_eq!(generated.status, 0, "{task}: {}", generated.stderr_text());
         let circuit = generated.stdout_text();
         let parsed = Circuit::from_stim_bytes(circuit.as_bytes()).expect("parse generated circuit");
-        let measurement_width = measurement_record_count(&parsed).expect("measurement width");
-        let detection_width = detection_record_width(&parsed).expect("detection width");
+        let measurement_width = MeasurementToDetectionCompiler::default()
+            .compile(&parsed)
+            .expect("compile conversion")
+            .measurement_width()
+            .get();
+        let detection_width =
+            detection_record_width(&parsed, &DetectionConversionLimits::default())
+                .expect("detection width");
 
         let sampled = run(
             &[

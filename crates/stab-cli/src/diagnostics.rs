@@ -49,13 +49,13 @@ pub(crate) enum CliError {
     },
 
     #[error("sampling failed while producing output: {0}")]
-    SampleOutput(#[source] RunError<std::io::Error>),
+    SampleOutput(#[source] RunError<SamplingExecutionError, std::io::Error>),
 
     #[error("sampling failed while writing {path}: {source}")]
     SamplePath {
         path: PathBuf,
         #[source]
-        source: RunError<std::io::Error>,
+        source: RunError<SamplingExecutionError, std::io::Error>,
     },
 
     #[error("file roles {first} and {second} refer to the same file")]
@@ -615,7 +615,10 @@ fn cli_error_context(error: &CliError) -> Value {
     }
 }
 
-fn sample_run_error_context(error: &RunError<std::io::Error>, path: Option<&Path>) -> Value {
+fn sample_run_error_context(
+    error: &RunError<SamplingExecutionError, std::io::Error>,
+    path: Option<&Path>,
+) -> Value {
     let progress = error.progress();
     let mut context = match error {
         RunError::Engine { .. } => json!({

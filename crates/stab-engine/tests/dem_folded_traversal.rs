@@ -5,7 +5,9 @@
 
 use std::convert::Infallible;
 
-use stab_engine::{DemSamplingCompiler, DemSamplingPlan, RandomPolicy, Seed, ShotCount};
+use stab_engine::{
+    DemSamplingCompiler, DemSamplingPlan, DemSamplingSessionOptions, RandomPolicy, Seed, ShotCount,
+};
 use stab_model::DetectorErrorModel;
 use stab_records::{BitIndex, DemSampleBatchView, DemSampleSink, ShotIndex};
 
@@ -63,7 +65,7 @@ fn dem(text: &str) -> DetectorErrorModel {
 }
 
 fn compile_dem_sampling(model: &DetectorErrorModel) -> Result<DemSamplingPlan, String> {
-    DemSamplingCompiler::new()
+    DemSamplingCompiler::default()
         .compile(model)
         .map_err(|error| error.to_string())
 }
@@ -75,7 +77,10 @@ fn collect_dem_samples(
 ) -> Result<SampleOutput, String> {
     let shots = u64::try_from(shots).map_err(|_| "shot count does not fit u64".to_owned())?;
     let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(seed)))
+        .session(&DemSamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(seed)),
+            ..Default::default()
+        })
         .map_err(|error| error.to_string())?;
     let mut sink = CollectSamples::default();
     session

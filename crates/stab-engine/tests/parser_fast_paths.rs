@@ -34,10 +34,12 @@ fn stim_negative_zero_target_preserves_boundary_semantics() {
     assert_eq!(exact, generic);
     assert_eq!(exact.to_stim_string(), "M 0\nDETECTOR rec[-0]\n");
 
-    let conversion_error = MeasurementToDetectionCompiler::new()
-        .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample)
-        .compile(&exact)
-        .expect_err("zero lookback must not compile for detection conversion");
+    let conversion_error = MeasurementToDetectionCompiler {
+        reference_sample_mode: ReferenceSampleMode::SkipReferenceSample,
+        ..MeasurementToDetectionCompiler::default()
+    }
+    .compile(&exact)
+    .expect_err("zero lookback must not compile for detection conversion");
     assert_matches!(
         conversion_error,
         DetectionCompileError::InvalidCircuit(DetectionError::InvalidResultFormat { .. })
@@ -61,7 +63,7 @@ fn stim_negative_zero_target_preserves_boundary_semantics() {
         circuit_to_detector_error_model(&feedback, &ErrorAnalyzerOptions::default())
             .expect("Stim analyzer treats negative-zero feedback as having no effect");
     assert_eq!(feedback_model.to_dem_string(), "");
-    let sampling_error = SamplingCompiler::new()
+    let sampling_error = SamplingCompiler::default()
         .compile(&feedback)
         .expect_err("zero lookback must not compile for sampling");
     assert_matches!(

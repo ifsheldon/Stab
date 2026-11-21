@@ -49,21 +49,14 @@ impl CircuitReferenceSigns {
 
 /// Computes detector and observable signs using the noiseless all-zero-sweep reference sample.
 ///
-/// Detection-plan work is admitted with [`DetectionConversionLimits::default`]. Use
-/// [`circuit_reference_signs_with_limits`] when the caller owns a different resource policy.
-pub fn circuit_reference_signs(circuit: &Circuit) -> Result<CircuitReferenceSigns, DetectionError> {
-    circuit_reference_signs_with_limits(circuit, DetectionConversionLimits::default())
-}
-
-/// Computes reference signs after applying the caller's detection-conversion resource limits.
-///
-/// The packed signs are admitted against the budget together with the compiled conversion that
-/// computes them.
-pub fn circuit_reference_signs_with_limits(
+/// The packed signs are admitted against the limits' budget together with the compiled
+/// conversion that computes them.
+pub fn circuit_reference_signs(
     circuit: &Circuit,
-    limits: DetectionConversionLimits,
+    limits: &DetectionConversionLimits,
 ) -> Result<CircuitReferenceSigns, DetectionError> {
-    let budget = limits.memory_budget();
+    let limits = limits.clone();
+    let budget = limits.memory_budget;
     let prepared = PreparedMeasurementToDetection::compile_with_limits(
         circuit,
         crate::ReferenceSampleMode::UseReferenceSample,

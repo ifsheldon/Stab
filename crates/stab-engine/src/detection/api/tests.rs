@@ -14,13 +14,7 @@ use stab_records::{BitIndex, MeasurementSink, PackedShotBatch, ShotIndex};
 use super::super::test_support::convert_measurements_to_detection_events_with_sweep;
 use super::*;
 use crate::detection::DetectionRecordBuffer;
-use crate::{DetectionResourceKind, Seed};
-
-fn budget(bytes: impl TryInto<u64>) -> DetectionConversionLimits {
-    DetectionConversionLimits::default().with_memory_budget(MemoryBudget::from_bytes(
-        bytes.try_into().ok().expect("test budget fits u64"),
-    ))
-}
+use crate::{DetectionResourceKind, RandomPolicy, Seed};
 
 #[derive(Default)]
 struct CollectSink {
@@ -154,14 +148,18 @@ fn run_plan_at(
     lane_width: LaneWidth,
 ) -> CollectSink {
     let mut session = plan
-        .session_with_lane_width(RandomPolicy::Seeded(Seed::new(seed)), lane_width)
+        .session(&DetectionSamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(seed)),
+            lane_width,
+            ..Default::default()
+        })
         .expect("create detection session");
     assert_eq!(session.lane_width(), lane_width);
     let mut sink = CollectSink::default();
     let summary = session
         .run(ShotCount::new(shots), &mut sink)
         .expect("run detection session");
-    assert_eq!(summary.status(), DetectionRunStatus::Completed);
+    assert_eq!(summary.status(), RunStatus::Completed);
     assert_eq!(summary.requested_shots(), ShotCount::new(shots));
     assert_eq!(summary.committed_shots(), ShotCount::new(shots));
     assert_eq!(summary.total_committed_shots(), ShotCount::new(shots));
@@ -171,6 +169,7 @@ fn run_plan_at(
 fn assert_send_sync<T: Send + Sync>() {}
 
 mod m2d_oracle;
+mod storage;
 
 #[test]
 fn measurement_sink_transaction_preserves_sweep_semantics_and_sink_lifecycle() {
@@ -185,14 +184,16 @@ fn measurement_sink_transaction_preserves_sweep_semantics_and_sink_lifecycle() {
         ReferenceSampleMode::UseReferenceSample,
     )
     .expect("materialize transaction oracle");
-    let plan = MeasurementToDetectionCompiler::new()
+    let plan = MeasurementToDetectionCompiler::default()
         .compile(&circuit)
         .expect("compile transaction plan");
     assert_eq!(plan.measurement_width().get(), 1);
     assert_eq!(plan.sweep_width().get(), 1);
     let measurement_batch = packed(&measurements, 1);
     let sweep_batch = packed(&sweeps, 1);
-    let mut session = plan.session().expect("create transaction session");
+    let mut session = plan
+        .session(&Default::default())
+        .expect("create transaction session");
     let mut sink = CollectSink::default();
     {
         let mut transaction = session
@@ -204,7 +205,7 @@ fn measurement_sink_transaction_preserves_sweep_semantics_and_sink_lifecycle() {
                 Some(MeasurementBatchView::new(sweep_batch.view())),
             )
             .expect("convert measurement batch with sweep data");
-        assert_eq!(summary.status(), DetectionRunStatus::Completed);
+        assert_eq!(summary.status(), RunStatus::Completed);
         transaction.finish().expect("finish conversion sink");
     }
     assert_eq!(sink.records, expected.records);
@@ -214,11 +215,13 @@ fn measurement_sink_transaction_preserves_sweep_semantics_and_sink_lifecycle() {
 #[test]
 fn conversion_cancellation_rejects_a_whole_batch_and_is_resumable() {
     let circuit = circuit("M 0\nDETECTOR rec[-1]\n");
-    let plan = MeasurementToDetectionCompiler::new()
+    let plan = MeasurementToDetectionCompiler::default()
         .compile(&circuit)
         .expect("compile cancellable conversion");
     let input = packed(&[vec![true]], 1);
-    let mut session = plan.session().expect("create cancellable conversion");
+    let mut session = plan
+        .session(&Default::default())
+        .expect("create cancellable conversion");
     let cancellation = session.cancellation();
     cancellation.cancel();
     let mut untouched = CollectSink::default();
@@ -228,7 +231,7 @@ fn conversion_cancellation_rejects_a_whole_batch_and_is_resumable() {
     let summary = delivery
         .write_batch_with_sweep(MeasurementBatchView::new(input.view()), None)
         .expect("cancel conversion batch");
-    assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
+    assert_eq!(summary.status(), RunStatus::Cancelled);
     assert_eq!(summary.committed_shots(), ShotCount::new(0));
 
     cancellation.reset();
@@ -244,11 +247,13 @@ fn conversion_cancellation_rejects_a_whole_batch_and_is_resumable() {
 #[test]
 fn composed_conversion_cancellation_reports_the_committed_transaction_prefix() {
     let circuit = circuit("M 0\nDETECTOR rec[-1]\n");
-    let plan = MeasurementToDetectionCompiler::new()
+    let plan = MeasurementToDetectionCompiler::default()
         .compile(&circuit)
         .expect("compile composed conversion");
     let input = packed(&[vec![true]], 1);
-    let mut session = plan.session().expect("create composed conversion");
+    let mut session = plan
+        .session(&Default::default())
+        .expect("create composed conversion");
     let cancellation = session.cancellation();
     let mut sink = CollectSink::default();
     let mut transaction = session
@@ -264,7 +269,7 @@ fn composed_conversion_cancellation_reports_the_committed_transaction_prefix() {
 
     assert_matches!(
         &error,
-        DetectionRunError::Engine {
+        RunError::Engine {
             source: DetectionExecutionError::CancelledComposition,
             ..
         }
@@ -300,11 +305,15 @@ fn sweep_batches_and_reference_modes_match_materialized_conversion() {
             },
         )
         .expect("materialized sweep conversion");
-        let plan = MeasurementToDetectionCompiler::new()
-            .reference_sample_mode(mode)
-            .compile(&circuit)
-            .expect("compile sweep conversion");
-        let mut session = plan.session().expect("create sweep conversion session");
+        let plan = MeasurementToDetectionCompiler {
+            reference_sample_mode: mode,
+            ..MeasurementToDetectionCompiler::default()
+        }
+        .compile(&circuit)
+        .expect("compile sweep conversion");
+        let mut session = plan
+            .session(&Default::default())
+            .expect("create sweep conversion session");
         let mut sink = CollectSink::default();
         session
             .run(
@@ -320,10 +329,12 @@ fn sweep_batches_and_reference_modes_match_materialized_conversion() {
 #[test]
 fn record_at_a_time_conversion_preserves_valid_prefix_and_preflight_reuse() {
     let circuit = circuit("M 0\nDETECTOR rec[-1]\n");
-    let plan = MeasurementToDetectionCompiler::new()
+    let plan = MeasurementToDetectionCompiler::default()
         .compile(&circuit)
         .expect("compile conversion");
-    let mut session = plan.session().expect("create conversion session");
+    let mut session = plan
+        .session(&Default::default())
+        .expect("create conversion session");
     let valid = packed(&[vec![true]], 1);
     let invalid = packed(&[vec![true, false]], 2);
     let mut sink = CollectSink::default();
@@ -339,7 +350,7 @@ fn record_at_a_time_conversion_preserves_valid_prefix_and_preflight_reuse() {
         .expect_err("reject malformed later record");
     assert_matches!(
         error,
-        DetectionRunError::Engine {
+        RunError::Engine {
             source: DetectionExecutionError::Conversion(_),
             ..
         }
@@ -359,11 +370,13 @@ fn record_at_a_time_conversion_preserves_valid_prefix_and_preflight_reuse() {
 #[test]
 fn incremental_delivery_finalizes_once_and_rejects_post_finish_writes() {
     let circuit = circuit("M 0\nDETECTOR rec[-1]\n");
-    let plan = MeasurementToDetectionCompiler::new()
+    let plan = MeasurementToDetectionCompiler::default()
         .compile(&circuit)
         .expect("compile delivery lifecycle");
     let input = packed(&[vec![true]], 1);
-    let mut session = plan.session().expect("create delivery lifecycle session");
+    let mut session = plan
+        .session(&Default::default())
+        .expect("create delivery lifecycle session");
     let mut sink = CollectSink::default();
     let mut delivery = session
         .start_transaction(&mut sink)
@@ -376,7 +389,7 @@ fn incremental_delivery_finalizes_once_and_rejects_post_finish_writes() {
     let repeated = MeasurementSink::finish(&mut delivery).expect_err("reject double finish");
     assert_matches!(
         repeated,
-        DetectionRunError::Engine {
+        RunError::Engine {
             source: DetectionExecutionError::DeliveryFinished,
             ..
         }
@@ -387,7 +400,7 @@ fn incremental_delivery_finalizes_once_and_rejects_post_finish_writes() {
         .expect_err("reject write after finish");
     assert_matches!(
         post_finish,
-        DetectionRunError::Engine {
+        RunError::Engine {
             source: DetectionExecutionError::DeliveryFinished,
             ..
         }
@@ -403,12 +416,12 @@ fn incremental_delivery_finalizes_once_and_rejects_post_finish_writes() {
 #[test]
 fn incremental_finish_failure_reports_committed_prefix_and_poisons_session() {
     let circuit = circuit("M 0\nDETECTOR rec[-1]\n");
-    let plan = MeasurementToDetectionCompiler::new()
+    let plan = MeasurementToDetectionCompiler::default()
         .compile(&circuit)
         .expect("compile finish failure lifecycle");
     let input = packed(&[vec![true]], 1);
     let mut session = plan
-        .session()
+        .session(&Default::default())
         .expect("create finish failure lifecycle session");
     let mut sink = FailingSink {
         fail_write: false,
@@ -426,7 +439,7 @@ fn incremental_finish_failure_reports_committed_prefix_and_poisons_session() {
     let error = delivery.finish().expect_err("surface finish failure");
     assert_matches!(
         error,
-        DetectionRunError::Sink {
+        RunError::Sink {
             phase: SinkFailurePhase::Finish,
             source: TestSinkError::Finish,
             ..
@@ -440,11 +453,13 @@ fn incremental_finish_failure_reports_committed_prefix_and_poisons_session() {
 #[test]
 fn dropping_a_committed_incremental_delivery_poisons_the_parent_session() {
     let circuit = circuit("M 0\nDETECTOR rec[-1]\n");
-    let plan = MeasurementToDetectionCompiler::new()
+    let plan = MeasurementToDetectionCompiler::default()
         .compile(&circuit)
         .expect("compile abandoned delivery");
     let input = packed(&[vec![true]], 1);
-    let mut session = plan.session().expect("create abandoned delivery session");
+    let mut session = plan
+        .session(&Default::default())
+        .expect("create abandoned delivery session");
     let mut sink = CollectSink::default();
     {
         let mut delivery = session
@@ -465,12 +480,12 @@ fn dropping_a_committed_incremental_delivery_poisons_the_parent_session() {
 )]
 fn forgotten_incremental_transaction_cannot_rebind_another_sink() {
     let circuit = circuit("M 0\nDETECTOR rec[-1]\n");
-    let plan = MeasurementToDetectionCompiler::new()
+    let plan = MeasurementToDetectionCompiler::default()
         .compile(&circuit)
         .expect("compile forgotten transaction");
     let input = packed(&[vec![true]], 1);
     let mut session = plan
-        .session()
+        .session(&Default::default())
         .expect("create forgotten transaction session");
     let mut first_sink = CollectSink::default();
     let mut transaction = session
@@ -496,7 +511,7 @@ fn direct_detection_sampling_reports_widths_and_bounded_batches() {
         ("X_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n", 1, 1, 0),
         ("RX 0\nZ_ERROR(0.25) 0\nOBSERVABLE_INCLUDE(0) X0\n", 0, 0, 1),
     ] {
-        let plan = DetectionSamplingCompiler::new()
+        let plan = DetectionSamplingCompiler::default()
             .compile(&circuit(circuit_text))
             .expect("compile detection sampling");
         assert_eq!(plan.measurement_width().get(), measurements);
@@ -517,7 +532,7 @@ fn direct_detection_sampling_reports_widths_and_bounded_batches() {
 fn noiseless_detection_is_exact_at_every_batch_boundary_and_partition() {
     // Resets and measurements randomize the frame lanes, but every detector and observable is
     // deterministic, so every record must be all false however the shots split across batches.
-    let plan = DetectionSamplingCompiler::new()
+    let plan = DetectionSamplingCompiler::default()
         .compile(&circuit(
             "RX 0\nH 0\nM 0\nDETECTOR rec[-1]\nX 1\nM 1\nOBSERVABLE_INCLUDE(0) rec[-1]\n\
              MR 1 1\nDETECTOR rec[-1] rec[-2]\nMX 2\nMX 2\nDETECTOR rec[-1] rec[-2]\n",
@@ -543,7 +558,11 @@ fn noiseless_detection_is_exact_at_every_batch_boundary_and_partition() {
             );
 
             let mut session = plan
-                .session_with_lane_width(RandomPolicy::Seeded(Seed::new(3)), lane_width)
+                .session(&DetectionSamplingSessionOptions {
+                    random: RandomPolicy::Seeded(Seed::new(3)),
+                    lane_width,
+                    ..Default::default()
+                })
                 .expect("create partitioned session");
             let mut records = 0_usize;
             for part in [shots / 3, shots - shots / 3] {
@@ -562,14 +581,18 @@ fn noiseless_detection_is_exact_at_every_batch_boundary_and_partition() {
 #[test]
 fn seeded_same_session_partitioning_is_exact() {
     let circuit = circuit("X_ERROR(0.375) 0\nM 0\nDETECTOR rec[-1]\n");
-    let plan = DetectionSamplingCompiler::new()
+    let plan = DetectionSamplingCompiler::default()
         .compile(&circuit)
         .expect("compile detection plan");
     let mut streams = Vec::new();
     for &lane_width in LaneWidth::ALL {
         let combined = run_plan_at(&plan, 600, 44, lane_width).records;
         let mut session = plan
-            .session_with_lane_width(RandomPolicy::Seeded(Seed::new(44)), lane_width)
+            .session(&DetectionSamplingSessionOptions {
+                random: RandomPolicy::Seeded(Seed::new(44)),
+                lane_width,
+                ..Default::default()
+            })
             .expect("create partitioned session");
         let mut partitioned = Vec::new();
         for shots in [17, 47, 1, 63, 300, 1, 171] {
@@ -591,14 +614,18 @@ fn seeded_same_session_partitioning_is_exact() {
 #[test]
 fn cancellation_stops_between_bounded_batches_and_finalizes_sink() {
     let circuit = circuit("X_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n");
-    let plan = DetectionSamplingCompiler::new()
+    let plan = DetectionSamplingCompiler::default()
         .compile(&circuit)
         .expect("compile detection plan");
     for &lane_width in LaneWidth::ALL {
         let batch = lane_width.shots_per_batch();
         let batch_shots = ShotCount::new(batch as u64);
         let mut session = plan
-            .session_with_lane_width(RandomPolicy::Seeded(Seed::new(7)), lane_width)
+            .session(&DetectionSamplingSessionOptions {
+                random: RandomPolicy::Seeded(Seed::new(7)),
+                lane_width,
+                ..Default::default()
+            })
             .expect("create cancellable session");
         let cancellation = session.cancellation();
         let mut sink = CancellingSink {
@@ -608,7 +635,7 @@ fn cancellation_stops_between_bounded_batches_and_finalizes_sink() {
         let summary = session
             .run(ShotCount::new(600), &mut sink)
             .expect("cancel detection run");
-        assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
+        assert_eq!(summary.status(), RunStatus::Cancelled);
         assert_eq!(summary.requested_shots(), ShotCount::new(600));
         assert_eq!(summary.committed_shots(), batch_shots);
         assert_eq!(summary.total_committed_shots(), batch_shots);
@@ -631,11 +658,14 @@ fn cancellation_stops_between_bounded_batches_and_finalizes_sink() {
 #[test]
 fn sink_failures_preserve_first_error_progress_and_poison_sessions() {
     let circuit = circuit("M 0\nDETECTOR rec[-1]\n");
-    let plan = DetectionSamplingCompiler::new()
+    let plan = DetectionSamplingCompiler::default()
         .compile(&circuit)
         .expect("compile detection sampling");
     let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .session(&DetectionSamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(5)),
+            ..Default::default()
+        })
         .expect("create detection session");
     let mut sink = FailingSink {
         fail_write: true,
@@ -651,7 +681,7 @@ fn sink_failures_preserve_first_error_progress_and_poison_sessions() {
         ShotCount::new(256)
     );
     match error {
-        DetectionRunError::Sink {
+        RunError::Sink {
             phase,
             source,
             progress,
@@ -661,7 +691,7 @@ fn sink_failures_preserve_first_error_progress_and_poison_sessions() {
             assert_eq!(progress.committed_shots(), ShotCount::new(0));
             assert_eq!(progress.attempted_batch_shots(), ShotCount::new(256));
         }
-        DetectionRunError::Engine { .. } => panic!("expected sink error"),
+        RunError::Engine { .. } => panic!("expected sink error"),
     }
     assert!(session.is_poisoned());
     let mut untouched = FailingSink {
@@ -671,7 +701,7 @@ fn sink_failures_preserve_first_error_progress_and_poison_sessions() {
     };
     assert_matches!(
         session.run(ShotCount::new(1), &mut untouched),
-        Err(DetectionRunError::Engine {
+        Err(RunError::Engine {
             source: DetectionExecutionError::SessionPoisoned,
             ..
         })
@@ -683,10 +713,10 @@ fn sink_failures_preserve_first_error_progress_and_poison_sessions() {
     );
     assert_eq!(untouched.writes, 0);
 
-    let mut conversion = MeasurementToDetectionCompiler::new()
+    let mut conversion = MeasurementToDetectionCompiler::default()
         .compile(&circuit)
         .expect("compile conversion")
-        .session()
+        .session(&Default::default())
         .expect("create conversion session");
     let input = packed(&[vec![false]], 1);
     let mut finish_failure = FailingSink {
@@ -702,7 +732,7 @@ fn sink_failures_preserve_first_error_progress_and_poison_sessions() {
         )
         .expect_err("surface finish failure");
     match error {
-        DetectionRunError::Sink {
+        RunError::Sink {
             phase,
             source,
             progress,
@@ -712,7 +742,7 @@ fn sink_failures_preserve_first_error_progress_and_poison_sessions() {
             assert_eq!(progress.committed_shots(), ShotCount::new(1));
             assert_eq!(progress.attempted_batch_shots(), ShotCount::new(0));
         }
-        DetectionRunError::Engine { .. } => panic!("expected finish error"),
+        RunError::Engine { .. } => panic!("expected finish error"),
     }
     assert!(conversion.is_poisoned());
 }
@@ -720,11 +750,14 @@ fn sink_failures_preserve_first_error_progress_and_poison_sessions() {
 #[test]
 fn zero_shots_do_not_touch_sink_or_advance_seeded_stream() {
     let circuit = circuit("X_ERROR(0.5) 0\nM 0\nDETECTOR rec[-1]\n");
-    let plan = DetectionSamplingCompiler::new()
+    let plan = DetectionSamplingCompiler::default()
         .compile(&circuit)
         .expect("compile detection sampling");
     let mut with_zero = plan
-        .session(RandomPolicy::Seeded(Seed::new(123)))
+        .session(&DetectionSamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(123)),
+            ..Default::default()
+        })
         .expect("create session");
     let mut untouched = CollectSink::default();
     let zero = with_zero
@@ -741,11 +774,11 @@ fn zero_shots_do_not_touch_sink_or_advance_seeded_stream() {
         .expect("run after zero");
     assert_eq!(after_zero.records, run_plan(&plan, 16, 123).records);
 
-    let conversion_plan = MeasurementToDetectionCompiler::new()
+    let conversion_plan = MeasurementToDetectionCompiler::default()
         .compile(&circuit)
         .expect("compile zero-shot conversion");
     let mut conversion = conversion_plan
-        .session()
+        .session(&Default::default())
         .expect("create zero-shot conversion session");
     let empty = PackedShotBatch::zeros(0, conversion_plan.measurement_width().get())
         .expect("create empty measurement batch");
@@ -762,352 +795,9 @@ fn zero_shots_do_not_touch_sink_or_advance_seeded_stream() {
 }
 
 #[test]
-fn compilation_rejects_limits_before_session_or_sink_work() {
-    let circuit = circuit("M 0 1\nDETECTOR rec[-1]\nDETECTOR rec[-2]\n");
-    let limits = budget(0_u64);
-    let conversion_error = MeasurementToDetectionCompiler::new()
-        .limits(limits.clone())
-        .compile(&circuit)
-        .expect_err("reject conversion plan beyond its record limit");
-    assert_matches!(&conversion_error, DetectionCompileError::InvalidCircuit(_));
-    assert!(conversion_error.to_string().contains("memory budget"));
-    let sampling_error = DetectionSamplingCompiler::new()
-        .limits(limits.clone())
-        .compile(&circuit)
-        .expect_err("reject detection sampling plan beyond its record limit");
-    assert_matches!(&sampling_error, DetectionCompileError::InvalidCircuit(_));
-    assert!(sampling_error.to_string().contains("memory budget"));
-}
-
-#[test]
-fn direct_frame_compilation_charges_executable_targets_before_materialization() {
-    let targets = (0..256)
-        .map(|qubit| format!("X{qubit}"))
-        .collect::<Vec<_>>()
-        .join(" ");
-    let metadata = "tag".repeat(1_024);
-    let tagged = circuit(&format!("OBSERVABLE_INCLUDE[{metadata}](0) {targets}\n"));
-    let untagged = circuit(&format!("OBSERVABLE_INCLUDE(0) {targets}\n"));
-    let compiler = DetectionSamplingCompiler::new();
-    let tagged_plan = compiler
-        .compile(&tagged)
-        .expect("compile tagged direct frame");
-    let untagged_plan = compiler
-        .compile(&untagged)
-        .expect("compile untagged direct frame");
-    let exact_bytes = direct_compiled_bytes(&tagged_plan);
-    assert_eq!(
-        exact_bytes,
-        direct_compiled_bytes(&untagged_plan),
-        "nonsemantic tags must not be retained by the private executable"
-    );
-
-    DetectionSamplingCompiler::new()
-        .limits(budget(exact_bytes))
-        .compile(&tagged)
-        .expect("accept exact combined direct-plan byte boundary");
-    let error = DetectionSamplingCompiler::new()
-        .limits(budget(exact_bytes - 1))
-        .compile(&tagged)
-        .expect_err("reject the first byte above the direct-plan boundary");
-    let DetectionCompileError::InvalidCircuit(DetectionError::ResourceLimit(resource)) = error
-    else {
-        panic!("direct-plan byte rejection must remain typed");
-    };
-    assert_eq!(resource.kind(), DetectionResourceKind::CompiledBytes);
-    assert_eq!(resource.actual(), exact_bytes);
-    assert_eq!(resource.limit(), exact_bytes - 1);
-}
-
-#[test]
-fn direct_frame_compilation_admits_repeats_and_filtered_targets_before_materialization() {
-    let repeated =
-        circuit("REPEAT 4096 {\n M 0\n DETECTOR rec[-1]\n OBSERVABLE_INCLUDE(0) X0 rec[-1]\n}\n");
-    let filtered_targets = (0..512)
-        .flat_map(|index| {
-            let qubit = index * 3;
-            [
-                format!("{qubit} sweep[{index}]"),
-                format!("{} {}", qubit + 1, qubit + 2),
-            ]
-        })
-        .collect::<Vec<_>>()
-        .join(" ");
-    let filtered = circuit(&format!(
-        "XCZ {filtered_targets}\nOBSERVABLE_INCLUDE(0) X0\n"
-    ));
-
-    let baseline = circuit("OBSERVABLE_INCLUDE(0) X0\n");
-    let baseline_exact = direct_compiled_bytes(
-        &DetectionSamplingCompiler::new()
-            .compile(&baseline)
-            .expect("compile rejection-overhead baseline"),
-    );
-    let baseline_allocations = rejected_direct_frame_allocations(&baseline, baseline_exact);
-
-    for circuit in [&repeated, &filtered] {
-        let exact_plan = DetectionSamplingCompiler::new()
-            .compile(circuit)
-            .expect("compile exact-byte probe");
-        let exact_bytes = direct_compiled_bytes(&exact_plan);
-        DetectionSamplingCompiler::new()
-            .limits(budget(exact_bytes))
-            .compile(circuit)
-            .expect("accept exact combined direct-plan byte boundary");
-
-        let measured = rejected_direct_frame_allocations(circuit, exact_bytes);
-        assert_eq!(
-            measured.count_max, baseline_allocations.count_max,
-            "aggregate byte rejection retained plan allocations concurrently"
-        );
-        assert_eq!(
-            measured.bytes_max, baseline_allocations.bytes_max,
-            "aggregate byte rejection allocated a retained plan buffer"
-        );
-    }
-}
-
-fn rejected_direct_frame_allocations(
-    circuit: &Circuit,
-    exact_bytes: u64,
-) -> allocation_counter::AllocationInfo {
-    let mut rejected = false;
-    let measured = allocation_counter::measure(|| {
-        rejected = DetectionSamplingCompiler::new()
-            .limits(budget(exact_bytes - 1))
-            .compile(circuit)
-            .is_err();
-    });
-    assert!(rejected, "reject first byte beyond retained-plan limit");
-    measured
-}
-
-fn direct_compiled_bytes(plan: &DetectionSamplingPlan) -> u64 {
-    plan.inner
-        .direct
-        .compiled_bytes()
-        .expect("compute retained direct-plan bytes")
-}
-
-#[test]
-fn warmed_conversion_reuses_width_and_batch_bounded_storage() {
-    let circuit = circuit(
-        "H 0\nCX sweep[0] 0\nSPP X0*Z1\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
-    );
-    let plan = MeasurementToDetectionCompiler::new()
-        .compile(&circuit)
-        .expect("compile sweep conversion");
-    let mut session = plan.session().expect("create conversion session");
-    let measurements = packed(&vec![vec![false]; 64], 1);
-    let sweeps = packed(&vec![vec![true]; 64], 1);
-    let measurement_view = MeasurementBatchView::new(measurements.view());
-    let sweep_view = MeasurementBatchView::new(sweeps.view());
-    let mut sink = NullSink::default();
-
-    let mut delivery = session
-        .start_transaction(&mut sink)
-        .expect("start allocation delivery");
-    delivery
-        .write_batch_with_sweep(measurement_view, Some(sweep_view))
-        .expect("warm conversion scratch");
-    let measured = allocation_counter::measure(|| {
-        for _ in 0..128 {
-            delivery
-                .write_batch_with_sweep(measurement_view, Some(sweep_view))
-                .expect("reuse conversion scratch");
-        }
-    });
-    delivery.finish().expect("finish allocation delivery");
-    assert_eq!(
-        measured.count_total, 0,
-        "warmed conversion allocated while reusing bounded scratch: {measured:?}"
-    );
-    assert_eq!(sink.shots, 64 * 129);
-}
-
-#[test]
-fn session_storage_estimates_match_retained_allocations_at_word_boundaries() {
-    for (detectors, observables) in [(0, 0), (1, 1), (63, 64), (64, 63), (65, 65)] {
-        let mut text = String::from("M 0\n");
-        for _ in 0..detectors {
-            text.push_str("DETECTOR rec[-1]\n");
-        }
-        if observables > 0 {
-            text.push_str(&format!(
-                "OBSERVABLE_INCLUDE({}) rec[-1]\n",
-                observables - 1
-            ));
-        }
-        let direct = DetectionSamplingCompiler::new()
-            .compile(&circuit(&text))
-            .expect("compile direct allocation fixture");
-        for &lane_width in LaneWidth::ALL {
-            let mut session = None;
-            let allocated = allocation_counter::measure(|| {
-                session = Some(
-                    direct
-                        .session_with_lane_width(RandomPolicy::Seeded(Seed::new(1)), lane_width)
-                        .expect("allocate direct session"),
-                );
-            });
-            assert_eq!(
-                execution::direct_session_storage_bytes(&direct.inner.direct, lane_width),
-                u128::try_from(allocated.bytes_current).expect("retained direct allocation"),
-                "direct widths {detectors}/{observables} at {lane_width:?}"
-            );
-        }
-
-        for sweep in [false, true] {
-            let text = if sweep {
-                format!("CX sweep[0] 0\n{text}")
-            } else {
-                text.clone()
-            };
-            let conversion = MeasurementToDetectionCompiler::new()
-                .compile(&circuit(&text))
-                .expect("compile conversion allocation fixture");
-            // A windowed session sizes its records by the batches it converts, so its storage
-            // is complete once it converted a batch of the most shots it accepts.
-            let records = PackedShotBatch::zeros(MAX_BATCH_SHOTS, 1).expect("full input batch");
-            let mut session = None;
-            let allocated = allocation_counter::measure(|| {
-                let mut created = conversion.session().expect("allocate conversion session");
-                created
-                    .run(
-                        MeasurementBatchView::new(records.view()),
-                        None,
-                        &mut NullSink::default(),
-                    )
-                    .expect("convert a full batch");
-                session = Some(created);
-            });
-            assert_eq!(
-                execution::conversion_session_storage_bytes(&conversion),
-                u128::try_from(allocated.bytes_current).expect("retained conversion allocation"),
-                "conversion widths {detectors}/{observables}, sweep={sweep}"
-            );
-        }
-    }
-}
-
-#[test]
-fn direct_session_storage_admits_the_exact_budget_and_rejects_the_first_excess_byte() {
-    let fixture = circuit("M 1000\nDETECTOR rec[-1]\n");
-    let probe = DetectionSamplingCompiler::new()
-        .compile(&fixture)
-        .expect("compile storage probe");
-    let seeded = RandomPolicy::Seeded(Seed::new(1));
-    let narrow = execution::direct_session_storage_bytes(&probe.inner.direct, LaneWidth::Lanes64);
-    let wide = execution::direct_session_storage_bytes(&probe.inner.direct, LaneWidth::Lanes256);
-    assert_eq!(
-        wide,
-        4 * narrow,
-        "a narrow session holds a quarter of the planes"
-    );
-    for &lane_width in LaneWidth::ALL {
-        let exact = execution::direct_session_storage_bytes(&probe.inner.direct, lane_width);
-        let at_limit = DetectionSamplingCompiler::new()
-            .limits(budget(exact))
-            .compile(&fixture)
-            .expect("the plan fits the session budget");
-        at_limit
-            .session_with_lane_width(seeded, lane_width)
-            .expect("admit the exact session budget");
-
-        let over_limit = DetectionSamplingCompiler::new()
-            .limits(budget(exact - 1))
-            .compile(&fixture)
-            .expect("the plan still fits one byte less");
-        let mut rejected = None;
-        let allocated = allocation_counter::measure(|| {
-            rejected = Some(
-                over_limit
-                    .session_with_lane_width(seeded, lane_width)
-                    .expect_err("reject the first excess byte before allocation"),
-            );
-        });
-        assert_eq!(allocated.bytes_total, 0, "{lane_width:?}");
-        assert_eq!(
-            rejected,
-            Some(DetectionExecutionError::SessionStorageLimit {
-                exceeded: refusal(exact),
-            }),
-            "{lane_width:?}"
-        );
-    }
-}
-
-#[test]
-fn conversion_session_storage_admits_the_exact_budget_and_rejects_the_first_excess_byte() {
-    let fixture = circuit("CX sweep[0] 1000\nM 0 0 0 0 0 0 0 0\nDETECTOR rec[-1]\n");
-    let compile = |limits| {
-        MeasurementToDetectionCompiler::new()
-            .limits(limits)
-            .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample)
-            .compile(&fixture)
-            .expect("compile conversion storage probe")
-    };
-    let exact =
-        execution::conversion_session_storage_bytes(&compile(DetectionConversionLimits::default()));
-    compile(budget(exact))
-        .session()
-        .expect("admit the exact session budget");
-
-    let over_limit = compile(budget(exact - 1));
-    let mut rejected = None;
-    let allocated = allocation_counter::measure(|| {
-        rejected = Some(
-            over_limit
-                .session()
-                .expect_err("reject the first excess byte before allocation"),
-        );
-    });
-    assert_eq!(allocated.bytes_total, 0);
-    assert_eq!(
-        rejected,
-        Some(DetectionExecutionError::SessionStorageLimit {
-            exceeded: refusal(exact),
-        })
-    );
-}
-
-#[test]
-fn warmed_detection_session_reuses_batch_storage() {
-    let spp = (0..32)
-        .map(|qubit| format!("X{qubit}"))
-        .collect::<Vec<_>>()
-        .join("*");
-    let circuit = circuit(&format!(
-        "SPP {spp}\nX_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n"
-    ));
-    let plan = DetectionSamplingCompiler::new()
-        .compile(&circuit)
-        .expect("compile detection plan");
-    let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(91)))
-        .expect("create reusable detection session");
-    let mut sink = NullSink::default();
-    session
-        .run(ShotCount::new(64), &mut sink)
-        .expect("warm detection session");
-    let measured = allocation_counter::measure(|| {
-        for _ in 0..128 {
-            session
-                .run(ShotCount::new(64), &mut sink)
-                .expect("reuse detection session");
-        }
-    });
-    assert_eq!(
-        measured.count_total, 0,
-        "warmed detection session allocated while reusing bounded state: {measured:?}"
-    );
-    assert_eq!(sink.shots, 64 * 129);
-}
-
-#[test]
 fn direct_frame_rejects_anti_hermitian_spp_during_compilation() {
     let circuit = circuit("SPP X0*Z0\nM 0\nDETECTOR rec[-1]\n");
-    let error = DetectionSamplingCompiler::new()
+    let error = DetectionSamplingCompiler::default()
         .compile(&circuit)
         .expect_err("reject anti-Hermitian SPP before a session exists");
 
@@ -1127,10 +817,12 @@ fn wide_detectors_and_observables_convert_to_the_parity_of_every_term() {
         repeat("rec[-1]", 64),
         repeat("rec[-2]", 5001),
     );
-    let plan = MeasurementToDetectionCompiler::new()
+    let plan = MeasurementToDetectionCompiler::default()
         .compile(&circuit(&text))
         .expect("compile wide conversion");
-    let mut session = plan.session().expect("create conversion session");
+    let mut session = plan
+        .session(&Default::default())
+        .expect("create conversion session");
     let records: Vec<Vec<bool>> = (0..8_u8)
         .map(|bits| (0..3).map(|bit| bits >> bit & 1 == 1).collect())
         .collect();
@@ -1139,20 +831,11 @@ fn wide_detectors_and_observables_convert_to_the_parity_of_every_term() {
     let summary = session
         .run(MeasurementBatchView::new(input.view()), None, &mut sink)
         .expect("convert wide parities");
-    assert_eq!(summary.status(), DetectionRunStatus::Completed);
+    assert_eq!(summary.status(), RunStatus::Completed);
     for (record, converted) in records.iter().zip(&sink.records) {
         let [m0, m1, m2] = <[bool; 3]>::try_from(record.as_slice()).expect("three measurements");
         assert_eq!(converted.detectors, vec![m2 ^ m0, m1]);
         assert_eq!(converted.observables, vec![m1 ^ m0]);
     }
     assert_eq!(sink.records.len(), records.len());
-}
-
-/// The refusal of an exact `required`-byte requirement by a budget one byte smaller.
-fn refusal(required: u128) -> stab_model::MemoryBudgetExceeded {
-    let required = u64::try_from(required).expect("small requirement");
-    stab_model::MemoryBudgetExceeded::new(
-        stab_model::ResourceAmount::exact(required),
-        stab_model::MemoryBudget::from_bytes(required - 1),
-    )
 }

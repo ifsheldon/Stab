@@ -4,18 +4,18 @@ use std::fmt;
 use std::sync::OnceLock;
 
 use rand::rngs::SmallRng;
-use stab_model::{Cancellation, MemoryBudget};
+use stab_model::Cancellation;
 use stab_records::{DetectionBatchView, DetectionSink};
 
 use super::execution::{detection_rng, invariant_error, validate_session_storage};
-use super::{
-    DetectionExecutionError, DetectionRunError, DetectionRunProgress, DetectionRunStatus,
-    DetectionRunSummary, DetectionSamplingPlan,
-};
+use super::{DetectionExecutionError, DetectionSamplingPlan};
 use crate::detection::frame::{FrameLanes, FrameWord, sample_or_rewind};
 use crate::detection::streaming::{StreamingDetectionFrame, StreamingDetectionShape};
 use crate::sampling::{session_cancellation, session_cancellation_slot};
-use crate::{LaneWidth, RandomPolicy, ShotCount, SinkFailurePhase};
+use crate::{
+    DetectionSamplingSessionOptions, LaneWidth, RunError, RunProgress, RunStatus, RunSummary,
+    ShotCount, SinkFailurePhase,
+};
 
 #[derive(Debug)]
 enum StreamingFrame {
@@ -54,36 +54,27 @@ impl DetectionSamplingPlan {
     ///
     /// Storage is admitted for bounded windows of measurement and detector planes and for
     /// `min(shots, lane_width)` shot-major detector and observable records, instead of one plane
-    /// per measurement and detector at `lane_width`.
+    /// per measurement and detector at `lane_width`, against the options' memory budget or the
+    /// plan's when the options leave it unset.
     pub fn streaming_run(
         &self,
-        random_policy: RandomPolicy,
-        lane_width: LaneWidth,
+        options: &DetectionSamplingSessionOptions,
         shots: ShotCount,
     ) -> Result<StreamingDetectionRun, DetectionExecutionError> {
-        self.streaming_run_with_budget(
-            random_policy,
+        let DetectionSamplingSessionOptions {
+            random: random_policy,
             lane_width,
-            shots,
-            self.inner.direct.memory_budget(),
-        )
-    }
-
-    /// Prepares one streaming run like [`Self::streaming_run`], admitting its storage against
-    /// `memory_budget` instead of the compiler's memory budget.
-    pub fn streaming_run_with_budget(
-        &self,
-        random_policy: RandomPolicy,
-        lane_width: LaneWidth,
-        shots: ShotCount,
-        memory_budget: MemoryBudget,
-    ) -> Result<StreamingDetectionRun, DetectionExecutionError> {
+            memory_budget,
+        } = *options;
         let direct = &self.inner.direct;
         let lanes = usize::try_from(shots.get()).map_or(lane_width.shots_per_batch(), |shots| {
             shots.min(lane_width.shots_per_batch())
         });
         let shape = StreamingDetectionShape::new(direct, lane_width, lanes);
-        validate_session_storage(shape.storage_bytes(direct, lane_width), memory_budget)?;
+        validate_session_storage(
+            shape.storage_bytes(direct, lane_width),
+            memory_budget.unwrap_or_else(|| direct.memory_budget()),
+        )?;
         // Only the plan's signal exists yet; the run's own signal is created after the run.
         let cancellation = direct.cancellation();
         let frame = match lane_width {
@@ -131,18 +122,18 @@ impl StreamingDetectionRun {
     /// Executes the run with the sink lifecycle of [`super::DetectionSamplingSession::run`].
     ///
     /// Cooperative cancellation, observed before or inside a batch, ends the run with
-    /// [`DetectionRunStatus::Cancelled`], the complete batches delivered, and the sink finalized.
+    /// [`RunStatus::Cancelled`], the complete batches delivered, and the sink finalized.
     /// The run consumed itself, so nothing can resume it; a fresh run restarts the seeded stream.
     pub fn run<Sink>(
         mut self,
         sink: &mut Sink,
-    ) -> Result<DetectionRunSummary, DetectionRunError<Sink::Error>>
+    ) -> Result<RunSummary, RunError<DetectionExecutionError, Sink::Error>>
     where
         Sink: DetectionSink,
     {
         let shots = self.shots;
         if shots.get() == 0 {
-            return Ok(summary(DetectionRunStatus::Completed, shots, 0));
+            return Ok(summary(RunStatus::Completed, shots, 0));
         }
         let cancellation = session_cancellation(&self.cancellation);
         let delivered = match &mut self.frame {
@@ -155,32 +146,23 @@ impl StreamingDetectionRun {
         };
         let (committed, completed) = delivered?;
         if let Err(source) = sink.finish() {
-            return Err(DetectionRunError::Sink {
+            return Err(RunError::Sink {
                 phase: SinkFailurePhase::Finish,
                 source,
-                progress: DetectionRunProgress::new(committed, 0),
+                progress: RunProgress::new(committed, 0),
             });
         }
         let status = if completed {
-            DetectionRunStatus::Completed
+            RunStatus::Completed
         } else {
-            DetectionRunStatus::Cancelled
+            RunStatus::Cancelled
         };
         Ok(summary(status, shots, committed))
     }
 }
 
-const fn summary(
-    status: DetectionRunStatus,
-    requested_shots: ShotCount,
-    committed: u64,
-) -> DetectionRunSummary {
-    DetectionRunSummary {
-        status,
-        requested_shots,
-        committed_shots: ShotCount::new(committed),
-        total_committed_shots: ShotCount::new(committed),
-    }
+const fn summary(status: RunStatus, requested_shots: ShotCount, committed: u64) -> RunSummary {
+    RunSummary::new(status, requested_shots, committed, committed)
 }
 
 /// Delivers `shots` shots in fresh batches; returns the committed shots and whether all were.
@@ -191,7 +173,7 @@ fn deliver<W, Sink>(
     cancellation: &Cancellation,
     shots: ShotCount,
     sink: &mut Sink,
-) -> Result<(u64, bool), DetectionRunError<Sink::Error>>
+) -> Result<(u64, bool), RunError<DetectionExecutionError, Sink::Error>>
 where
     W: FrameWord,
     Sink: DetectionSink,
@@ -204,9 +186,8 @@ where
         }
         let lanes = usize::try_from(remaining)
             .map_or(W::LANE_COUNT, |remaining| remaining.min(W::LANE_COUNT));
-        let progress = DetectionRunProgress::new(committed, lanes as u64);
-        let engine =
-            |source: DetectionExecutionError| DetectionRunError::Engine { source, progress };
+        let progress = RunProgress::new(committed, lanes as u64);
+        let engine = |source: DetectionExecutionError| RunError::Engine { source, progress };
         let sampled = sample_or_rewind(rng, |rng| {
             frame.sample_batch(&plan.inner.direct, lanes, rng, cancellation)
         })
@@ -224,12 +205,11 @@ where
             .map_err(|error| engine(error.into()))?;
         let view = DetectionBatchView::try_new(detectors, observables)
             .map_err(|error| engine(invariant_error(error)))?;
-        sink.write_batch(view)
-            .map_err(|source| DetectionRunError::Sink {
-                phase: SinkFailurePhase::WriteBatch,
-                source,
-                progress,
-            })?;
+        sink.write_batch(view).map_err(|source| RunError::Sink {
+            phase: SinkFailurePhase::WriteBatch,
+            source,
+            progress,
+        })?;
         committed += lanes as u64;
         remaining -= lanes as u64;
     }

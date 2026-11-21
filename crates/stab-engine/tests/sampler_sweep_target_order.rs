@@ -6,11 +6,21 @@
 
 mod support;
 
-use stab_engine::{
-    ReferenceSampleMode, circuit_reference_sample, validate_detection_sampling_circuit,
-};
+use stab_engine::{DetectionSamplingCompiler, ReferenceSampleMode, SamplingCompiler};
 use stab_model::Circuit;
 use support::{convert_detection_records, sample_detections};
+
+/// Computes the reference sample of a default-compiled sampling plan, reporting a failure of
+/// either step as its message.
+fn circuit_reference_sample(circuit: &Circuit) -> Result<Vec<bool>, String> {
+    let plan = SamplingCompiler::default()
+        .compile(circuit)
+        .map_err(|error| error.to_string())?;
+    let sample = plan
+        .try_reference_sample()
+        .map_err(|error| error.to_string())?;
+    Ok(sample.iter().collect())
+}
 
 #[test]
 fn pf3_sampler_sweep_target_order_rejects_cx_cy_second_sweep() {
@@ -20,9 +30,8 @@ fn pf3_sampler_sweep_target_order_rejects_cx_cy_second_sweep() {
     ] {
         let circuit = Circuit::from_stim_str(source).expect("parse invalid sweep order");
 
-        let reference_error = circuit_reference_sample(&circuit)
-            .expect_err("reject reference sampling")
-            .to_string();
+        let reference_error =
+            circuit_reference_sample(&circuit).expect_err("reject reference sampling");
         assert!(
             reference_error.contains("does not support"),
             "{reference_error}"
@@ -41,7 +50,8 @@ fn pf3_sampler_sweep_target_order_rejects_cx_cy_second_sweep() {
             "{conversion_error}"
         );
 
-        let validation_error = validate_detection_sampling_circuit(&circuit)
+        let validation_error = DetectionSamplingCompiler::default()
+            .compile(&circuit)
             .expect_err("reject detection sampling validation")
             .to_string();
         assert!(
@@ -69,7 +79,9 @@ fn pf3_sampler_sweep_target_order_keeps_accepted_orders() {
     ] {
         let circuit = Circuit::from_stim_str(source).expect("parse accepted sweep order");
         circuit_reference_sample(&circuit).expect("reference sample accepted order");
-        validate_detection_sampling_circuit(&circuit).expect("validate accepted order");
+        DetectionSamplingCompiler::default()
+            .compile(&circuit)
+            .expect("validate accepted order");
         convert_detection_records(
             &circuit,
             &[vec![false]],

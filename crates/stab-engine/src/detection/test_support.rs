@@ -12,7 +12,7 @@ use stab_records::{
 };
 
 use super::{DetectionRecordBuffer, DetectionSamplingCompiler, MeasurementToDetectionCompiler};
-use crate::{RandomPolicy, ReferenceSampleMode, Seed, ShotCount};
+use crate::{DetectionSamplingSessionOptions, RandomPolicy, ReferenceSampleMode, Seed, ShotCount};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct DetectionConversionOutput {
@@ -61,10 +61,12 @@ fn convert(
     sweeps: Option<&[Vec<bool>]>,
     reference_mode: ReferenceSampleMode,
 ) -> Result<DetectionConversionOutput, TestDetectionError> {
-    let plan = MeasurementToDetectionCompiler::new()
-        .reference_sample_mode(reference_mode)
-        .compile(circuit)
-        .map_err(display_error)?;
+    let plan = MeasurementToDetectionCompiler {
+        reference_sample_mode: reference_mode,
+        ..MeasurementToDetectionCompiler::default()
+    }
+    .compile(circuit)
+    .map_err(display_error)?;
     let measurement_batch =
         PackedShotBatch::from_records(measurements, plan.measurement_width().get())
             .map_err(display_error)?;
@@ -72,7 +74,7 @@ fn convert(
         .map(|records| PackedShotBatch::from_records(records, plan.sweep_width().get()))
         .transpose()
         .map_err(display_error)?;
-    let mut session = plan.session().map_err(display_error)?;
+    let mut session = plan.session(&Default::default()).map_err(display_error)?;
     let mut sink = CollectSink::default();
     session
         .run(
@@ -95,13 +97,16 @@ pub(super) fn sample_detection_events(
     shots: usize,
     seed: Option<u64>,
 ) -> Result<DetectionConversionOutput, TestDetectionError> {
-    let plan = DetectionSamplingCompiler::new()
+    let plan = DetectionSamplingCompiler::default()
         .compile(circuit)
         .map_err(display_error)?;
     let mut session = plan
-        .session(seed.map_or(RandomPolicy::Entropy, |seed| {
-            RandomPolicy::Seeded(Seed::new(seed))
-        }))
+        .session(&DetectionSamplingSessionOptions {
+            random: seed.map_or(RandomPolicy::Entropy, |seed| {
+                RandomPolicy::Seeded(Seed::new(seed))
+            }),
+            ..Default::default()
+        })
         .map_err(display_error)?;
     let mut sink = CollectSink::default();
     session

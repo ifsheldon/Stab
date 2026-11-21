@@ -16,7 +16,10 @@ use crate::detection::frame::{
     ShotRecordTransposer, WindowShape,
 };
 use crate::work_poll::WorkPoll;
-use crate::{CompilationRequestFingerprint, LaneWidth};
+use crate::{
+    CompilationRequestFingerprint, LaneWidth, RunError, RunProgress, RunStatus, RunSummary,
+    SinkFailurePhase,
+};
 
 mod compile_error;
 mod delivery;
@@ -97,9 +100,12 @@ impl TryFrom<usize> for ShotCount {
 }
 
 /// Policy used to initialize a session's random stream.
+///
+/// The default draws the seed from entropy, as Stim does without `--seed`.
 #[non_exhaustive]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum RandomPolicy {
+    #[default]
     Entropy,
     Seeded(Seed),
 }
@@ -136,6 +142,24 @@ pub enum ReferenceSampleMode {
     SkipReferenceSample,
 }
 
+/// Options of one sampling session or streaming run; see [`SamplingPlan::session`].
+///
+/// The default draws its seed from entropy, uses the reference sample, samples 256 lanes per
+/// batch, and admits its storage against the plan's memory budget.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub struct SamplingSessionOptions {
+    /// How the session's random stream is initialized.
+    pub random: RandomPolicy,
+    /// Whether output is relative to the reference sample.
+    pub reference_sample_mode: ReferenceSampleMode,
+    /// Shots each frame batch samples together. The seeded stream is a function of the plan,
+    /// the seed, and this width.
+    pub lane_width: LaneWidth,
+    /// Budget for the session's frame and reference-sample storage; `None` admits it against
+    /// the plan's [`SamplingCompiler::memory_budget`].
+    pub memory_budget: Option<MemoryBudget>,
+}
+
 /// Reference-sample execution policy for compact repeat blocks.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
@@ -163,48 +187,25 @@ impl ReferenceSampleLoopPolicy {
     }
 }
 
-/// Builder for immutable sampling plans.
+/// Options of an immutable sampling plan, and the compiler that builds it.
 ///
-/// The memory budget bounds the compiled program, every session's reusable storage, and the
-/// reference-simulator scratch, each admitted before it is allocated.
+/// The memory budget bounds the compiled program, every session's reusable storage unless the
+/// session's options override it, and the reference-simulator scratch, each admitted before it
+/// is allocated.
 ///
 /// The cancellation signal is polled while the plan's reference sample is computed and by every
 /// session of the plan, which also returns it from [`SamplingSession::cancellation`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SamplingCompiler {
-    reference_sample_loop_policy: ReferenceSampleLoopPolicy,
-    memory_budget: MemoryBudget,
-    cancellation: Cancellation,
+    /// How the reference sample executes compact repeat blocks.
+    pub reference_sample_loop_policy: ReferenceSampleLoopPolicy,
+    /// Budget for the compiled program and, by default, for each session's storage.
+    pub memory_budget: MemoryBudget,
+    /// Signal polled by the plan and its sessions.
+    pub cancellation: Cancellation,
 }
 
 impl SamplingCompiler {
-    pub const fn new() -> Self {
-        Self {
-            reference_sample_loop_policy: ReferenceSampleLoopPolicy::Fold,
-            memory_budget: MemoryBudget::DEFAULT,
-            cancellation: Cancellation::never(),
-        }
-    }
-
-    #[must_use]
-    pub const fn memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
-        self.memory_budget = memory_budget;
-        self
-    }
-
-    #[must_use]
-    pub const fn reference_sample_loop_policy(mut self, policy: ReferenceSampleLoopPolicy) -> Self {
-        self.reference_sample_loop_policy = policy;
-        self
-    }
-
-    /// Sets the cancellation signal polled by the plan and its sessions.
-    #[must_use]
-    pub fn cancellation(mut self, cancellation: Cancellation) -> Self {
-        self.cancellation = cancellation;
-        self
-    }
-
     pub fn compile(&self, circuit: &Circuit) -> Result<SamplingPlan, SamplingCompileError> {
         self.cancellation.check()?;
         let program = compile_program(circuit, self.memory_budget)?;
@@ -425,103 +426,31 @@ impl SamplingPlan {
         self.inner.program.retained_bytes()
     }
 
-    #[inline]
+    /// Creates a reusable session.
+    ///
+    /// Session storage is admitted at the options' lane width against the options' memory
+    /// budget, or the plan's when the options leave it unset.
     pub fn session(
         &self,
-        random_policy: RandomPolicy,
+        options: &SamplingSessionOptions,
     ) -> Result<SamplingSession, SamplingExecutionError> {
-        self.session_with_reference_mode(random_policy, ReferenceSampleMode::UseReferenceSample)
-    }
-
-    #[inline]
-    pub fn session_with_reference_mode(
-        &self,
-        random_policy: RandomPolicy,
-        reference_mode: ReferenceSampleMode,
-    ) -> Result<SamplingSession, SamplingExecutionError> {
-        self.session_with_lane_width(random_policy, reference_mode, LaneWidth::default())
-    }
-
-    /// Creates a session whose frame batches sample `lane_width` shots at a time.
-    ///
-    /// The seeded stream is a function of this plan, the seed, and `lane_width`; the default
-    /// width reproduces [`Self::session_with_reference_mode`]. Session storage is admitted at
-    /// this width against the plan's memory budget.
-    pub fn session_with_lane_width(
-        &self,
-        random_policy: RandomPolicy,
-        reference_mode: ReferenceSampleMode,
-        lane_width: LaneWidth,
-    ) -> Result<SamplingSession, SamplingExecutionError> {
-        self.session_with_budget(
-            random_policy,
-            reference_mode,
-            lane_width,
-            self.inner.memory_budget,
-        )
-    }
-
-    /// Creates a session like [`Self::session_with_lane_width`], admitting its frame and
-    /// reference-sample storage against `memory_budget` instead of the plan's compile budget.
-    pub fn session_with_budget(
-        &self,
-        random_policy: RandomPolicy,
-        reference_mode: ReferenceSampleMode,
-        lane_width: LaneWidth,
-        memory_budget: MemoryBudget,
-    ) -> Result<SamplingSession, SamplingExecutionError> {
-        SamplingSession::new(
-            self.clone(),
-            random_policy,
-            reference_mode,
-            lane_width,
-            None,
-            memory_budget,
-        )
+        SamplingSession::new(self.clone(), options, None)
     }
 
     /// Prepares one run of exactly `shots` shots that streams wide records.
     ///
-    /// The run's output equals the first [`SamplingSession::run`] of `shots` shots on
-    /// [`Self::session_with_lane_width`] with the same arguments. Instead of materializing one
-    /// plane per measurement for every lane of a batch, it hands the planes over in bounded
-    /// windows and keeps shot-major records of only the lanes it delivers, so its storage is
-    /// admitted for `min(shots, lane_width)` records rather than `lane_width` planes per
-    /// measurement. Because it keeps no undelivered lanes, it runs once.
+    /// The run's output equals the first [`SamplingSession::run`] of `shots` shots on a
+    /// [`Self::session`] with the same options. Instead of materializing one plane per
+    /// measurement for every lane of a batch, it hands the planes over in bounded windows and
+    /// keeps shot-major records of only the lanes it delivers, so its storage is admitted for
+    /// `min(shots, lane_width)` records rather than `lane_width` planes per measurement. Because
+    /// it keeps no undelivered lanes, it runs once.
     pub fn streaming_run(
         &self,
-        random_policy: RandomPolicy,
-        reference_mode: ReferenceSampleMode,
-        lane_width: LaneWidth,
+        options: &SamplingSessionOptions,
         shots: ShotCount,
     ) -> Result<StreamingSamplingRun, SamplingExecutionError> {
-        self.streaming_run_with_budget(
-            random_policy,
-            reference_mode,
-            lane_width,
-            shots,
-            self.inner.memory_budget,
-        )
-    }
-
-    /// Prepares one streaming run like [`Self::streaming_run`], admitting its storage against
-    /// `memory_budget` instead of the plan's compile budget.
-    pub fn streaming_run_with_budget(
-        &self,
-        random_policy: RandomPolicy,
-        reference_mode: ReferenceSampleMode,
-        lane_width: LaneWidth,
-        shots: ShotCount,
-        memory_budget: MemoryBudget,
-    ) -> Result<StreamingSamplingRun, SamplingExecutionError> {
-        let session = SamplingSession::new(
-            self.clone(),
-            random_policy,
-            reference_mode,
-            lane_width,
-            Some(shots),
-            memory_budget,
-        )?;
+        let session = SamplingSession::new(self.clone(), options, Some(shots))?;
         Ok(StreamingSamplingRun { session, shots })
     }
 }
@@ -553,9 +482,12 @@ impl StreamingSamplingRun {
     /// Executes the run with the sink lifecycle of [`SamplingSession::run`].
     ///
     /// Cooperative cancellation, observed before or inside a batch, ends the run with
-    /// [`SamplingRunStatus::Cancelled`], the complete batches delivered, and the sink finalized.
+    /// [`RunStatus::Cancelled`], the complete batches delivered, and the sink finalized.
     /// The run consumed itself, so nothing can resume it; a fresh run restarts the seeded stream.
-    pub fn run<Sink>(mut self, sink: &mut Sink) -> Result<SamplingRunSummary, RunError<Sink::Error>>
+    pub fn run<Sink>(
+        mut self,
+        sink: &mut Sink,
+    ) -> Result<RunSummary, RunError<SamplingExecutionError, Sink::Error>>
     where
         Sink: MeasurementSink,
     {
@@ -737,146 +669,6 @@ impl SamplingExecutionError {
     }
 }
 
-/// Sink operation that failed.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum SinkFailurePhase {
-    WriteBatch,
-    Finish,
-}
-
-impl SinkFailurePhase {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::WriteBatch => "write-batch",
-            Self::Finish => "finish",
-        }
-    }
-}
-
-/// Exact progress at an execution failure.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct SamplingRunProgress {
-    committed_shots: ShotCount,
-    attempted_batch_shots: ShotCount,
-}
-
-impl SamplingRunProgress {
-    pub(super) const fn new(committed_shots: u64, attempted_batch_shots: u64) -> Self {
-        Self {
-            committed_shots: ShotCount::new(committed_shots),
-            attempted_batch_shots: ShotCount::new(attempted_batch_shots),
-        }
-    }
-
-    pub const fn committed_shots(self) -> ShotCount {
-        self.committed_shots
-    }
-
-    pub const fn attempted_batch_shots(self) -> ShotCount {
-        self.attempted_batch_shots
-    }
-}
-
-/// Non-lossy composition of engine and sink failures.
-#[derive(Debug)]
-pub enum RunError<SinkError> {
-    Engine {
-        source: SamplingExecutionError,
-        progress: SamplingRunProgress,
-    },
-    Sink {
-        phase: SinkFailurePhase,
-        source: SinkError,
-        progress: SamplingRunProgress,
-    },
-}
-
-impl<SinkError> RunError<SinkError> {
-    /// The engine's memory-budget refusal; a sink failure is the caller's own type and is not
-    /// inspected.
-    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
-        match self {
-            Self::Engine { source, .. } => source.memory_budget_exceeded(),
-            Self::Sink { .. } => None,
-        }
-    }
-
-    pub const fn progress(&self) -> SamplingRunProgress {
-        match self {
-            Self::Engine { progress, .. } | Self::Sink { progress, .. } => *progress,
-        }
-    }
-}
-
-impl<SinkError: fmt::Display> fmt::Display for RunError<SinkError> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Engine { source, progress } => write!(
-                formatter,
-                "{source} after {} committed shots",
-                progress.committed_shots().get()
-            ),
-            Self::Sink {
-                phase,
-                source,
-                progress,
-            } => write!(
-                formatter,
-                "sampling sink {} failed after {} committed shots while attempting {} shots: {source}",
-                phase.as_str(),
-                progress.committed_shots().get(),
-                progress.attempted_batch_shots().get()
-            ),
-        }
-    }
-}
-
-impl<SinkError> std::error::Error for RunError<SinkError>
-where
-    SinkError: std::error::Error + 'static,
-{
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Engine { source, .. } => Some(source),
-            Self::Sink { source, .. } => Some(source),
-        }
-    }
-}
-
-/// Completion state of one sampling call.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum SamplingRunStatus {
-    Completed,
-    Cancelled,
-}
-
-/// Summary of one completed or cooperatively cancelled call.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct SamplingRunSummary {
-    status: SamplingRunStatus,
-    requested_shots: ShotCount,
-    committed_shots: ShotCount,
-    total_committed_shots: ShotCount,
-}
-
-impl SamplingRunSummary {
-    pub const fn status(self) -> SamplingRunStatus {
-        self.status
-    }
-
-    pub const fn requested_shots(self) -> ShotCount {
-        self.requested_shots
-    }
-
-    pub const fn committed_shots(self) -> ShotCount {
-        self.committed_shots
-    }
-
-    pub const fn total_committed_shots(self) -> ShotCount {
-        self.total_committed_shots
-    }
-}
-
 /// Mutable reusable execution state for one immutable sampling plan.
 pub struct SamplingSession {
     plan: SamplingPlan,
@@ -909,12 +701,16 @@ impl SamplingSession {
     /// A materializing session, or the session of one streaming run of `streaming_shots` shots.
     fn new(
         plan: SamplingPlan,
-        random_policy: RandomPolicy,
-        reference_mode: ReferenceSampleMode,
-        lane_width: LaneWidth,
+        options: &SamplingSessionOptions,
         streaming_shots: Option<ShotCount>,
-        memory_budget: MemoryBudget,
     ) -> Result<Self, SamplingExecutionError> {
+        let SamplingSessionOptions {
+            random: random_policy,
+            reference_sample_mode: reference_mode,
+            lane_width,
+            memory_budget,
+        } = *options;
+        let memory_budget = memory_budget.unwrap_or(plan.inner.memory_budget);
         match streaming_shots {
             None => {
                 validate_session_storage(&plan.inner, reference_mode, lane_width, memory_budget)?
@@ -972,7 +768,7 @@ impl SamplingSession {
 
     /// The signal this session polls between and inside batches.
     ///
-    /// It is the plan's signal when [`SamplingCompiler::cancellation`] supplied a cancellable one,
+    /// It is the plan's signal when [`SamplingCompiler::cancellation`] is a cancellable one,
     /// and otherwise a session-local signal created by the first call.
     pub fn cancellation(&self) -> Cancellation {
         self.cancellation.get_or_init(Cancellation::new).clone()
@@ -1013,7 +809,7 @@ impl SamplingSession {
     /// engine failure stops immediately without finalization because the sink may already contain
     /// an unknown partial prefix.
     ///
-    /// Cancellation returns [`SamplingRunStatus::Cancelled`] with the shots delivered so far and
+    /// Cancellation returns [`RunStatus::Cancelled`] with the shots delivered so far and
     /// the sink finalized, and leaves the session resumable: wherever it is observed, before or
     /// inside a batch, the sink holds only complete batches, and a batch it interrupts is
     /// discarded with the random stream rewound to where that batch began. A later run on the
@@ -1025,14 +821,14 @@ impl SamplingSession {
         &mut self,
         shots: ShotCount,
         sink: &mut Sink,
-    ) -> Result<SamplingRunSummary, RunError<Sink::Error>>
+    ) -> Result<RunSummary, RunError<SamplingExecutionError, Sink::Error>>
     where
         Sink: MeasurementSink,
     {
         if self.poisoned {
             return Err(RunError::Engine {
                 source: SamplingExecutionError::SessionPoisoned,
-                progress: SamplingRunProgress::new(0, 0),
+                progress: RunProgress::new(0, 0),
             });
         }
         if self
@@ -1042,11 +838,11 @@ impl SamplingSession {
         {
             return Err(RunError::Engine {
                 source: SamplingExecutionError::ShotCounterOverflow,
-                progress: SamplingRunProgress::new(0, 0),
+                progress: RunProgress::new(0, 0),
             });
         }
         if shots.get() == 0 {
-            return Ok(self.summary(SamplingRunStatus::Completed, shots, 0));
+            return Ok(self.summary(RunStatus::Completed, shots, 0));
         }
 
         let reference = match session_reference(&self.plan, self.uses_reference_sample) {
@@ -1055,7 +851,7 @@ impl SamplingSession {
                 self.poisoned = true;
                 return Err(RunError::Engine {
                     source,
-                    progress: SamplingRunProgress::new(0, 0),
+                    progress: RunProgress::new(0, 0),
                 });
             }
         };
@@ -1112,7 +908,7 @@ impl SamplingSession {
             }) => {
                 self.poisoned = true;
                 self.total_committed_shots += committed;
-                let progress = SamplingRunProgress::new(committed, attempted);
+                let progress = RunProgress::new(committed, attempted);
                 return Err(match error {
                     SamplingDeliveryError::Engine(source) => RunError::Engine { source, progress },
                     SamplingDeliveryError::Sink(source) => RunError::Sink {
@@ -1131,29 +927,29 @@ impl SamplingSession {
             return Err(RunError::Sink {
                 phase: SinkFailurePhase::Finish,
                 source,
-                progress: SamplingRunProgress::new(committed, 0),
+                progress: RunProgress::new(committed, 0),
             });
         }
         let status = if outcome.completed {
-            SamplingRunStatus::Completed
+            RunStatus::Completed
         } else {
-            SamplingRunStatus::Cancelled
+            RunStatus::Cancelled
         };
         Ok(self.summary(status, shots, committed))
     }
 
     const fn summary(
         &self,
-        status: SamplingRunStatus,
+        status: RunStatus,
         requested_shots: ShotCount,
         committed_shots: u64,
-    ) -> SamplingRunSummary {
-        SamplingRunSummary {
+    ) -> RunSummary {
+        RunSummary::new(
             status,
             requested_shots,
-            committed_shots: ShotCount::new(committed_shots),
-            total_committed_shots: ShotCount::new(self.total_committed_shots),
-        }
+            committed_shots,
+            self.total_committed_shots,
+        )
     }
 }
 

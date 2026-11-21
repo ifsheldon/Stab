@@ -4,30 +4,29 @@ use stab_model::MemoryBudget;
 use stab_records::DemSampleSink;
 
 use super::batch::{SessionUse, initial_capacities, session_storage_bytes};
-use super::{
-    DemReplayBatchStatus, DemReplayTransaction, DemSamplingExecutionError, DemSamplingRunError,
-    DemSamplingRunProgress, ReplayRecords,
-};
-use crate::ShotCount;
+use super::{DemReplayTransaction, DemSamplingExecutionError, ReplayRecords};
 use crate::dem_sampling::DemResourceLimitError;
+use crate::dem_sampling::plan::replay_limits;
 use crate::dem_sampling::replay_store::RetainedBatch;
 use crate::dem_sampling::{
-    DemReplayRecordStore, DemReplayStoreState, DemSamplerLimits, DemSamplingPlan,
+    DemReplayRecordStore, DemReplaySessionOptions, DemReplayStoreState, DemSamplingPlan,
 };
+use crate::{RunError, RunProgress, RunStatus, ShotCount};
 
 impl DemSamplingPlan {
     /// Creates an empty store for the `expected_shots` replay records a caller's validation
-    /// pass decodes, budgeted at the part of `limits`' memory budget that a replay session
-    /// created under the same limits leaves free.
+    /// pass decodes, budgeted at the part of the memory budget that a replay session created
+    /// with the same `options` leaves free.
     ///
     /// Retained records and that session's storage therefore stay within the one budget. A
     /// store whose records cannot fit in any retention layout, including every store of a plan
     /// whose replay session would not fit, is released from the start.
     pub fn replay_record_store(
         &self,
-        limits: &DemSamplerLimits,
+        options: &DemReplaySessionOptions,
         expected_shots: ShotCount,
     ) -> DemReplayRecordStore {
+        let limits = &replay_limits(self, options);
         let session_bytes = initial_capacities(self, limits, SessionUse::Replay)
             .ok()
             .map(|capacities| {
@@ -48,7 +47,8 @@ impl DemSamplingPlan {
 
     /// Admits `input_bytes` of a caller's replay-input storage (its record reader, for
     /// example) beside the smallest replay session, a one-record batch with its sampled-error
-    /// planes, and returns the part of `limits`' memory budget both leave free.
+    /// planes, and returns the part of the memory budget of a replay session created with
+    /// `options` that both leave free.
     ///
     /// A caller that holds the input storage and creates its session under the rest of the
     /// budget can give part of the returned bytes to other storage and still leave the session
@@ -59,10 +59,10 @@ impl DemSamplingPlan {
     /// [`DemResourceKind::ActiveBatchBytes`]: crate::DemResourceKind::ActiveBatchBytes
     pub fn admit_replay_input(
         &self,
-        limits: &DemSamplerLimits,
+        options: &DemReplaySessionOptions,
         input_bytes: u64,
     ) -> Result<MemoryBudget, DemSamplingExecutionError> {
-        let budget = limits.memory_budget();
+        let budget = replay_limits(self, options).memory_budget();
         let required =
             u128::from(input_bytes).saturating_add(session_storage_bytes(self, 1, 1, true));
         match u64::try_from(required) {
@@ -93,10 +93,10 @@ where
     pub fn write_retained(
         &mut self,
         records: &DemReplayRecordStore,
-    ) -> Result<DemReplayBatchStatus, DemSamplingRunError<Sink::Error>> {
-        let lifecycle_error = |message, committed| DemSamplingRunError::Engine {
+    ) -> Result<RunStatus, RunError<DemSamplingExecutionError, Sink::Error>> {
+        let lifecycle_error = |message, committed| RunError::Engine {
             source: DemSamplingExecutionError::ReplayLifecycle { message },
-            progress: DemSamplingRunProgress::new(committed, 0),
+            progress: RunProgress::new(committed, 0),
         };
         if records.state() == DemReplayStoreState::Released {
             return Err(lifecycle_error(
@@ -121,14 +121,14 @@ where
                 },
             };
             let status = self.write_replay_records(batch_records)?;
-            if status == DemReplayBatchStatus::Cancelled {
+            if status == RunStatus::Cancelled {
                 cancelled = true;
                 return Ok(false);
             }
             Ok(true)
         })?;
         if cancelled {
-            return Ok(DemReplayBatchStatus::Cancelled);
+            return Ok(RunStatus::Cancelled);
         }
         if delivered != records.shot_count() {
             return Err(lifecycle_error(
@@ -136,6 +136,6 @@ where
                 self.session.committed_shots,
             ));
         }
-        Ok(DemReplayBatchStatus::Accepted)
+        Ok(RunStatus::Completed)
     }
 }

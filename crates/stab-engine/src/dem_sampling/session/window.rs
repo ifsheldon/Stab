@@ -2,11 +2,8 @@
 
 use stab_records::{BitPlaneBatchView, DemSampleBatchView, DemSampleSink, DetectionBatchView};
 
-use super::{
-    DemSamplingExecutionError, DemSamplingRunError, DemSamplingRunProgress, DemSamplingSession,
-    internal_format_error,
-};
-use crate::SinkFailurePhase;
+use super::{DemSamplingExecutionError, DemSamplingSession, internal_format_error};
+use crate::{RunError, RunProgress, SinkFailurePhase};
 
 impl DemSamplingSession {
     /// Delivers shots `window_start..window_start + window_shots` of the sampled planes, which
@@ -19,7 +16,7 @@ impl DemSamplingSession {
         include_sampled_errors: bool,
         sink: &mut Sink,
         committed: u64,
-    ) -> Result<(), DemSamplingRunError<Sink::Error>>
+    ) -> Result<(), RunError<DemSamplingExecutionError, Sink::Error>>
     where
         Sink: DemSampleSink,
     {
@@ -32,18 +29,18 @@ impl DemSamplingSession {
             Ok(batch) => batch,
             Err(source) => {
                 self.poisoned = true;
-                return Err(DemSamplingRunError::Engine {
+                return Err(RunError::Engine {
                     source,
-                    progress: DemSamplingRunProgress::new(committed, window_shots as u64),
+                    progress: RunProgress::new(committed, window_shots as u64),
                 });
             }
         };
         if let Err(source) = sink.write_batch(batch) {
             self.poisoned = true;
-            return Err(DemSamplingRunError::Sink {
+            return Err(RunError::Sink {
                 phase: SinkFailurePhase::WriteBatch,
                 source,
-                progress: DemSamplingRunProgress::new(committed, window_shots as u64),
+                progress: RunProgress::new(committed, window_shots as u64),
             });
         }
         Ok(())

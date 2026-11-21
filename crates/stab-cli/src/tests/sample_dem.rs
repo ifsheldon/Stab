@@ -254,7 +254,7 @@ fn sample_dem_rejects_malformed_or_short_replay_input() {
     let scratch = Scratch::new();
     let one_error_dem =
         stab_model::DetectorErrorModel::from_dem_str("error(1) D0\n").expect("parse DEM");
-    let one_error_plan = stab_engine::DemSamplingCompiler::new()
+    let one_error_plan = stab_engine::DemSamplingCompiler::default()
         .compile(&one_error_dem)
         .expect("compile DEM");
     let record_cap = replay_text_record_cap(&one_error_plan, RecordFormat::Dets, 2 * 1024 * 1024);
@@ -306,7 +306,7 @@ fn sample_dem_rejects_malformed_or_short_replay_input() {
 /// The bytes the CLI admits beside its compiled plan before reading a replay input of `format`:
 /// the reader's fixed storage for 64-record batches and the smallest replay session.
 fn replay_reader_floor(plan: &stab_engine::DemSamplingPlan, format: RecordFormat) -> u64 {
-    use stab_engine::DemSamplerLimits;
+    use stab_engine::DemReplaySessionOptions;
     use stab_model::MemoryBudget;
     use stab_records::RecordStreamStorage;
 
@@ -315,7 +315,10 @@ fn replay_reader_floor(plan: &stab_engine::DemSamplingPlan, format: RecordFormat
         .expect("u64 reader bound");
     let free = plan
         .admit_replay_input(
-            &DemSamplerLimits::new(MemoryBudget::from_bytes(u64::MAX)),
+            &DemReplaySessionOptions {
+                memory_budget: Some(MemoryBudget::from_bytes(u64::MAX)),
+                ..Default::default()
+            },
             fixed,
         )
         .expect("admit under an unbounded budget");
@@ -345,7 +348,7 @@ fn sample_dem_replay_admits_reader_storage_against_the_command_budget() {
     const DEM: &[u8] = b"repeat 4096 {\n    error(0.5) D0\n    shift_detectors 1\n}\n";
     let (parsed, _) =
         DetectorErrorModel::from_dem_bytes_admitted(DEM, ParseLimits::default()).expect("parse");
-    let plan = DemSamplingCompiler::new()
+    let plan = DemSamplingCompiler::default()
         .compile(&parsed)
         .expect("compile");
     let held = plan.retained_bytes();
@@ -460,7 +463,9 @@ fn sample_dem_record_format_options_reject_the_stim_circuit_format() {
 /// creating any output file.
 #[test]
 fn sample_dem_replay_matches_across_retained_and_released_record_stores() {
-    use stab_engine::{DemReplayRetention, DemSamplerLimits, DemSamplingCompiler, ShotCount};
+    use stab_engine::{
+        DemReplayRetention, DemReplaySessionOptions, DemSamplingCompiler, ShotCount,
+    };
     use stab_model::{DetectorErrorModel, MemoryBudget, ParseLimits};
     use stab_records::PackedShotBatch;
 
@@ -469,12 +474,15 @@ fn sample_dem_replay_matches_across_retained_and_released_record_stores() {
 
     let (parsed, _) =
         DetectorErrorModel::from_dem_bytes_admitted(DEM, ParseLimits::default()).expect("parse");
-    let plan = DemSamplingCompiler::new()
+    let plan = DemSamplingCompiler::default()
         .compile(&parsed)
         .expect("compile");
     let fits_store = |bytes: u64| {
         plan.replay_record_store(
-            &DemSamplerLimits::new(MemoryBudget::from_bytes(bytes)),
+            &DemReplaySessionOptions {
+                memory_budget: Some(MemoryBudget::from_bytes(bytes)),
+                ..Default::default()
+            },
             ShotCount::new(SHOTS as u64),
         )
         .state()
@@ -497,7 +505,10 @@ fn sample_dem_replay_matches_across_retained_and_released_record_stores() {
     let dense_batch = PackedShotBatch::from_records(&dense_vecs, 64).expect("pack dense");
     let fits_dense = |bytes: u64| {
         let mut store = plan.replay_record_store(
-            &DemSamplerLimits::new(MemoryBudget::from_bytes(bytes)),
+            &DemReplaySessionOptions {
+                memory_budget: Some(MemoryBudget::from_bytes(bytes)),
+                ..Default::default()
+            },
             ShotCount::new(SHOTS as u64),
         );
         store.try_retain(dense_batch.view()).expect("try dense") == DemReplayRetention::Retained

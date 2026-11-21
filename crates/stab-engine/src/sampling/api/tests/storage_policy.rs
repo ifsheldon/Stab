@@ -13,10 +13,12 @@ fn pauli_frame_plan(text: &str) -> SamplingPlan {
 }
 
 fn budgeted_plan(text: &str, budget: MemoryBudget) -> SamplingPlan {
-    SamplingCompiler::new()
-        .memory_budget(budget)
-        .compile(&Circuit::from_stim_str(text).expect("parse storage fixture"))
-        .expect("compile storage fixture")
+    SamplingCompiler {
+        memory_budget: budget,
+        ..SamplingCompiler::default()
+    }
+    .compile(&Circuit::from_stim_str(text).expect("parse storage fixture"))
+    .expect("compile storage fixture")
 }
 
 #[test]
@@ -38,11 +40,12 @@ fn pauli_frame_session_storage_estimate_equals_retained_allocation_at_word_bound
                     let mut session = None;
                     let allocated = allocation_counter::measure(|| {
                         session = Some(
-                            plan.session_with_lane_width(
-                                RandomPolicy::Seeded(Seed::new(1)),
-                                mode,
+                            plan.session(&SamplingSessionOptions {
+                                random: RandomPolicy::Seeded(Seed::new(1)),
+                                reference_sample_mode: mode,
                                 lane_width,
-                            )
+                                ..Default::default()
+                            })
                             .expect("allocate Pauli-frame session"),
                         );
                     });
@@ -82,7 +85,12 @@ fn pauli_frame_session_storage_admits_the_exact_budget_and_rejects_the_first_exc
         )
         .expect("admit the exact boundary without allocating its state");
         at_limit
-            .session_with_lane_width(seeded, mode, lane_width)
+            .session(&SamplingSessionOptions {
+                random: seeded,
+                reference_sample_mode: mode,
+                lane_width,
+                ..Default::default()
+            })
             .expect("construct the session at the exact budget");
 
         let over_limit = budgeted_plan(text, MemoryBudget::from_bytes(exact_u64 - 1));
@@ -90,7 +98,12 @@ fn pauli_frame_session_storage_admits_the_exact_budget_and_rejects_the_first_exc
         let allocated = allocation_counter::measure(|| {
             rejected = Some(
                 over_limit
-                    .session_with_lane_width(seeded, mode, lane_width)
+                    .session(&SamplingSessionOptions {
+                        random: seeded,
+                        reference_sample_mode: mode,
+                        lane_width,
+                        ..Default::default()
+                    })
                     .expect_err("public construction must use the same admission"),
             );
         });
@@ -112,9 +125,19 @@ fn pauli_frame_session_storage_admits_the_exact_budget_and_rejects_the_first_exc
         MemoryBudget::from_bytes(u64::try_from(narrow).expect("small")),
     );
     between
-        .session_with_lane_width(seeded, mode, LaneWidth::Lanes64)
+        .session(&SamplingSessionOptions {
+            random: seeded,
+            reference_sample_mode: mode,
+            lane_width: LaneWidth::Lanes64,
+            ..Default::default()
+        })
         .expect("admit the narrow session");
     between
-        .session_with_lane_width(seeded, mode, LaneWidth::Lanes256)
+        .session(&SamplingSessionOptions {
+            random: seeded,
+            reference_sample_mode: mode,
+            lane_width: LaneWidth::Lanes256,
+            ..Default::default()
+        })
         .expect_err("reject the wide session");
 }

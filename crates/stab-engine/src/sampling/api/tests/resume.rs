@@ -11,9 +11,9 @@ use stab_records::{
 
 use crate::work_poll::test_hook;
 use crate::{
-    DetectionSamplingCompiler, DetectionSamplingSession, LaneWidth, RandomPolicy,
-    ReferenceSampleLoopPolicy, ReferenceSampleMode, SamplingCompiler, SamplingExecutionError,
-    SamplingSession, Seed, ShotCount,
+    DetectionSamplingCompiler, DetectionSamplingSession, DetectionSamplingSessionOptions,
+    LaneWidth, RandomPolicy, ReferenceSampleLoopPolicy, ReferenceSampleMode, SamplingCompiler,
+    SamplingExecutionError, SamplingSession, SamplingSessionOptions, Seed, ShotCount,
 };
 
 /// A short poll interval, so every batch of the fixture polls many times.
@@ -106,7 +106,7 @@ impl Session for SamplingSession {
         let summary = self
             .run(ShotCount::new(shots), sink)
             .expect("a cancelled sampling run is not a failure");
-        let completed = summary.status() == crate::SamplingRunStatus::Completed;
+        let completed = summary.status() == crate::RunStatus::Completed;
         (completed, summary.committed_shots().get())
     }
 
@@ -120,7 +120,7 @@ impl Session for DetectionSamplingSession {
         let summary = self
             .run(ShotCount::new(shots), sink)
             .expect("a cancelled detection run is not a failure");
-        let completed = summary.status() == crate::DetectionRunStatus::Completed;
+        let completed = summary.status() == crate::RunStatus::Completed;
         (completed, summary.committed_shots().get())
     }
 
@@ -210,18 +210,25 @@ fn noisy() -> Circuit {
 
 #[test]
 fn sampling_cancelled_inside_a_batch_resumes_byte_identically() {
-    let plan = SamplingCompiler::new()
-        .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Iterate)
-        .compile(&noisy())
-        .expect("compile fixture");
+    let plan = SamplingCompiler {
+        reference_sample_loop_policy: ReferenceSampleLoopPolicy::Iterate,
+        ..SamplingCompiler::default()
+    }
+    .compile(&noisy())
+    .expect("compile fixture");
     for &lane_width in LaneWidth::ALL {
         for mode in [
             ReferenceSampleMode::UseReferenceSample,
             ReferenceSampleMode::SkipReferenceSample,
         ] {
             let session = || {
-                plan.session_with_lane_width(RandomPolicy::Seeded(Seed::new(9)), mode, lane_width)
-                    .expect("create session")
+                plan.session(&SamplingSessionOptions {
+                    random: RandomPolicy::Seeded(Seed::new(9)),
+                    reference_sample_mode: mode,
+                    lane_width,
+                    ..Default::default()
+                })
+                .expect("create session")
             };
             assert_resumes_identically(session, lane_width.shots_per_batch() as u64);
         }
@@ -230,13 +237,17 @@ fn sampling_cancelled_inside_a_batch_resumes_byte_identically() {
 
 #[test]
 fn detection_sampling_cancelled_inside_a_batch_resumes_byte_identically() {
-    let plan = DetectionSamplingCompiler::new()
+    let plan = DetectionSamplingCompiler::default()
         .compile(&noisy())
         .expect("compile fixture");
     for &lane_width in LaneWidth::ALL {
         let session = || {
-            plan.session_with_lane_width(RandomPolicy::Seeded(Seed::new(9)), lane_width)
-                .expect("create session")
+            plan.session(&DetectionSamplingSessionOptions {
+                random: RandomPolicy::Seeded(Seed::new(9)),
+                lane_width,
+                ..Default::default()
+            })
+            .expect("create session")
         };
         assert_resumes_identically(session, lane_width.shots_per_batch() as u64);
     }
@@ -247,33 +258,53 @@ fn detection_sampling_cancelled_inside_a_batch_resumes_byte_identically() {
 #[test]
 fn sampling_cancelled_during_the_reference_sample_retries_identically() {
     let compile = || {
-        SamplingCompiler::new()
-            .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Iterate)
-            .compile(&noisy())
-            .expect("compile fixture")
+        SamplingCompiler {
+            reference_sample_loop_policy: ReferenceSampleLoopPolicy::Iterate,
+            ..SamplingCompiler::default()
+        }
+        .compile(&noisy())
+        .expect("compile fixture")
     };
     let seed = RandomPolicy::Seeded(Seed::new(4));
     let mut expected = Shots::default();
     compile()
-        .session(seed)
+        .session(&SamplingSessionOptions {
+            random: seed,
+            ..Default::default()
+        })
         .expect("create session")
         .run_shots(300, &mut expected);
 
     test_hook::with_units_per_poll(TEST_UNITS_PER_POLL, || {
         let counted = compile();
-        let (created, polls) = test_hook::count_polls(|| counted.session(seed));
+        let (created, polls) = test_hook::count_polls(|| {
+            counted.session(&SamplingSessionOptions {
+                random: seed,
+                ..Default::default()
+            })
+        });
         created.expect("create counted session");
         assert!(polls >= 2, "the reference sample polls only {polls} times");
         let plan = compile();
-        let (interrupted, fired) =
-            test_hook::cancel_at_poll(polls / 2, || plan.session(seed).map(drop));
+        let (interrupted, fired) = test_hook::cancel_at_poll(polls / 2, || {
+            plan.session(&SamplingSessionOptions {
+                random: seed,
+                ..Default::default()
+            })
+            .map(drop)
+        });
         assert!(fired);
         assert_eq!(
             interrupted,
             Err(SamplingExecutionError::Cancelled(stab_model::Cancelled))
         );
         let mut resumed = Shots::default();
-        let mut session = plan.session(seed).expect("retry the reference sample");
+        let mut session = plan
+            .session(&SamplingSessionOptions {
+                random: seed,
+                ..Default::default()
+            })
+            .expect("retry the reference sample");
         assert_eq!(session.run_shots(300, &mut resumed), (true, 300));
         assert!(resumed.0 == expected.0, "retried plan diverged");
     });
@@ -307,32 +338,52 @@ fn single_collapse_and_fold_comparison_poll_in_chunks_and_retry_cleanly() {
         (&fold_circuit, ReferenceSampleLoopPolicy::Fold),
     ] {
         let compile = || {
-            SamplingCompiler::new()
-                .reference_sample_loop_policy(policy)
-                .compile(circuit)
-                .expect("compile fixture")
+            SamplingCompiler {
+                reference_sample_loop_policy: policy,
+                ..SamplingCompiler::default()
+            }
+            .compile(circuit)
+            .expect("compile fixture")
         };
         let mut expected = Shots::default();
         compile()
-            .session(seed)
+            .session(&SamplingSessionOptions {
+                random: seed,
+                ..Default::default()
+            })
             .expect("baseline session")
             .run_shots(64, &mut expected);
 
         test_hook::with_units_per_poll(64, || {
             let counted = compile();
-            let (created, polls) = test_hook::count_polls(|| counted.session(seed));
+            let (created, polls) = test_hook::count_polls(|| {
+                counted.session(&SamplingSessionOptions {
+                    random: seed,
+                    ..Default::default()
+                })
+            });
             created.expect("counted session");
             assert!(polls >= 8, "expected chunked inner polls, got {polls}");
             let plan = compile();
-            let (interrupted, fired) =
-                test_hook::cancel_at_poll(polls - 2, || plan.session(seed).map(drop));
+            let (interrupted, fired) = test_hook::cancel_at_poll(polls - 2, || {
+                plan.session(&SamplingSessionOptions {
+                    random: seed,
+                    ..Default::default()
+                })
+                .map(drop)
+            });
             assert!(fired);
             assert_eq!(
                 interrupted,
                 Err(SamplingExecutionError::Cancelled(stab_model::Cancelled))
             );
             let mut resumed = Shots::default();
-            let mut session = plan.session(seed).expect("retry session");
+            let mut session = plan
+                .session(&SamplingSessionOptions {
+                    random: seed,
+                    ..Default::default()
+                })
+                .expect("retry session");
             assert_eq!(session.run_shots(64, &mut resumed), (true, 64));
             assert_eq!(resumed.0, expected.0);
         });
@@ -362,10 +413,12 @@ fn batched_pivot_column_collapses_poll_in_chunks_and_retry_cleanly() {
     src.push('\n');
     let circuit = Circuit::from_stim_str(&src).expect("parse wide layer");
     let compile = || {
-        SamplingCompiler::new()
-            .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Iterate)
-            .compile(&circuit)
-            .expect("compile wide layer")
+        SamplingCompiler {
+            reference_sample_loop_policy: ReferenceSampleLoopPolicy::Iterate,
+            ..SamplingCompiler::default()
+        }
+        .compile(&circuit)
+        .expect("compile wide layer")
     };
     let seed = RandomPolicy::Seeded(Seed::new(23));
     crate::sampling::reference_simulator::take_pivot_column_stats();
@@ -376,18 +429,31 @@ fn batched_pivot_column_collapses_poll_in_chunks_and_retry_cleanly() {
     assert!(stats.builds > 0 && stats.bit_follows > 0, "{stats:?}");
     let mut expected = Shots::default();
     compile()
-        .session(seed)
+        .session(&SamplingSessionOptions {
+            random: seed,
+            ..Default::default()
+        })
         .expect("baseline session")
         .run_shots(64, &mut expected);
 
     test_hook::with_units_per_poll(64, || {
-        let (created, polls) = test_hook::count_polls(|| compile().session(seed));
+        let (created, polls) = test_hook::count_polls(|| {
+            compile().session(&SamplingSessionOptions {
+                random: seed,
+                ..Default::default()
+            })
+        });
         created.expect("counted session");
         assert!(polls >= 64, "expected chunked inner polls, got {polls}");
         for poll in (1..polls).step_by(usize::try_from(polls / 24).unwrap_or(1).max(1)) {
             let plan = compile();
-            let (interrupted, fired) =
-                test_hook::cancel_at_poll(poll, || plan.session(seed).map(drop));
+            let (interrupted, fired) = test_hook::cancel_at_poll(poll, || {
+                plan.session(&SamplingSessionOptions {
+                    random: seed,
+                    ..Default::default()
+                })
+                .map(drop)
+            });
             assert!(fired);
             assert_eq!(
                 interrupted,
@@ -398,7 +464,12 @@ fn batched_pivot_column_collapses_poll_in_chunks_and_retry_cleanly() {
                 reference
             );
             let mut resumed = Shots::default();
-            let mut session = plan.session(seed).expect("retry session");
+            let mut session = plan
+                .session(&SamplingSessionOptions {
+                    random: seed,
+                    ..Default::default()
+                })
+                .expect("retry session");
             assert_eq!(session.run_shots(64, &mut resumed), (true, 64));
             assert_eq!(resumed.0, expected.0);
         }
@@ -455,10 +526,10 @@ fn cancellation_inside_a_pending_lane_shift_resumes_byte_identically() {
         "R 0 1\nREPEAT 1500 {\n    X_ERROR(0.3) 0 1\n    M 0 1\n    DETECTOR rec[-1] rec[-2]\n}\n",
     )
     .expect("parse wide record");
-    let sampling = SamplingCompiler::new()
+    let sampling = SamplingCompiler::default()
         .compile(&circuit)
         .expect("compile sampling");
-    let detection = DetectionSamplingCompiler::new()
+    let detection = DetectionSamplingCompiler::default()
         .compile(&circuit)
         .expect("compile detection");
     let seed = RandomPolicy::Seeded(Seed::new(11));
@@ -466,13 +537,22 @@ fn cancellation_inside_a_pending_lane_shift_resumes_byte_identically() {
         let lanes = lane_width.shots_per_batch() as u64;
         let sampling_session = || {
             sampling
-                .session_with_lane_width(seed, ReferenceSampleMode::UseReferenceSample, lane_width)
+                .session(&SamplingSessionOptions {
+                    random: seed,
+                    reference_sample_mode: ReferenceSampleMode::UseReferenceSample,
+                    lane_width,
+                    ..Default::default()
+                })
                 .expect("create sampling session")
         };
         assert_lane_shift_resumes(sampling_session, lanes);
         let detection_session = || {
             detection
-                .session_with_lane_width(seed, lane_width)
+                .session(&DetectionSamplingSessionOptions {
+                    random: seed,
+                    lane_width,
+                    ..Default::default()
+                })
                 .expect("create detection session")
         };
         assert_lane_shift_resumes(detection_session, lanes);

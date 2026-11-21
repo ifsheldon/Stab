@@ -16,11 +16,12 @@ use std::thread;
 use std::time::Duration;
 
 use stab_engine::{
-    DemReplayBatchStatus, DemSamplerLimits, DemSamplingCompiler, DemSamplingExecutionError,
-    DemSamplingRunError, DetectionCompileError, DetectionConversionLimits, DetectionError,
-    DetectionExecutionError, DetectionRunError, DetectionRunStatus, DetectionSamplingCompiler,
-    LaneWidth, MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode, SamplingCompiler,
-    SamplingExecutionError, SamplingRunStatus, Seed, ShotCount, SinkFailurePhase,
+    DemReplaySessionOptions, DemSamplingCompiler, DemSamplingExecutionError,
+    DemSamplingSessionOptions, DetectionCompileError, DetectionError, DetectionExecutionError,
+    DetectionSamplingCompiler, DetectionSamplingSessionOptions, LaneWidth,
+    MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode, RunError, RunStatus,
+    SamplingCompiler, SamplingExecutionError, SamplingSessionOptions, Seed, ShotCount,
+    SinkFailurePhase,
 };
 use stab_model::{Cancellation, Cancelled, Circuit, DetectorErrorModel};
 use stab_records::{
@@ -142,15 +143,20 @@ fn cancel_while_running<T: Send + 'static>(
 #[test]
 fn reference_sample_computation_stops_when_cancelled() {
     let cancellation = Cancellation::new();
-    let plan = SamplingCompiler::new()
-        .cancellation(cancellation.clone())
-        .compile(&circuit(ENDLESS_SAMPLING))
-        .expect("compile endless reference sample");
+    let plan = SamplingCompiler {
+        cancellation: cancellation.clone(),
+        ..SamplingCompiler::default()
+    }
+    .compile(&circuit(ENDLESS_SAMPLING))
+    .expect("compile endless reference sample");
     // The plan computes its reference sample lazily, so a signal set after compilation is
     // observed only by the reference simulator's repeat interpretation.
     cancellation.cancel();
     assert_matches!(
-        plan.session(RandomPolicy::Seeded(Seed::new(1))),
+        plan.session(&SamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(1)),
+            ..Default::default()
+        }),
         Err(SamplingExecutionError::Cancelled(Cancelled))
     );
     assert_matches!(
@@ -158,9 +164,11 @@ fn reference_sample_computation_stops_when_cancelled() {
         Err(SamplingExecutionError::Cancelled(Cancelled))
     );
     assert_matches!(
-        SamplingCompiler::new()
-            .cancellation(cancellation)
-            .compile(&circuit(ENDLESS_SAMPLING)),
+        SamplingCompiler {
+            cancellation,
+            ..SamplingCompiler::default()
+        }
+        .compile(&circuit(ENDLESS_SAMPLING)),
         Err(stab_engine::SamplingCompileError::Cancelled(Cancelled))
     );
 }
@@ -171,16 +179,19 @@ fn sampling_batch_cancellation_delivers_no_partial_batch_and_stays_resumable() {
         let cancellation = Cancellation::new();
         let signal = cancellation.clone();
         let (summary, sink, poisoned) = cancel_while_running(&cancellation, move |started| {
-            let plan = SamplingCompiler::new()
-                .cancellation(signal)
-                .compile(&circuit(ENDLESS_SAMPLING))
-                .expect("compile endless sampler");
+            let plan = SamplingCompiler {
+                cancellation: signal,
+                ..SamplingCompiler::default()
+            }
+            .compile(&circuit(ENDLESS_SAMPLING))
+            .expect("compile endless sampler");
             let mut session = plan
-                .session_with_lane_width(
-                    RandomPolicy::Seeded(Seed::new(3)),
-                    ReferenceSampleMode::SkipReferenceSample,
+                .session(&SamplingSessionOptions {
+                    random: RandomPolicy::Seeded(Seed::new(3)),
+                    reference_sample_mode: ReferenceSampleMode::SkipReferenceSample,
                     lane_width,
-                )
+                    ..Default::default()
+                })
                 .expect("skip-reference session needs no reference simulation");
             let mut sink = CountingSink::default();
             started();
@@ -189,7 +200,7 @@ fn sampling_batch_cancellation_delivers_no_partial_batch_and_stays_resumable() {
                 .expect("an in-batch sampling cancellation is not a failure");
             (summary, sink, session.is_poisoned())
         });
-        assert_eq!(summary.status(), SamplingRunStatus::Cancelled);
+        assert_eq!(summary.status(), RunStatus::Cancelled);
         assert_eq!(summary.committed_shots(), ShotCount::new(0));
         assert_eq!((sink.writes, sink.finishes), (0, 1));
         assert!(!poisoned, "the interrupted batch rewinds its random stream");
@@ -202,12 +213,18 @@ fn detection_sampling_batch_cancellation_delivers_no_partial_batch_and_stays_res
         let cancellation = Cancellation::new();
         let signal = cancellation.clone();
         let (summary, sink, poisoned) = cancel_while_running(&cancellation, move |started| {
-            let plan = DetectionSamplingCompiler::new()
-                .limits(DetectionConversionLimits::default().with_cancellation(signal))
-                .compile(&circuit(ENDLESS_SAMPLING))
-                .expect("compile endless detection sampler");
+            let plan = DetectionSamplingCompiler {
+                cancellation: signal,
+                ..DetectionSamplingCompiler::default()
+            }
+            .compile(&circuit(ENDLESS_SAMPLING))
+            .expect("compile endless detection sampler");
             let mut session = plan
-                .session_with_lane_width(RandomPolicy::Seeded(Seed::new(5)), lane_width)
+                .session(&DetectionSamplingSessionOptions {
+                    random: RandomPolicy::Seeded(Seed::new(5)),
+                    lane_width,
+                    ..Default::default()
+                })
                 .expect("create detection session");
             let mut sink = CountingSink::default();
             started();
@@ -216,7 +233,7 @@ fn detection_sampling_batch_cancellation_delivers_no_partial_batch_and_stays_res
                 .expect("an in-batch detection cancellation is not a failure");
             (summary, sink, session.is_poisoned())
         });
-        assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
+        assert_eq!(summary.status(), RunStatus::Cancelled);
         assert_eq!(summary.committed_shots(), ShotCount::new(0));
         assert_eq!((sink.writes, sink.finishes), (0, 1));
         assert!(!poisoned, "the interrupted batch rewinds its random stream");
@@ -229,17 +246,22 @@ fn streaming_runs_stop_inside_a_batch_with_the_sink_finalized() {
         let cancellation = Cancellation::new();
         let signal = cancellation.clone();
         let (summary, sink) = cancel_while_running(&cancellation, move |started| {
-            let run = SamplingCompiler::new()
-                .cancellation(signal)
-                .compile(&circuit(ENDLESS_SAMPLING))
-                .expect("compile endless sampler")
-                .streaming_run(
-                    RandomPolicy::Seeded(Seed::new(3)),
-                    ReferenceSampleMode::SkipReferenceSample,
+            let run = SamplingCompiler {
+                cancellation: signal,
+                ..SamplingCompiler::default()
+            }
+            .compile(&circuit(ENDLESS_SAMPLING))
+            .expect("compile endless sampler")
+            .streaming_run(
+                &SamplingSessionOptions {
+                    random: RandomPolicy::Seeded(Seed::new(3)),
+                    reference_sample_mode: ReferenceSampleMode::SkipReferenceSample,
                     lane_width,
-                    ShotCount::new(1),
-                )
-                .expect("prepare streaming run");
+                    ..Default::default()
+                },
+                ShotCount::new(1),
+            )
+            .expect("prepare streaming run");
             let mut sink = CountingSink::default();
             started();
             let summary = run
@@ -247,22 +269,27 @@ fn streaming_runs_stop_inside_a_batch_with_the_sink_finalized() {
                 .expect("an in-batch streaming cancellation is not a failure");
             (summary, sink)
         });
-        assert_eq!(summary.status(), SamplingRunStatus::Cancelled);
+        assert_eq!(summary.status(), RunStatus::Cancelled);
         assert_eq!((sink.writes, sink.finishes), (0, 1));
 
         let cancellation = Cancellation::new();
         let signal = cancellation.clone();
         let (summary, sink) = cancel_while_running(&cancellation, move |started| {
-            let run = DetectionSamplingCompiler::new()
-                .limits(DetectionConversionLimits::default().with_cancellation(signal))
-                .compile(&circuit(ENDLESS_SAMPLING))
-                .expect("compile endless detection sampler")
-                .streaming_run(
-                    RandomPolicy::Seeded(Seed::new(5)),
+            let run = DetectionSamplingCompiler {
+                cancellation: signal,
+                ..DetectionSamplingCompiler::default()
+            }
+            .compile(&circuit(ENDLESS_SAMPLING))
+            .expect("compile endless detection sampler")
+            .streaming_run(
+                &DetectionSamplingSessionOptions {
+                    random: RandomPolicy::Seeded(Seed::new(5)),
                     lane_width,
-                    ShotCount::new(1),
-                )
-                .expect("prepare streaming detection run");
+                    ..Default::default()
+                },
+                ShotCount::new(1),
+            )
+            .expect("prepare streaming detection run");
             let mut sink = CountingSink::default();
             started();
             let summary = run
@@ -270,7 +297,7 @@ fn streaming_runs_stop_inside_a_batch_with_the_sink_finalized() {
                 .expect("an in-batch streaming cancellation is not a failure");
             (summary, sink)
         });
-        assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
+        assert_eq!(summary.status(), RunStatus::Cancelled);
         assert_eq!((sink.writes, sink.finishes), (0, 1));
     }
 }
@@ -335,17 +362,20 @@ impl RecordingSink {
         lane_width: LaneWidth,
         shots: u64,
     ) -> Vec<Vec<bool>> {
-        let mut compiler = SamplingCompiler::new();
-        if let Some((signal, _)) = &cancellable {
-            compiler = compiler.cancellation(signal.clone());
-        }
+        let compiler = SamplingCompiler {
+            cancellation: cancellable
+                .as_ref()
+                .map_or_else(Cancellation::never, |(signal, _)| signal.clone()),
+            ..SamplingCompiler::default()
+        };
         let plan = compiler.compile(fixture).expect("compile noisy fixture");
         let mut session = plan
-            .session_with_lane_width(
-                RandomPolicy::Seeded(Seed::new(17)),
-                ReferenceSampleMode::UseReferenceSample,
+            .session(&SamplingSessionOptions {
+                random: RandomPolicy::Seeded(Seed::new(17)),
+                reference_sample_mode: ReferenceSampleMode::UseReferenceSample,
                 lane_width,
-            )
+                ..Default::default()
+            })
             .expect("create session");
         let mut sink = Self::default();
         let mut remaining = shots;
@@ -361,7 +391,7 @@ impl RecordingSink {
         let summary = session
             .run(ShotCount::new(remaining), &mut sink)
             .expect("resume the session");
-        assert_eq!(summary.status(), SamplingRunStatus::Completed);
+        assert_eq!(summary.status(), RunStatus::Completed);
         sink.0
     }
 }
@@ -371,8 +401,10 @@ fn measurement_to_detection_reference_sample_stops_when_cancelled() {
     let cancellation = Cancellation::new();
     let signal = cancellation.clone();
     let result = cancel_while_running(&cancellation, move |started| {
-        let compiler = MeasurementToDetectionCompiler::new()
-            .limits(DetectionConversionLimits::default().with_cancellation(signal));
+        let compiler = MeasurementToDetectionCompiler {
+            cancellation: signal,
+            ..MeasurementToDetectionCompiler::default()
+        };
         started();
         compiler.compile(&circuit(ENDLESS_REFERENCE)).map(drop)
     });
@@ -391,12 +423,16 @@ fn measurement_to_detection_sweep_correction_rejects_the_whole_batch_and_stays_r
     let (summary, sink, poisoned) = cancel_while_running(&cancellation, move |started| {
         let fixture =
             circuit("CX sweep[0] 0\nREPEAT 1000000000000 {\n    H 0\n}\nM 0\nDETECTOR rec[-1]\n");
-        let plan = MeasurementToDetectionCompiler::new()
-            .limits(DetectionConversionLimits::default().with_cancellation(signal))
-            .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample)
-            .compile(&fixture)
-            .expect("compile sweep-corrected conversion");
-        let mut session = plan.session().expect("create conversion session");
+        let plan = MeasurementToDetectionCompiler {
+            cancellation: signal,
+            reference_sample_mode: ReferenceSampleMode::SkipReferenceSample,
+            ..MeasurementToDetectionCompiler::default()
+        }
+        .compile(&fixture)
+        .expect("compile sweep-corrected conversion");
+        let mut session = plan
+            .session(&Default::default())
+            .expect("create conversion session");
         let measurements = PackedShotBatch::from_records(&[vec![true]], 1).expect("pack");
         let sweeps = PackedShotBatch::from_records(&[vec![true]], 1).expect("pack");
         let mut sink = CountingSink::default();
@@ -410,7 +446,7 @@ fn measurement_to_detection_sweep_correction_rejects_the_whole_batch_and_stays_r
             .expect("an in-batch conversion cancellation is not a failure");
         (summary, sink, session.is_poisoned())
     });
-    assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
+    assert_eq!(summary.status(), RunStatus::Cancelled);
     assert_eq!(summary.committed_shots(), ShotCount::new(0));
     assert_eq!(sink.writes, 0, "no partially converted batch is delivered");
     assert!(
@@ -426,14 +462,15 @@ fn dem_sampling_batch_stops_and_stays_resumable() {
     let cancellation = Cancellation::new();
     let signal = cancellation.clone();
     let (summary, sink, poisoned, total) = cancel_while_running(&cancellation, move |started| {
-        let plan = DemSamplingCompiler::new()
+        let plan = DemSamplingCompiler::default()
             .compile(&model)
             .expect("compile endless DEM sampler");
         let mut session = plan
-            .session_with_limits(
-                RandomPolicy::Seeded(Seed::new(7)),
-                DemSamplerLimits::default().with_cancellation(signal),
-            )
+            .session(&DemSamplingSessionOptions {
+                random: RandomPolicy::Seeded(Seed::new(7)),
+                cancellation: Some(signal),
+                ..DemSamplingSessionOptions::default()
+            })
             .expect("create DEM session");
         let mut sink = CountingSink::default();
         started();
@@ -467,7 +504,7 @@ fn dem_replay_batch_stops_without_delivering_a_partial_batch() {
     let cancellation = Cancellation::new();
     let signal = cancellation.clone();
     let (status, sink, poisoned) = cancel_while_running(&cancellation, move |started| {
-        let plan = DemSamplingCompiler::new()
+        let plan = DemSamplingCompiler::default()
             .compile(&model)
             .expect("compile large replay");
         let mut records = PackedShotBatch::zeros(SHOTS, ERRORS).expect("allocate records");
@@ -478,9 +515,12 @@ fn dem_replay_batch_stops_without_delivering_a_partial_batch() {
                 .expect("fill replay record");
         }
         let mut replay = plan
-            .replay_session_with_limits(
+            .replay_session(
+                &DemReplaySessionOptions {
+                    cancellation: Some(signal),
+                    ..DemReplaySessionOptions::default()
+                },
                 ShotCount::new(SHOTS as u64),
-                DemSamplerLimits::default().with_cancellation(signal),
             )
             .expect("create replay session");
         let mut sink = CountingSink::default();
@@ -494,17 +534,19 @@ fn dem_replay_batch_stops_without_delivering_a_partial_batch() {
         assert!(summary.status().is_cancelled());
         (status, sink, replay.is_poisoned())
     });
-    assert_eq!(status, DemReplayBatchStatus::Cancelled);
+    assert_eq!(status, RunStatus::Cancelled);
     assert_eq!((sink.writes, sink.finishes), (0, 1));
     assert!(!poisoned);
 }
 
 #[test]
 fn a_sink_error_stops_measurement_to_detection_within_one_batch() {
-    let plan = MeasurementToDetectionCompiler::new()
+    let plan = MeasurementToDetectionCompiler::default()
         .compile(&circuit("M 0\nDETECTOR rec[-1]\n"))
         .expect("compile conversion");
-    let mut session = plan.session().expect("create conversion session");
+    let mut session = plan
+        .session(&Default::default())
+        .expect("create conversion session");
     let input = PackedShotBatch::from_records(&[vec![true]], 1).expect("pack");
     let mut sink = CountingSink::failing();
     let mut transaction = session.start_transaction(&mut sink).expect("start");
@@ -513,7 +555,7 @@ fn a_sink_error_stops_measurement_to_detection_within_one_batch() {
         .expect_err("the sink rejects the first batch");
     assert_matches!(
         error,
-        DetectionRunError::Sink {
+        RunError::Sink {
             phase: SinkFailurePhase::WriteBatch,
             source: SinkFailed,
             ..
@@ -521,7 +563,7 @@ fn a_sink_error_stops_measurement_to_detection_within_one_batch() {
     );
     assert_matches!(
         transaction.write_batch_with_sweep(MeasurementBatchView::new(input.view()), None),
-        Err(DetectionRunError::Engine {
+        Err(RunError::Engine {
             source: DetectionExecutionError::SessionPoisoned,
             ..
         })
@@ -533,16 +575,16 @@ fn a_sink_error_stops_measurement_to_detection_within_one_batch() {
 
 #[test]
 fn a_sink_error_stops_dem_replay_within_one_batch() {
-    let plan = DemSamplingCompiler::new()
+    let plan = DemSamplingCompiler::default()
         .compile(&dem("error(0.5) D0\n"))
         .expect("compile replay");
     let records = vec![vec![true]; 200];
     let mut replay = plan
-        .replay_session(ShotCount::new(200))
+        .replay_session(&Default::default(), ShotCount::new(200))
         .expect("create replay session");
     let mut sink = CountingSink::failing();
     match replay.run(&records, &mut sink) {
-        Err(DemSamplingRunError::Sink {
+        Err(RunError::Sink {
             phase: SinkFailurePhase::WriteBatch,
             source: SinkFailed,
             progress,

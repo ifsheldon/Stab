@@ -45,7 +45,8 @@ use output_storage::{EncodedBatches, OutputStorage, admit_output_then_session};
 use sample_dem::{SampleDemArgs, run_sample_dem};
 use stab_engine::{
     LaneWidth, RandomPolicy, ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError,
-    SamplingCompiler, SamplingSession, Seed, ShotCount, StreamingSamplingRun,
+    SamplingCompiler, SamplingExecutionError, SamplingSession, SamplingSessionOptions, Seed,
+    ShotCount, StreamingSamplingRun,
 };
 use stab_model::{
     Cancellation, Circuit, FoldedCircuitSummary, FoldedCount, GateKind, MemoryBudget,
@@ -523,11 +524,13 @@ where
         ReferenceSampleLoopPolicy::Fold
     };
     let compile = ledger.stage();
-    let plan = SamplingCompiler::new()
-        .memory_budget(compile.get())
-        .reference_sample_loop_policy(reference_sample_loop_policy)
-        .compile(&circuit)
-        .map_err(|error| compile.refusal(error))?;
+    let plan = SamplingCompiler {
+        reference_sample_loop_policy,
+        memory_budget: compile.get(),
+        ..SamplingCompiler::default()
+    }
+    .compile(&circuit)
+    .map_err(|error| compile.refusal(error))?;
     let _plan_hold = ledger.hold(plan.retained_bytes());
     let skip_reference_sample = args.skip_reference_sample;
     let visible_measurements = if args.shots == 1 && !skip_reference_sample {
@@ -577,21 +580,16 @@ where
         .scratch(filtered_record_bytes)
         .file_buffer(args.output.is_some());
     let (_output_hold, run) = admit_output_then_session(output, &mut ledger, |budget| {
+        let options = SamplingSessionOptions {
+            random: random_policy,
+            reference_sample_mode: reference_mode,
+            lane_width,
+            memory_budget: Some(budget),
+        };
         let run = if streams {
-            SampleRun::Streaming(plan.streaming_run_with_budget(
-                random_policy,
-                reference_mode,
-                lane_width,
-                shots,
-                budget,
-            )?)
+            SampleRun::Streaming(plan.streaming_run(&options, shots)?)
         } else {
-            SampleRun::Session(plan.session_with_budget(
-                random_policy,
-                reference_mode,
-                lane_width,
-                budget,
-            )?)
+            SampleRun::Session(plan.session(&options)?)
         };
         Ok(run)
     })?;
@@ -660,7 +658,7 @@ fn write_sample_output<W>(
     visible_measurements: Option<&[usize]>,
     encoder: RecordEncoder,
     output: &mut W,
-) -> Result<(), RunError<std::io::Error>>
+) -> Result<(), RunError<SamplingExecutionError, std::io::Error>>
 where
     W: Write,
 {

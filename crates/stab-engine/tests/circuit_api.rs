@@ -8,13 +8,35 @@ mod support;
 use std::assert_matches;
 
 use stab_engine::{
-    DetectionError, InitialState, ReferenceSampleTree, circuit_reference_sample,
-    circuit_reference_signs, count_determined_measurements, detection_record_width,
-    measurement_record_count,
+    DetectionConversionLimits, DetectionError, InitialState, MeasurementToDetectionCompiler,
+    ReferenceSample, ReferenceSampleTree, SamplingCompiler, circuit_reference_signs,
+    detection_record_width,
 };
 use stab_model::Circuit;
 
 use support::SamplingFixture;
+
+/// The reference sample of `circuit`'s default-compiled sampling plan, with a failure of either
+/// step reported as its message.
+fn circuit_reference_sample(circuit: &Circuit) -> Result<ReferenceSample, String> {
+    SamplingCompiler::default()
+        .compile(circuit)
+        .map_err(|error| error.to_string())?
+        .try_reference_sample()
+        .map_err(|error| error.to_string())
+}
+
+/// The determined-measurement count of `circuit`'s default-compiled sampling plan.
+fn count_determined_measurements(
+    circuit: &Circuit,
+    initial_state: InitialState,
+) -> Result<u64, String> {
+    SamplingCompiler::default()
+        .compile(circuit)
+        .map_err(|error| error.to_string())?
+        .try_count_determined_measurements(initial_state)
+        .map_err(|error| error.to_string())
+}
 
 fn reference_bits(circuit: &Circuit) -> Vec<bool> {
     circuit_reference_sample(circuit)
@@ -34,11 +56,16 @@ fn pf1_circuit_stats_detection_width_helpers_match_owned_upstream_semantics() {
     .expect("parse circuit");
 
     assert_eq!(
-        measurement_record_count(&circuit).expect("measurement record count"),
+        MeasurementToDetectionCompiler::default()
+            .compile(&circuit)
+            .expect("compile conversion")
+            .measurement_width()
+            .get(),
         2
     );
     assert_eq!(
-        detection_record_width(&circuit).expect("detection record width"),
+        detection_record_width(&circuit, &DetectionConversionLimits::default())
+            .expect("detection record width"),
         5
     );
 }
@@ -61,8 +88,7 @@ fn pf1_circuit_reference_determined_reference_sample_matches_compiled_sampler() 
         let invalid_sweep_order =
             Circuit::from_stim_str(source).expect("parse invalid sweep order");
         let error = circuit_reference_sample(&invalid_sweep_order)
-            .expect_err("reject invalid sampler sweep target order")
-            .to_string();
+            .expect_err("reject invalid sampler sweep target order");
         assert!(error.contains("does not support"), "{source}\n{error}");
     }
 
@@ -134,7 +160,8 @@ fn circuit_reference_signs_match_stim_ordering_and_reference_semantics() {
     ];
     for (name, source, expected_detectors, expected_observables) in cases {
         let circuit = Circuit::from_stim_str(source).expect("parse reference-sign case");
-        let signs = circuit_reference_signs(&circuit).expect("compute reference-sign case");
+        let signs = circuit_reference_signs(&circuit, &DetectionConversionLimits::default())
+            .expect("compute reference-sign case");
         let detectors = signs.detector_signs().iter().collect::<Vec<_>>();
         let observables = signs.observable_signs().iter().collect::<Vec<_>>();
         assert_eq!(detectors, *expected_detectors, "{name}");
@@ -152,7 +179,8 @@ fn circuit_reference_signs_match_stim_ordering_and_reference_semantics() {
         ));
     }
     let circuit = Circuit::from_stim_str(&wide).expect("parse word-straddling case");
-    let signs = circuit_reference_signs(&circuit).expect("compute word-straddling case");
+    let signs = circuit_reference_signs(&circuit, &DetectionConversionLimits::default())
+        .expect("compute word-straddling case");
     let expected = (0..130).map(|qubit| qubit % 3 == 0).collect::<Vec<_>>();
     for slice in [signs.detector_signs(), signs.observable_signs()] {
         assert_eq!(slice.len(), 130);
@@ -169,7 +197,7 @@ fn circuit_reference_signs_match_stim_ordering_and_reference_semantics() {
     let invalid =
         Circuit::from_stim_str("DETECTOR rec[-1]\n").expect("parse unavailable record target");
     assert_matches!(
-        circuit_reference_signs(&invalid),
+        circuit_reference_signs(&invalid, &DetectionConversionLimits::default()),
         Err(DetectionError::InvalidResultFormat { .. })
     );
 }

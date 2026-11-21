@@ -11,7 +11,10 @@ use super::buffers::try_zero_words;
 use super::plan::DemSamplingPlan;
 use super::{DemError, DemSamplerLimits};
 use crate::sampling::{session_cancellation, session_cancellation_slot};
-use crate::{DetectionRecordBuffer, RandomPolicy, ShotCount, SinkFailurePhase};
+use crate::{
+    DetectionRecordBuffer, RandomPolicy, RunError, RunProgress, RunStatus, RunSummary, ShotCount,
+    SinkFailurePhase,
+};
 
 /// Most records one replay batch holds.
 const MAX_REPLAY_BATCH_SHOTS: usize = 64;
@@ -25,7 +28,7 @@ mod replay_session;
 mod retained;
 mod window;
 
-pub use replay_session::{DemReplayBatchStatus, DemReplaySession, DemReplayTransaction};
+pub use replay_session::{DemReplaySession, DemReplayTransaction};
 
 use batch::{SessionBatch, SessionUse, initial_capacities, validate_session_storage};
 use replay_records::{ReplayRecord, ReplayRecords};
@@ -69,140 +72,6 @@ impl DemSamplingExecutionError {
             }
             other => DemError::invalid_sampler_compilation(other.to_string()),
         }
-    }
-}
-
-/// Exact progress at a DEM sampling execution failure.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct DemSamplingRunProgress {
-    committed_shots: ShotCount,
-    attempted_batch_shots: ShotCount,
-}
-
-impl DemSamplingRunProgress {
-    const fn new(committed_shots: u64, attempted_batch_shots: u64) -> Self {
-        Self {
-            committed_shots: ShotCount::new(committed_shots),
-            attempted_batch_shots: ShotCount::new(attempted_batch_shots),
-        }
-    }
-
-    pub const fn committed_shots(self) -> ShotCount {
-        self.committed_shots
-    }
-
-    pub const fn attempted_batch_shots(self) -> ShotCount {
-        self.attempted_batch_shots
-    }
-}
-
-/// Non-lossy composition of DEM engine and sink failures.
-#[derive(Debug)]
-pub enum DemSamplingRunError<SinkError> {
-    Engine {
-        source: DemSamplingExecutionError,
-        progress: DemSamplingRunProgress,
-    },
-    Sink {
-        phase: SinkFailurePhase,
-        source: SinkError,
-        progress: DemSamplingRunProgress,
-    },
-}
-
-impl<SinkError> DemSamplingRunError<SinkError> {
-    /// The engine's memory-budget refusal; a sink failure is the caller's own type and is not
-    /// inspected.
-    pub fn memory_budget_exceeded(&self) -> Option<&stab_model::MemoryBudgetExceeded> {
-        match self {
-            Self::Engine { source, .. } => source.memory_budget_exceeded(),
-            Self::Sink { .. } => None,
-        }
-    }
-
-    pub const fn progress(&self) -> DemSamplingRunProgress {
-        match self {
-            Self::Engine { progress, .. } | Self::Sink { progress, .. } => *progress,
-        }
-    }
-}
-
-impl<SinkError: fmt::Display> fmt::Display for DemSamplingRunError<SinkError> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Engine { source, progress } => write!(
-                formatter,
-                "{source} after {} committed shots",
-                progress.committed_shots().get()
-            ),
-            Self::Sink {
-                phase,
-                source,
-                progress,
-            } => write!(
-                formatter,
-                "DEM sampling sink {} failed after {} committed shots while attempting {} shots: {source}",
-                phase.as_str(),
-                progress.committed_shots().get(),
-                progress.attempted_batch_shots().get()
-            ),
-        }
-    }
-}
-
-impl<SinkError> std::error::Error for DemSamplingRunError<SinkError>
-where
-    SinkError: std::error::Error + 'static,
-{
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Engine { source, .. } => Some(source),
-            Self::Sink { source, .. } => Some(source),
-        }
-    }
-}
-
-/// Completion state of one DEM sampling call.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum DemSamplingRunStatus {
-    Completed,
-    Cancelled,
-}
-
-impl DemSamplingRunStatus {
-    pub const fn is_completed(self) -> bool {
-        matches!(self, Self::Completed)
-    }
-
-    pub const fn is_cancelled(self) -> bool {
-        matches!(self, Self::Cancelled)
-    }
-}
-
-/// Summary of one completed or cooperatively cancelled DEM sampling call.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct DemSamplingRunSummary {
-    status: DemSamplingRunStatus,
-    requested_shots: ShotCount,
-    committed_shots: ShotCount,
-    total_committed_shots: ShotCount,
-}
-
-impl DemSamplingRunSummary {
-    pub const fn status(self) -> DemSamplingRunStatus {
-        self.status
-    }
-
-    pub const fn requested_shots(self) -> ShotCount {
-        self.requested_shots
-    }
-
-    pub const fn committed_shots(self) -> ShotCount {
-        self.committed_shots
-    }
-
-    pub const fn total_committed_shots(self) -> ShotCount {
-        self.total_committed_shots
     }
 }
 
@@ -294,7 +163,7 @@ impl DemSamplingSession {
 
     /// The signal this session polls between batches and while sampling a batch.
     ///
-    /// It is the signal of [`DemSamplerLimits::with_cancellation`] when that one is cancellable,
+    /// It is the session options' or else the plan's signal when that one is cancellable,
     /// and otherwise a session-local signal created by the first call. Shots are drawn from
     /// counter-based streams, so cancellation observed inside a batch discards that batch and
     /// the session resumes with the same seeded output.
@@ -315,7 +184,7 @@ impl DemSamplingSession {
         &mut self,
         shots: ShotCount,
         sink: &mut Sink,
-    ) -> Result<DemSamplingRunSummary, DemSamplingRunError<Sink::Error>>
+    ) -> Result<RunSummary, RunError<DemSamplingExecutionError, Sink::Error>>
     where
         Sink: DemSampleSink,
     {
@@ -330,7 +199,7 @@ impl DemSamplingSession {
         &mut self,
         shots: ShotCount,
         sink: &mut Sink,
-    ) -> Result<DemSamplingRunSummary, DemSamplingRunError<Sink::Error>>
+    ) -> Result<RunSummary, RunError<DemSamplingExecutionError, Sink::Error>>
     where
         Sink: DemSampleSink,
     {
@@ -342,18 +211,18 @@ impl DemSamplingSession {
         shots: ShotCount,
         sink: &mut Sink,
         mode: RunMode,
-    ) -> Result<DemSamplingRunSummary, DemSamplingRunError<Sink::Error>>
+    ) -> Result<RunSummary, RunError<DemSamplingExecutionError, Sink::Error>>
     where
         Sink: DemSampleSink,
     {
         self.preflight_common(shots)
             .map_err(preflight_execution_error)?;
         if shots.get() == 0 {
-            return Ok(self.summary(DemSamplingRunStatus::Completed, shots, 0));
+            return Ok(self.summary(RunStatus::Completed, shots, 0));
         }
-        usize::try_from(shots.get()).map_err(|_| DemSamplingRunError::Engine {
+        usize::try_from(shots.get()).map_err(|_| RunError::Engine {
             source: DemSamplingExecutionError::ShotCounterOverflow,
-            progress: DemSamplingRunProgress::new(0, 0),
+            progress: RunProgress::new(0, 0),
         })?;
         if matches!(mode, RunMode::WithSampledErrors) {
             self.ensure_sampled_error_storage()
@@ -367,13 +236,12 @@ impl DemSamplingSession {
                 break;
             }
             let sample_shots_u64 = remaining.min(self.sample_capacity as u64);
-            let sample_shots =
-                usize::try_from(sample_shots_u64).map_err(|_| DemSamplingRunError::Engine {
-                    source: DemSamplingExecutionError::InternalInvariant {
-                        message: "bounded DEM sample window did not fit usize".to_owned(),
-                    },
-                    progress: DemSamplingRunProgress::new(committed, sample_shots_u64),
-                })?;
+            let sample_shots = usize::try_from(sample_shots_u64).map_err(|_| RunError::Engine {
+                source: DemSamplingExecutionError::InternalInvariant {
+                    message: "bounded DEM sample window did not fit usize".to_owned(),
+                },
+                progress: RunProgress::new(committed, sample_shots_u64),
+            })?;
             if let Err(source) = self.fill_sample_planes(sample_shots, mode) {
                 if matches!(
                     source,
@@ -382,9 +250,9 @@ impl DemSamplingSession {
                     break;
                 }
                 self.poisoned = true;
-                return Err(DemSamplingRunError::Engine {
+                return Err(RunError::Engine {
                     source,
-                    progress: DemSamplingRunProgress::new(committed, sample_shots_u64),
+                    progress: RunProgress::new(committed, sample_shots_u64),
                 });
             }
             let mut sample_offset = 0_usize;
@@ -506,7 +374,7 @@ impl DemSamplingSession {
         include_sampled_errors: bool,
         sink: &mut Sink,
         committed: u64,
-    ) -> Result<(), DemSamplingRunError<Sink::Error>>
+    ) -> Result<(), RunError<DemSamplingExecutionError, Sink::Error>>
     where
         Sink: DemSampleSink,
     {
@@ -515,17 +383,17 @@ impl DemSamplingSession {
             .view(shot_count, include_sampled_errors)
             .map_err(|source| {
                 self.poisoned = true;
-                DemSamplingRunError::Engine {
+                RunError::Engine {
                     source,
-                    progress: DemSamplingRunProgress::new(committed, shot_count as u64),
+                    progress: RunProgress::new(committed, shot_count as u64),
                 }
             })?;
         if let Err(source) = sink.write_batch(batch) {
             self.poisoned = true;
-            return Err(DemSamplingRunError::Sink {
+            return Err(RunError::Sink {
                 phase: SinkFailurePhase::WriteBatch,
                 source,
-                progress: DemSamplingRunProgress::new(committed, shot_count as u64),
+                progress: RunProgress::new(committed, shot_count as u64),
             });
         }
         Ok(())
@@ -537,22 +405,22 @@ impl DemSamplingSession {
         requested_shots: ShotCount,
         committed: u64,
         completed: bool,
-    ) -> Result<DemSamplingRunSummary, DemSamplingRunError<Sink::Error>>
+    ) -> Result<RunSummary, RunError<DemSamplingExecutionError, Sink::Error>>
     where
         Sink: DemSampleSink,
     {
         if let Err(source) = sink.finish() {
             self.poisoned = true;
-            return Err(DemSamplingRunError::Sink {
+            return Err(RunError::Sink {
                 phase: SinkFailurePhase::Finish,
                 source,
-                progress: DemSamplingRunProgress::new(committed, 0),
+                progress: RunProgress::new(committed, 0),
             });
         }
         let status = if completed {
-            DemSamplingRunStatus::Completed
+            RunStatus::Completed
         } else {
-            DemSamplingRunStatus::Cancelled
+            RunStatus::Cancelled
         };
         Ok(self.summary(status, requested_shots, committed))
     }
@@ -584,16 +452,16 @@ impl DemSamplingSession {
 
     fn summary(
         &self,
-        status: DemSamplingRunStatus,
+        status: RunStatus,
         requested_shots: ShotCount,
         committed_shots: u64,
-    ) -> DemSamplingRunSummary {
-        DemSamplingRunSummary {
+    ) -> RunSummary {
+        RunSummary::new(
             status,
             requested_shots,
-            committed_shots: ShotCount::new(committed_shots),
-            total_committed_shots: ShotCount::new(self.total_committed_shots),
-        }
+            committed_shots,
+            self.total_committed_shots,
+        )
     }
 }
 
@@ -634,16 +502,16 @@ fn internal_format_error(source: RecordsFormatError) -> DemSamplingExecutionErro
     }
 }
 
-fn preflight_error<SinkError>(source: DemError) -> DemSamplingRunError<SinkError> {
+fn preflight_error<SinkError>(source: DemError) -> RunError<DemSamplingExecutionError, SinkError> {
     preflight_execution_error(DemSamplingExecutionError::InvalidRequest(source))
 }
 
 fn preflight_execution_error<SinkError>(
     source: DemSamplingExecutionError,
-) -> DemSamplingRunError<SinkError> {
-    DemSamplingRunError::Engine {
+) -> RunError<DemSamplingExecutionError, SinkError> {
+    RunError::Engine {
         source,
-        progress: DemSamplingRunProgress::new(0, 0),
+        progress: RunProgress::new(0, 0),
     }
 }
 

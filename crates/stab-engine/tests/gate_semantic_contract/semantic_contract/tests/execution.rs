@@ -13,14 +13,14 @@ use super::super::{
     GateTargetPattern, gate_contract_statistical_count_is_accepted, gate_contract_statistical_plan,
     gate_contract_statistical_tolerance,
 };
-use super::SamplingFixture;
+use super::{SamplingFixture, circuit_reference_sample};
 use crate::{
     Circuit, Gate, PauliBasis, PauliSign, PauliString, Probability,
     analysis::{
         ErrorAnalyzerOptions, circuit_flow_generators, circuit_to_detector_error_model,
         decomposed_circuit, gate_tableau,
     },
-    execution::{ReferenceSampleMode, circuit_reference_sample},
+    execution::ReferenceSampleMode,
 };
 
 mod detection;

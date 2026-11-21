@@ -10,16 +10,14 @@ mod reference_signs;
 mod streaming;
 
 pub use api::{
-    DetectionCompileError, DetectionExecutionError, DetectionRunError, DetectionRunProgress,
-    DetectionRunStatus, DetectionRunSummary, DetectionSamplingCompiler, DetectionSamplingPlan,
-    DetectionSamplingSession, MeasurementToDetectionCompiler, MeasurementToDetectionPlan,
-    MeasurementToDetectionSession, MeasurementToDetectionTransaction, StreamingDetectionRun,
+    DetectionCompileError, DetectionExecutionError, DetectionSamplingCompiler,
+    DetectionSamplingPlan, DetectionSamplingSession, DetectionSamplingSessionOptions,
+    MeasurementToDetectionCompiler, MeasurementToDetectionPlan, MeasurementToDetectionSession,
+    MeasurementToDetectionSessionOptions, MeasurementToDetectionTransaction, StreamingDetectionRun,
 };
 pub use error::{DetectionError, DetectionResourceKind, DetectionResourceLimitError};
 pub use limits::DetectionConversionLimits;
-pub use reference_signs::{
-    CircuitReferenceSigns, circuit_reference_signs, circuit_reference_signs_with_limits,
-};
+pub use reference_signs::{CircuitReferenceSigns, circuit_reference_signs};
 
 use buffers::{try_false_vec, try_vec_with_capacity};
 use conversion_plan::ConversionPlan;
@@ -79,7 +77,7 @@ impl PreparedMeasurementToDetection {
         reference_mode: crate::ReferenceSampleMode,
         limits: DetectionConversionLimits,
     ) -> DetectionResult<Self> {
-        limits.cancellation().check()?;
+        limits.cancellation.check()?;
         let conversion_admission =
             ConversionPlan::admission_from_circuit_with_limits(circuit, limits.clone())?;
         let uses_reference = matches!(
@@ -92,7 +90,7 @@ impl PreparedMeasurementToDetection {
         let needs_program = uses_reference || conversion_admission.sweep_bit_count > 0;
         let conversion_bytes = conversion_admission.compiled_storage_bytes()?;
         let (program_base, program_limit) = if needs_program {
-            (conversion_bytes, limits.memory_budget().bytes())
+            (conversion_bytes, limits.memory_budget.bytes())
         } else {
             (0, u64::MAX)
         };
@@ -106,7 +104,7 @@ impl PreparedMeasurementToDetection {
             admit_combined_compiled_storage(
                 conversion_bytes,
                 admission.retained_bytes(),
-                limits.memory_budget().bytes(),
+                limits.memory_budget.bytes(),
             )?;
             Some(admission)
         } else {
@@ -120,7 +118,7 @@ impl PreparedMeasurementToDetection {
                 admit_combined_compiled_storage(
                     plan.compiled_storage_bytes()?,
                     program.retained_bytes(),
-                    limits.memory_budget().bytes(),
+                    limits.memory_budget.bytes(),
                 )?;
                 let counts = program.counts();
                 if counts.measurements != plan.measurement_count {
@@ -145,8 +143,8 @@ impl PreparedMeasurementToDetection {
                     circuit,
                     program,
                     plan.measurement_count,
-                    limits.memory_budget(),
-                    limits.cancellation(),
+                    limits.memory_budget,
+                    &limits.cancellation,
                 )?)
             }
             _ => ReferenceSampleSource::Zero,
@@ -356,50 +354,14 @@ fn xor_words(
     })
 }
 
-pub fn measurement_record_count(circuit: &Circuit) -> DetectionResult<usize> {
-    measurement_record_count_with_limits(circuit, DetectionConversionLimits::default())
-}
-
-pub fn measurement_record_count_with_limits(
+/// Compiles `circuit`'s detection conversion under `limits` and returns its detector plus
+/// observable record width, refusing every circuit measurement-to-detection conversion refuses
+/// for its measurement-record targets or its compiled size.
+pub fn detection_record_width(
     circuit: &Circuit,
-    limits: DetectionConversionLimits,
+    limits: &DetectionConversionLimits,
 ) -> DetectionResult<usize> {
-    Ok(detection_conversion_plan_with_limits(circuit, limits)?.measurement_count)
-}
-
-pub fn detection_record_width(circuit: &Circuit) -> DetectionResult<usize> {
-    detection_record_width_with_limits(circuit, DetectionConversionLimits::default())
-}
-
-pub fn detection_record_width_with_limits(
-    circuit: &Circuit,
-    limits: DetectionConversionLimits,
-) -> DetectionResult<usize> {
-    detection_conversion_plan_with_limits(circuit, limits)?.output_bit_count()
-}
-
-pub fn validate_detection_sampling_circuit(circuit: &Circuit) -> DetectionResult<()> {
-    validate_detection_sampling_circuit_with_limits(circuit, DetectionConversionLimits::default())
-}
-
-pub fn validate_detection_sampling_circuit_with_limits(
-    circuit: &Circuit,
-    limits: DetectionConversionLimits,
-) -> DetectionResult<()> {
-    DetectionSamplingCompiler::new()
-        .limits(limits)
-        .compile(circuit)
-        .map(|_| ())
-        .map_err(|error| match error {
-            DetectionCompileError::InvalidCircuit(error) => error,
-        })
-}
-
-fn detection_conversion_plan_with_limits(
-    circuit: &Circuit,
-    limits: DetectionConversionLimits,
-) -> DetectionResult<ConversionPlan> {
-    ConversionPlan::from_circuit_with_limits(circuit, limits)
+    ConversionPlan::from_circuit_with_limits(circuit, limits.clone())?.output_bit_count()
 }
 
 #[cfg(test)]

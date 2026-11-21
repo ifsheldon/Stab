@@ -696,14 +696,22 @@ fn convert_takes_model_counts_that_agree_with_the_engine_conversion_plan() {
         let detectors = circuit.count_detectors().expect("detector count");
         let observables = circuit.count_observables().expect("observable count");
         assert_eq!(
-            u64::try_from(stab_engine::measurement_record_count(&circuit).expect("plan"))
-                .expect("count fits u64"),
+            u64::try_from(
+                stab_engine::MeasurementToDetectionCompiler::default()
+                    .compile(&circuit)
+                    .expect("plan")
+                    .measurement_width()
+                    .get()
+            )
+            .expect("count fits u64"),
             measurements,
             "{text}"
         );
         assert_eq!(
-            u64::try_from(stab_engine::detection_record_width(&circuit).expect("plan"))
-                .expect("width fits u64"),
+            u64::try_from(
+                stab_engine::detection_record_width(&circuit, &Default::default()).expect("plan")
+            )
+            .expect("width fits u64"),
             detectors + observables,
             "{text}"
         );

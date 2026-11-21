@@ -8,8 +8,8 @@ use std::assert_matches;
 use std::fmt;
 
 use stab_engine::{
-    DemSamplerLimits, DemSamplingCompiler, DemSamplingExecutionError, DemSamplingPlan,
-    DemSamplingRunError, RandomPolicy, Seed, ShotCount,
+    DemSamplingCompiler, DemSamplingExecutionError, DemSamplingPlan, DemSamplingSessionOptions,
+    RandomPolicy, RunError, Seed, ShotCount,
 };
 use stab_model::{DetectorErrorModel, MemoryBudget};
 use stab_records::{BitIndex, DemSampleBatchView, DemSampleSink, RecordBatchView, ShotIndex};
@@ -32,7 +32,7 @@ struct TestDetectionOutput {
 
 fn compile_dem(text: &str) -> TestSampler {
     let model = DetectorErrorModel::from_dem_str(text).expect("parse DEM fixture");
-    let plan = DemSamplingCompiler::new()
+    let plan = DemSamplingCompiler::default()
         .compile(&model)
         .expect("compile DEM sampler");
     TestSampler { plan }
@@ -47,15 +47,22 @@ impl TestSampler {
         &self,
         random_policy: RandomPolicy,
     ) -> Result<stab_engine::DemSamplingSession, DemSamplingExecutionError> {
-        self.plan.session(random_policy)
+        self.plan.session(&DemSamplingSessionOptions {
+            random: random_policy,
+            ..DemSamplingSessionOptions::default()
+        })
     }
 
-    fn session_with_limits(
+    fn session_with_budget(
         &self,
         random_policy: RandomPolicy,
-        limits: DemSamplerLimits,
+        memory_budget: MemoryBudget,
     ) -> Result<stab_engine::DemSamplingSession, DemSamplingExecutionError> {
-        self.plan.session_with_limits(random_policy, limits)
+        self.plan.session(&DemSamplingSessionOptions {
+            random: random_policy,
+            memory_budget: Some(memory_budget),
+            ..DemSamplingSessionOptions::default()
+        })
     }
 
     fn collect_samples(
@@ -112,7 +119,9 @@ impl TestSampler {
         &self,
         error_records: &[Vec<bool>],
     ) -> Result<TestDetectionOutput, DemSamplingExecutionError> {
-        let mut session = self.plan.replay_session(shot_count(error_records.len())?)?;
+        let mut session = self
+            .plan
+            .replay_session(&Default::default(), shot_count(error_records.len())?)?;
         let mut sink = CollectSink::default();
         session
             .run(error_records, &mut sink)
@@ -143,10 +152,12 @@ fn shot_count(shots: usize) -> Result<ShotCount, DemSamplingExecutionError> {
         .map_err(|_| DemSamplingExecutionError::ShotCounterOverflow)
 }
 
-fn engine_run_error(error: DemSamplingRunError<SinkFailure>) -> DemSamplingExecutionError {
+fn engine_run_error(
+    error: RunError<DemSamplingExecutionError, SinkFailure>,
+) -> DemSamplingExecutionError {
     match error {
-        DemSamplingRunError::Engine { source, .. } => source,
-        DemSamplingRunError::Sink { source, .. } => DemSamplingExecutionError::InternalInvariant {
+        RunError::Engine { source, .. } => source,
+        RunError::Sink { source, .. } => DemSamplingExecutionError::InternalInvariant {
             message: source.to_string(),
         },
     }
@@ -373,7 +384,7 @@ fn streamed_sessions_match_materialized_sampling_across_dem_families() {
             .replay_samples(&materialized_errors)
             .expect("materialize replay reference");
         let mut replay_session = plan
-            .replay_session(ShotCount::new(65))
+            .replay_session(&Default::default(), ShotCount::new(65))
             .expect("create replay session");
         let mut replay_sink = CollectSink::default();
         replay_session
@@ -461,7 +472,7 @@ fn replay_session_owns_plan_state_and_binds_one_sink_per_transaction() {
         let sampler = compile_dem("error(1) D0 L0\n");
         sampler
             .plan()
-            .replay_session(ShotCount::new(2))
+            .replay_session(&Default::default(), ShotCount::new(2))
             .expect("owned replay session")
     };
     let mut sink = CollectSink::default();
@@ -500,7 +511,7 @@ fn incremental_replay_matches_complete_replay_across_chunking() {
 
     let mut replay = sampler
         .plan()
-        .replay_session(ShotCount::new(65))
+        .replay_session(&Default::default(), ShotCount::new(65))
         .expect("incremental replay session");
     let mut replayed = CollectSink::default();
     let mut transaction = replay
@@ -510,7 +521,7 @@ fn incremental_replay_matches_complete_replay_across_chunking() {
         transaction
             .write_batch(error_records.get(..1).expect("first replay record"))
             .expect("write first replay batch")
-            .is_accepted()
+            .is_completed()
     );
     for records in error_records
         .get(1..)
@@ -558,7 +569,7 @@ fn replay_batch_validation_is_retryable_and_abandonment_retains_no_sink() {
 
     let mut replay = sampler
         .plan()
-        .replay_session(ShotCount::new(2))
+        .replay_session(&Default::default(), ShotCount::new(2))
         .expect("retryable replay session");
     let mut sink = CollectSink::default();
     let mut transaction = replay
@@ -578,7 +589,7 @@ fn replay_batch_validation_is_retryable_and_abandonment_retains_no_sink() {
 
     let mut replay = sampler
         .plan()
-        .replay_session(ShotCount::new(2))
+        .replay_session(&Default::default(), ShotCount::new(2))
         .expect("prefix-progress replay session");
     let mut sink = CollectSink::default();
     let mut transaction = replay
@@ -602,7 +613,7 @@ fn replay_batch_validation_is_retryable_and_abandonment_retains_no_sink() {
 
     let mut replay = sampler
         .plan()
-        .replay_session(ShotCount::new(2))
+        .replay_session(&Default::default(), ShotCount::new(2))
         .expect("abandoned replay session");
     let mut sink = CollectSink::default();
     let mut transaction = replay
@@ -618,7 +629,7 @@ fn replay_batch_validation_is_retryable_and_abandonment_retains_no_sink() {
 
     let mut replay = sampler
         .plan()
-        .replay_session(ShotCount::new(2))
+        .replay_session(&Default::default(), ShotCount::new(2))
         .expect("forgotten replay transaction session");
     let mut first_sink = CollectSink::default();
     let mut transaction = replay
@@ -679,7 +690,7 @@ fn cancellation_commits_only_complete_batches_and_session_resumes() {
 
     let mut replay_session = sampler
         .plan()
-        .replay_session(ShotCount::new(65))
+        .replay_session(&Default::default(), ShotCount::new(65))
         .expect("cancellable replay session");
     let replay_cancellation = replay_session.cancellation();
     replay_cancellation.cancel();
@@ -701,7 +712,7 @@ fn cancellation_commits_only_complete_batches_and_session_resumes() {
 
     let mut replay_session = sampler
         .plan()
-        .replay_session(ShotCount::new(2))
+        .replay_session(&Default::default(), ShotCount::new(2))
         .expect("replay session cancelled before finish");
     let replay_cancellation = replay_session.cancellation();
     let cancellation_for_sink = replay_cancellation.clone();
@@ -744,12 +755,10 @@ fn session_batch_capacity_obeys_the_caller_active_byte_budget() {
     let detector_record_bytes = std::mem::size_of::<TestDetectionRecord>() + 1;
     let detector_plane_bytes = std::mem::size_of::<u64>();
     let active_scratch_bytes = detector_record_bytes + detector_plane_bytes;
-    let budget = |bytes: usize| {
-        DemSamplerLimits::default().with_memory_budget(MemoryBudget::from_bytes(bytes as u64))
-    };
+    let budget = |bytes: usize| MemoryBudget::from_bytes(bytes as u64);
     let limits = budget(active_scratch_bytes + 16);
     let mut session = sampler
-        .session_with_limits(RandomPolicy::Seeded(Seed::new(3)), limits)
+        .session_with_budget(RandomPolicy::Seeded(Seed::new(3)), limits)
         .expect("two-shot detector-only batch fits the active byte budget");
     let mut sink = WitnessSink::default();
     session
@@ -760,7 +769,7 @@ fn session_batch_capacity_obeys_the_caller_active_byte_budget() {
 
     let rejected = budget(active_scratch_bytes + 7);
     let error = sampler
-        .session_with_limits(RandomPolicy::Seeded(Seed::new(3)), rejected)
+        .session_with_budget(RandomPolicy::Seeded(Seed::new(3)), rejected)
         .expect_err("one record plus one packed shot exceeds the active byte budget");
     assert!(
         error.into_dem_error().to_string().contains("memory budget"),
@@ -789,7 +798,7 @@ fn sink_failures_preserve_progress_and_poison_sessions() {
         .run(ShotCount::new(1), &mut unused)
         .expect_err("poisoned session must reject");
     match poisoned {
-        DemSamplingRunError::Engine {
+        RunError::Engine {
             source: DemSamplingExecutionError::SessionPoisoned,
             progress,
         } => {
@@ -837,7 +846,7 @@ fn zero_shots_touch_neither_sink_nor_seeded_rng() {
         .expect("zero-shot sampled-error run");
     let mut replay = sampler
         .plan()
-        .replay_session(ShotCount::new(0))
+        .replay_session(&Default::default(), ShotCount::new(0))
         .expect("zero-shot replay session");
     replay.run(&[], &mut zero_sink).expect("zero-shot replay");
     assert_eq!(zero_sink.write_calls, 0);
@@ -863,7 +872,7 @@ fn replay_session_admits_poisoning_before_record_widths() {
     let sampler = compile_dem("error(0.25) D0\nerror(0.5) D1\n");
     let mut poisoned = sampler
         .plan()
-        .replay_session(ShotCount::new(1))
+        .replay_session(&Default::default(), ShotCount::new(1))
         .expect("create replay session to poison");
     let mut failing = CollectSink::failing_finish();
     let mut transaction = poisoned
@@ -881,7 +890,7 @@ fn replay_session_admits_poisoning_before_record_widths() {
         .expect_err("poison admission must precede record widths");
     assert_matches!(
         poison_error,
-        DemSamplingRunError::Engine {
+        RunError::Engine {
             source: DemSamplingExecutionError::SessionPoisoned,
             ..
         }
@@ -926,7 +935,7 @@ fn post_warmup_session_execution_allocations_are_record_count_independent() {
     let replay_records = vec![vec![true, false, true]; 65];
     let mut replay_session = sampler
         .plan()
-        .replay_session(ShotCount::new(65))
+        .replay_session(&Default::default(), ShotCount::new(65))
         .expect("replay allocation session");
     let mut replay_sink = WitnessSink::default();
     let mut transaction = replay_session

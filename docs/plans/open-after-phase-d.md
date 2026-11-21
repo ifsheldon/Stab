@@ -19,8 +19,8 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 | R1 | A verdict from the flow checks | M | Done on 2026-11-21, as a two-way verdict with errors for everything else. |
 | R2 | "No logical error found" as a search outcome, named search options | M | Done on 2026-11-21. |
 | R3 | `Option` from the gate-data getters | M | Done on 2026-11-21, with R9. |
-| R4 | One function per operation taking an options value | L | Analysis half done on 2026-11-21; the engine half is open. |
-| R5 | Engine run progress, status, summary, and error written once | M | Do, in the same pass as the engine half of R4. |
+| R4 | One function per operation taking an options value | L | Done on 2026-11-21. |
+| R5 | Engine run progress, status, summary, and error written once | M | Done on 2026-11-21. |
 | R6 | Typed gate-argument and target-group views in `stab-model` | L | Done on 2026-11-21. |
 | R7 | Nested option types for `ErrorAnalyzerOptions` | M | Done on 2026-11-21. |
 | R8 | The `Vec<Vec<bool>>` record codec family | M | Remove from the public surface; keep as a test oracle. |
@@ -33,7 +33,7 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 | S5 | Fixed caps in `stab-model` reported an invalid detector error model | S | Done with D2. |
 | N1 | Areas the review did not read | M | Run a second review pass before the next release. |
 
-Remaining order: R4 with R5 and R7, then R8, with S1 as an independent performance task at any point.
+Remaining: R8, with S1 as an independent performance task at any point.
 R4 goes late on purpose: R1, R2, R3, and R7 each delete or reshape functions that R4 would otherwise rewrite twice.
 
 ## Decided And Done
@@ -216,7 +216,11 @@ With R9 done, the parse disappears and `Option` is the whole truth; without R9 t
 `solve_for_flow_measurements` gained a real budget and cancellation, and the dense detecting-region lists gained cancellation.
 Still without a byte budget or cancellation: `tableau_to_circuit` (needs a proven output bound), cancellation in `CodeCircuitParams::generate`, and a byte budget for SAT generation and logical-error search, which have cancellation and count caps.
 `CodeCircuitParams` keeps its budget inside the parameters.
-The engine half is not done yet.
+
+**Outcome for the engine, 2026-11-21.** Done: each plan has one `session(&Options)` and one `streaming_run(&Options, shots)`, with per-family options because the knobs differ, and the four compilers have public fields.
+The free functions that compiled a plan only to discard it are removed, except `detection_record_width` and `circuit_reference_signs`, which have distinct uses.
+Outputs were byte-identical across 7,742 before-and-after CLI cases, and timings were within noise.
+Noticed and left: `convert` validates detection conversion under the default budget instead of `--memory-budget`, and `ReferenceSampleTree::from_circuit_reference_sample` compiles a default plan with no budget or cancellation.
 The rest of this section is the proposal as written before the work.
 
 **Today.** `stab-analysis` exports about twenty operations twice, as `f` and as `f_with_options`, `f_with_limits`, or `f_with_budget`, where the plain form is the other with defaults.
@@ -239,6 +243,11 @@ The engine free functions that compile a plan and discard it are removed, since 
 Callers write `&Default::default()` where they called the plain form.
 
 ### R5. Engine run types written once
+
+**Outcome, 2026-11-21.** Done: `RunProgress`, `RunStatus`, `RunSummary`, and `RunError<E, S>` are defined once with no per-family aliases, and `DemReplayBatchStatus` is `RunStatus`.
+The per-family types were not quite identical: each family's sink-failure message names its own sink, and that wording is kept.
+The decoder's `DecodeBatchStatus` stays separate, because sharing it would put an execution status in `stab-foundation` and its counts are `usize`.
+The rest of this section is the proposal as written before the work.
 
 **Today.** The engine defines the same four types three times: `SamplingRunProgress`, `DetectionRunProgress`, `DemSamplingRunProgress`; the three `*RunStatus`; the three `*RunSummary`; and `RunError`, `DetectionRunError`, `DemSamplingRunError`.
 Their fields are identical.

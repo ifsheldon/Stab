@@ -30,7 +30,7 @@ impl DirectDetectorFramePlan {
         circuit: &Circuit,
         limits: DetectionConversionLimits,
     ) -> DetectionResult<Self> {
-        let memory_budget = limits.memory_budget();
+        let memory_budget = limits.memory_budget;
         let conversion_admission =
             ConversionPlan::admission_from_circuit_with_limits(circuit, limits)?;
         let conversion_bytes = conversion_admission.compiled_storage_bytes()?;
@@ -61,11 +61,11 @@ impl DirectDetectorFramePlan {
     }
 
     pub(in crate::detection) fn memory_budget(&self) -> stab_model::MemoryBudget {
-        self.conversion.limits.memory_budget()
+        self.conversion.limits.memory_budget
     }
 
     pub(in crate::detection) fn cancellation(&self) -> &Cancellation {
-        self.conversion.limits.cancellation()
+        &self.conversion.limits.cancellation
     }
 
     pub(in crate::detection) fn qubit_count(&self) -> usize {

@@ -243,8 +243,8 @@ Larger redesigns the API review proposed and this batch did not do:
 - Done on 2026-11-21: one flow check returns a `FlowVerdict` per flow, and a refused budget, a cancellation, or an invalid circuit is an error instead of `false`.
 - Done on 2026-11-21: "no logical error found" is a `LogicalErrorSearch::NotFound` outcome, and each search takes one named options value.
 - Done on 2026-11-21: the gate-data getters return `Option`, and `GateDataUnavailable` is removed.
-- Done on 2026-11-21 for analysis: one function per operation taking an options value. The telescoping session constructors in the engine are still open.
-- Write the engine's run progress, status, summary, and error types once as generic types instead of once per family.
+- Done on 2026-11-21: one function per operation taking an options value in analysis, and one session constructor per plan taking an options value in the engine.
+- Done on 2026-11-21: the engine's run progress, status, summary, and error types are written once.
 - Done on 2026-11-21: `CircuitInstruction::gate_arguments()` and `gate_targets()` are typed, infallible views, which removed about 120 impossible branches in analysis and the engine.
 - Done on 2026-11-21: `ErrorAnalyzerOptions` uses nested option types instead of five independent booleans.
 - Budget or remove the `Vec<Vec<bool>>` record codec family, which only CLI tests use outside `stab-records`.

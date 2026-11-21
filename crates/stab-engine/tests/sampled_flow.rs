@@ -10,7 +10,6 @@ use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString};
 use stab_engine::{
     RandomPolicy, SampledFlowError, SampledFlowOptions, SamplingCompileError,
     SamplingExecutionError, Seed, ShotCount, sample_if_circuit_has_stabilizer_flows,
-    sample_if_circuit_has_stabilizer_flows_with_options,
 };
 use stab_model::{Cancellation, Circuit, MemoryBudget};
 
@@ -45,6 +44,7 @@ fn assert_signed_unitary_and_measurement_record_flows() {
             &unitary_flows,
             ShotCount::new(256),
             RandomPolicy::Seeded(Seed::new(5)),
+            &SampledFlowOptions::default()
         )
         .expect("sample signed flows"),
         vec![true, true, true, true, false, false, false, false]
@@ -83,6 +83,7 @@ fn assert_signed_unitary_and_measurement_record_flows() {
             &measurement_flows,
             ShotCount::new(256),
             RandomPolicy::Seeded(Seed::new(7)),
+            &SampledFlowOptions::default()
         )
         .expect("sample signed measurement flows"),
         vec![
@@ -120,6 +121,7 @@ fn assert_record_and_pauli_observables() {
             &observable_record_flows,
             ShotCount::new(256),
             RandomPolicy::Seeded(Seed::new(11)),
+            &SampledFlowOptions::default()
         )
         .expect("sample signed observable record flows"),
         vec![true, true, true, true, true, true, false, false, false]
@@ -147,6 +149,7 @@ fn assert_record_and_pauli_observables() {
             &observable_pauli_flows,
             ShotCount::new(256),
             RandomPolicy::Seeded(Seed::new(13)),
+            &SampledFlowOptions::default()
         )
         .expect("sample signed observable Pauli flows"),
         vec![true, true, true, false, false, false, false]
@@ -172,6 +175,7 @@ fn assert_inverted_observable_targets() {
             &inverted_pauli_flows,
             ShotCount::new(256),
             RandomPolicy::Seeded(Seed::new(17)),
+            &SampledFlowOptions::default()
         )
         .expect("sample signed inverted observable Pauli flows"),
         vec![true, true, false, false]
@@ -190,6 +194,7 @@ fn assert_inverted_observable_targets() {
             &inverted_record_flows,
             ShotCount::new(256),
             RandomPolicy::Seeded(Seed::new(23)),
+            &SampledFlowOptions::default()
         )
         .expect("sample signed inverted record-backed observable flows"),
         vec![true, false]
@@ -202,6 +207,7 @@ fn assert_malformed_measurement_references_are_rejected() {
         &[flow("Z -> rec[-2]")],
         ShotCount::new(8),
         RandomPolicy::Seeded(Seed::new(19)),
+        &SampledFlowOptions::default(),
     )
     .expect_err("reject out-of-range sampled flow record");
 
@@ -222,6 +228,7 @@ fn sampled_flow_preserves_sampling_storage_admission() {
             &[Flow::from_paulis(wide.clone(), wide)],
             ShotCount::new(1),
             RandomPolicy::Seeded(Seed::new(29)),
+            &SampledFlowOptions::default()
         ),
         Err(SampledFlowError::SamplingExecution(
             SamplingExecutionError::SessionStorageLimit { .. }
@@ -244,6 +251,7 @@ fn sampled_flow_compacts_sparse_qubits_and_ignores_coordinate_only_width() {
             ],
             ShotCount::new(256),
             RandomPolicy::Seeded(Seed::new(31)),
+            &SampledFlowOptions::default()
         )
         .expect("sample sparse high flows"),
         vec![true, false]
@@ -271,12 +279,12 @@ fn sampled_flow_admits_every_stage_against_one_caller_budget() {
     let checked = circuit("R 2 3\nX 1 3\nREPEAT 4000 {\n    M 0 1\n}\n");
     let flows = [flow("Z0 -> Z0"), flow("1 -> -Z3"), flow("Z1 -> Z1")];
     let run = |bytes: u64| {
-        sample_if_circuit_has_stabilizer_flows_with_options(
+        sample_if_circuit_has_stabilizer_flows(
             &checked,
             &flows,
             ShotCount::new(256),
             RandomPolicy::Seeded(Seed::new(41)),
-            SampledFlowOptions {
+            &SampledFlowOptions {
                 memory_budget: MemoryBudget::from_bytes(bytes),
                 ..SampledFlowOptions::default()
             },
@@ -304,6 +312,7 @@ fn sampled_flow_admits_every_stage_against_one_caller_budget() {
             &flows,
             ShotCount::new(256),
             RandomPolicy::Seeded(Seed::new(41)),
+            &SampledFlowOptions::default()
         )
         .expect("default budget")
     );
@@ -324,15 +333,15 @@ fn sampled_flow_reports_cancellation_instead_of_a_verdict() {
     let cancellation = Cancellation::new();
     cancellation.cancel();
     assert_matches!(
-        sample_if_circuit_has_stabilizer_flows_with_options(
+        sample_if_circuit_has_stabilizer_flows(
             &circuit("H 0\nM 0\n"),
             &[flow("X0 -> rec[-1]")],
             ShotCount::new(256),
             RandomPolicy::Seeded(Seed::new(43)),
-            SampledFlowOptions {
+            &SampledFlowOptions {
                 cancellation,
                 ..SampledFlowOptions::default()
-            },
+            }
         ),
         Err(SampledFlowError::Cancelled(_))
     );
@@ -346,12 +355,12 @@ fn sampled_flow_charges_augmented_witness_circuit_without_retaining_dropped_nois
         memory_budget: MemoryBudget::from_bytes(16_384),
         ..SampledFlowOptions::default()
     };
-    let refused = sample_if_circuit_has_stabilizer_flows_with_options(
+    let refused = sample_if_circuit_has_stabilizer_flows(
         &circuit(&unitary_heavy),
         &[flow("Z0 -> rec[-1]")],
         ShotCount::new(256),
         RandomPolicy::Seeded(Seed::new(47)),
-        tight.clone(),
+        &tight.clone(),
     )
     .expect_err("1,000-gate augmented witness circuit exceeds 16 KiB");
     assert_matches!(
@@ -363,12 +372,12 @@ fn sampled_flow_charges_augmented_witness_circuit_without_retaining_dropped_nois
     let mut noisy_heavy = "X_ERROR(0.1) 0\nY_ERROR(0.1) 0\n".repeat(2000);
     noisy_heavy.push_str("H 0\nM 0\n");
     assert_eq!(
-        sample_if_circuit_has_stabilizer_flows_with_options(
+        sample_if_circuit_has_stabilizer_flows(
             &circuit(&noisy_heavy),
             &[flow("X0 -> rec[-1]")],
             ShotCount::new(256),
             RandomPolicy::Seeded(Seed::new(47)),
-            tight,
+            &tight
         )
         .expect("dropped noise instructions do not inflate the witness circuit"),
         vec![true]

@@ -8,7 +8,9 @@
 
 use std::convert::Infallible;
 
-use stab_engine::{DemSamplingCompiler, DemSamplingPlan, RandomPolicy, Seed, ShotCount};
+use stab_engine::{
+    DemSamplingCompiler, DemSamplingPlan, DemSamplingSessionOptions, RandomPolicy, Seed, ShotCount,
+};
 use stab_model::DetectorErrorModel;
 use stab_records::{BitIndex, DemSampleBatchView, DemSampleSink, RecordBatchView, ShotIndex};
 
@@ -67,14 +69,17 @@ fn row(records: RecordBatchView<'_>, shot: usize) -> Vec<bool> {
 
 fn compile(text: &str) -> DemSamplingPlan {
     let model = DetectorErrorModel::from_dem_str(text).expect("parse DEM fixture");
-    DemSamplingCompiler::new()
+    DemSamplingCompiler::default()
         .compile(&model)
         .expect("compile DEM sampler")
 }
 
 fn sample(plan: &DemSamplingPlan, seed: u64, shots: u64, record_errors: bool) -> Rows {
     let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(seed)))
+        .session(&DemSamplingSessionOptions {
+            random: RandomPolicy::Seeded(Seed::new(seed)),
+            ..Default::default()
+        })
         .expect("DEM session");
     let mut rows = Rows::default();
     if record_errors {
@@ -103,7 +108,7 @@ fn recording_sampled_errors_leaves_seeded_detectors_and_replay_unchanged() {
                 assert_eq!(recorded.errors.len() as u64, shots, "{context}");
 
                 let mut replay = plan
-                    .replay_session(ShotCount::new(shots))
+                    .replay_session(&Default::default(), ShotCount::new(shots))
                     .expect("replay session");
                 let mut replayed = Rows::default();
                 replay

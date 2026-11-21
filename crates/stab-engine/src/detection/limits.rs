@@ -1,6 +1,7 @@
 use stab_model::{Cancellation, MemoryBudget};
 
-/// Admission and cancellation policy for compiling and executing detection conversion.
+/// Admission and cancellation policy of [`crate::detection_record_width`] and
+/// [`crate::circuit_reference_signs`], and the limits a detection compiler hands its plan.
 ///
 /// The memory budget bounds the compiled plan, including one byte per record bit of every
 /// record the plan's consumers hold, and separately bounds each session's reusable storage.
@@ -10,35 +11,8 @@ use stab_model::{Cancellation, MemoryBudget};
 /// of a plan compiled with these limits.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DetectionConversionLimits {
-    memory_budget: MemoryBudget,
-    cancellation: Cancellation,
-}
-
-impl DetectionConversionLimits {
-    pub const fn new(memory_budget: MemoryBudget) -> Self {
-        Self {
-            memory_budget,
-            cancellation: Cancellation::never(),
-        }
-    }
-
-    pub const fn memory_budget(&self) -> MemoryBudget {
-        self.memory_budget
-    }
-
-    pub const fn cancellation(&self) -> &Cancellation {
-        &self.cancellation
-    }
-
-    #[must_use]
-    pub const fn with_memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
-        self.memory_budget = memory_budget;
-        self
-    }
-
-    #[must_use]
-    pub fn with_cancellation(mut self, cancellation: Cancellation) -> Self {
-        self.cancellation = cancellation;
-        self
-    }
+    /// Budget for the compiled conversion and, by default, for each session's storage.
+    pub memory_budget: MemoryBudget,
+    /// Signal polled while compiling and by every session of the plan.
+    pub cancellation: Cancellation,
 }

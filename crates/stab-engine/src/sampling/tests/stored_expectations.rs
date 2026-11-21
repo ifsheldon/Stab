@@ -147,10 +147,12 @@ fn reference_samples_match_the_pre_e3_stored_digest() {
             ReferenceSampleLoopPolicy::Fold,
             ReferenceSampleLoopPolicy::Iterate,
         ] {
-            let plan = SamplingCompiler::new()
-                .reference_sample_loop_policy(policy)
-                .compile(&circuit)
-                .expect("compile corpus circuit");
+            let plan = SamplingCompiler {
+                reference_sample_loop_policy: policy,
+                ..SamplingCompiler::default()
+            }
+            .compile(&circuit)
+            .expect("compile corpus circuit");
             let reference = bits(&plan.try_reference_sample().expect("reference sample"));
             update_bits(&mut hasher, "reference", &reference);
         }

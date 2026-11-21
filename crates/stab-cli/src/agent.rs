@@ -199,9 +199,11 @@ where
 
     // Compilation is intentionally performed for validation. No sampling method is called.
     let compile = ledger.stage();
-    let compiler = SamplingCompiler::new()
-        .memory_budget(compile.get())
-        .reference_sample_loop_policy(reference_sample_loop_policy);
+    let compiler = SamplingCompiler {
+        reference_sample_loop_policy,
+        memory_budget: compile.get(),
+        ..SamplingCompiler::default()
+    };
     let plan = compiler
         .compile(&circuit)
         .map_err(|error| compile.refusal(error))?;

@@ -17,11 +17,20 @@ use crate::{
     Pauli, QubitId, Target,
     execution::{
         LaneWidth, RandomPolicy, ReferenceSampleMode, SamplingCompileError, SamplingCompiler,
-        SamplingPlan, Seed, ShotCount,
+        SamplingPlan, SamplingSessionOptions, Seed, ShotCount,
     },
 };
 
 mod execution;
+
+/// The all-false-sweep reference sample of `circuit`'s default-compiled sampling plan.
+fn circuit_reference_sample(
+    circuit: &Circuit,
+) -> Result<crate::execution::ReferenceSample, Box<dyn std::error::Error>> {
+    Ok(SamplingCompiler::default()
+        .compile(circuit)?
+        .try_reference_sample()?)
+}
 
 thread_local! {
     /// Lane width of every sampling and detection session the contract helpers create on this
@@ -52,7 +61,7 @@ struct SamplingFixture {
 
 impl SamplingFixture {
     fn compile(circuit: &Circuit) -> Result<Self, SamplingCompileError> {
-        SamplingCompiler::new()
+        SamplingCompiler::default()
             .compile(circuit)
             .map(|plan| Self { plan })
     }
@@ -77,7 +86,12 @@ impl SamplingFixture {
         };
         let mut session = self
             .plan
-            .session_with_lane_width(random_policy, reference_mode, session_lane_width())
+            .session(&SamplingSessionOptions {
+                random: random_policy,
+                reference_sample_mode: reference_mode,
+                lane_width: session_lane_width(),
+                ..Default::default()
+            })
             .expect("construct semantic sampling session");
         let mut sink = MeasurementCollector::default();
         session

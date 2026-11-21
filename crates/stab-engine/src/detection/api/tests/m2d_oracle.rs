@@ -94,10 +94,12 @@ fn conversion_matches_first_principles_oracle_for_packed_and_bit_plane_input() {
                 .zip(&sweeps)
                 .map(|(measurement, sweep)| expected_record(measurement, sweep, mode))
                 .collect::<Vec<_>>();
-            let plan = MeasurementToDetectionCompiler::new()
-                .reference_sample_mode(mode)
-                .compile(&circuit)
-                .expect("compile oracle conversion");
+            let plan = MeasurementToDetectionCompiler {
+                reference_sample_mode: mode,
+                ..MeasurementToDetectionCompiler::default()
+            }
+            .compile(&circuit)
+            .expect("compile oracle conversion");
             let shared = plan.clone();
             assert_eq!(shared.measurement_width().get(), MEASUREMENTS);
             assert_eq!(shared.sweep_width().get(), SWEEPS);
@@ -109,7 +111,9 @@ fn conversion_matches_first_principles_oracle_for_packed_and_bit_plane_input() {
             let label = format!("{shots} shots, {mode:?}");
 
             // One whole packed request; a request carries at most one 64-shot batch.
-            let mut session = shared.session().expect("create conversion session");
+            let mut session = shared
+                .session(&Default::default())
+                .expect("create conversion session");
             if shots <= 64 {
                 let packed_measurements = packed(&measurements, MEASUREMENTS);
                 let packed_sweeps = packed(&sweeps, SWEEPS);
@@ -231,11 +235,15 @@ fn windowed_conversion_matches_first_principles_across_window_boundaries() {
                 ReferenceSampleMode::UseReferenceSample,
                 ReferenceSampleMode::SkipReferenceSample,
             ] {
-                let plan = MeasurementToDetectionCompiler::new()
-                    .reference_sample_mode(mode)
-                    .compile(&circuit)
-                    .expect("compile windowed oracle conversion");
-                let mut session = plan.session().expect("create conversion session");
+                let plan = MeasurementToDetectionCompiler {
+                    reference_sample_mode: mode,
+                    ..MeasurementToDetectionCompiler::default()
+                }
+                .compile(&circuit)
+                .expect("compile windowed oracle conversion");
+                let mut session = plan
+                    .session(&Default::default())
+                    .expect("create conversion session");
                 for bit_planes in [false, true] {
                     let mut sink = CollectSink::default();
                     let mut transaction = session
