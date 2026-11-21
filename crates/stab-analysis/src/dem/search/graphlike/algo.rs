@@ -5,43 +5,44 @@ use stab_model::{DemItem, DetectorErrorModel};
 use super::{Graph, ObservableMask, SearchState};
 use crate::AnalysisOperation;
 use crate::dem::search::budget::{LogicalErrorSearchLimits, SearchBudget};
-use crate::{AnalysisError, AnalysisResult, NoLogicalErrorReport};
+use crate::dem::search::outcome::{
+    GraphlikeSearchOptions, LogicalErrorSearch, NoLogicalErrorReport, UngraphlikeErrors,
+};
+use crate::{AnalysisError, AnalysisResult};
 
-pub fn shortest_graphlike_undetectable_logical_error(
-    model: &DetectorErrorModel,
-    ignore_ungraphlike_errors: bool,
-) -> AnalysisResult<DetectorErrorModel> {
-    shortest_graphlike_undetectable_logical_error_with_limits(
-        model,
-        ignore_ungraphlike_errors,
-        LogicalErrorSearchLimits::default(),
-    )
-}
-
-/// Finds a shortest graphlike undetectable logical error under explicit limits.
+/// Finds a shortest undetectable logical error made of graphlike error components.
 ///
 /// # Errors
 ///
-/// Returns [`AnalysisError::Cancelled`] once the limits' cancellation signal is observed, while
-/// the graph is built or during the search, and [`AnalysisError::ResourceLimit`] when a limit is
-/// exceeded.
-pub fn shortest_graphlike_undetectable_logical_error_with_limits(
+/// Returns [`AnalysisError::NonGraphlikeError`] when the model has an ungraphlike component and
+/// the options reject them, [`AnalysisError::Cancelled`] once the limits' cancellation signal is
+/// observed while the graph is built or during the search, and [`AnalysisError::ResourceLimit`]
+/// when a limit is exceeded; a search stopped by a limit does not report
+/// [`LogicalErrorSearch::NotFound`].
+pub fn shortest_graphlike_undetectable_logical_error(
     model: &DetectorErrorModel,
-    ignore_ungraphlike_errors: bool,
-    limits: LogicalErrorSearchLimits,
-) -> AnalysisResult<DetectorErrorModel> {
-    let graph = Graph::from_dem_with_limits(model, ignore_ungraphlike_errors, &limits)?;
+    options: &GraphlikeSearchOptions,
+) -> AnalysisResult<LogicalErrorSearch> {
+    shortest_graphlike_search(model, options.ungraphlike_errors, &options.limits)
+}
+
+pub(in crate::dem::search) fn shortest_graphlike_search(
+    model: &DetectorErrorModel,
+    ungraphlike_errors: UngraphlikeErrors,
+    limits: &LogicalErrorSearchLimits,
+) -> AnalysisResult<LogicalErrorSearch> {
+    let graph = Graph::from_dem_with_limits(model, ungraphlike_errors.ignored(), limits)?;
     let empty = SearchState::new(None, None, ObservableMask::new());
     if !graph.distance_1_error_mask.is_empty() {
         let mut out = DetectorErrorModel::new();
         SearchState::new(None, None, graph.distance_1_error_mask)
             .append_transition_as_error_instruction_to(&empty, &mut out)?;
-        return Ok(out);
+        return Ok(LogicalErrorSearch::Found(out));
     }
 
     let mut queue = VecDeque::new();
     let mut back_map = BTreeMap::new();
-    let mut budget = SearchBudget::new("graphlike search", &limits);
+    let mut budget = SearchBudget::new("graphlike search", limits);
     budget.admit_state(0, 0, false)?;
     back_map.insert(empty.clone(), empty.clone());
 
@@ -115,7 +116,8 @@ pub fn shortest_graphlike_undetectable_logical_error_with_limits(
                 let mut inserted = entry.key().clone();
                 entry.insert(current.clone());
                 if undetected {
-                    return backtrack_path(&back_map, &inserted, &mut budget);
+                    return backtrack_path(&back_map, &inserted, &mut budget)
+                        .map(LogicalErrorSearch::Found);
                 }
                 if inserted.detector_active.is_none() {
                     std::mem::swap(&mut inserted.detector_active, &mut inserted.detector_held);
@@ -125,7 +127,7 @@ pub fn shortest_graphlike_undetectable_logical_error_with_limits(
         }
     }
 
-    Err(no_graphlike_logical_error(model, &graph, &mut budget)?)
+    no_graphlike_logical_error(model, &graph, &mut budget).map(LogicalErrorSearch::NotFound)
 }
 
 fn backtrack_path(
@@ -176,17 +178,15 @@ fn no_graphlike_logical_error(
     model: &DetectorErrorModel,
     graph: &Graph,
     budget: &mut SearchBudget,
-) -> AnalysisResult<AnalysisError> {
+) -> AnalysisResult<NoLogicalErrorReport> {
     let no_errors = model.count_errors()? == 0;
     // Pinned Stim inspects the graph's edges only when the model has errors.
     let no_graphlike_errors = !no_errors && !graph_has_edges(graph, budget)?;
-    Ok(AnalysisError::NoLogicalErrorFound(
-        NoLogicalErrorReport::graphlike(
-            graph.num_observables == 0,
-            !graph.has_declared_detectors,
-            no_errors,
-            no_graphlike_errors,
-        ),
+    Ok(NoLogicalErrorReport::graphlike(
+        graph.num_observables == 0,
+        !graph.has_declared_detectors,
+        no_errors,
+        no_graphlike_errors,
     ))
 }
 
@@ -210,22 +210,33 @@ mod tests {
 
     use super::*;
 
-    fn shortest(dem: &str) -> AnalysisResult<String> {
+    fn search(dem: &str, ungraphlike_errors: UngraphlikeErrors) -> AnalysisResult<String> {
         let model = DetectorErrorModel::from_dem_str(dem)?;
-        shortest_graphlike_undetectable_logical_error(&model, false)
-            .map(|error| error.to_dem_string())
+        let options = GraphlikeSearchOptions {
+            ungraphlike_errors,
+            ..GraphlikeSearchOptions::default()
+        };
+        let found = shortest_graphlike_undetectable_logical_error(&model, &options)?
+            .into_found()
+            .expect("the model has a graphlike logical error");
+        Ok(found.to_dem_string())
+    }
+
+    fn shortest(dem: &str) -> AnalysisResult<String> {
+        search(dem, UngraphlikeErrors::Reject)
     }
 
     fn shortest_ignoring_ungraphlike(dem: &str) -> AnalysisResult<String> {
-        let model = DetectorErrorModel::from_dem_str(dem)?;
-        shortest_graphlike_undetectable_logical_error(&model, true)
-            .map(|error| error.to_dem_string())
+        search(dem, UngraphlikeErrors::Ignore)
     }
 
     #[test]
     fn graphlike_algo_ignores_ungraphlike_errors_when_requested() {
         let dem = "error(0.1) D0 D1 D2\nerror(0.1) D0\nerror(0.1) D0 L0\n";
-        assert!(shortest(dem).is_err());
+        assert!(matches!(
+            shortest(dem),
+            Err(AnalysisError::NonGraphlikeError)
+        ));
         assert_eq!(
             shortest_ignoring_ungraphlike(dem).unwrap(),
             "error(1) D0\nerror(1) D0 L0\n"

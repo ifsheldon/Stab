@@ -17,7 +17,7 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 | D3 | One observable-id domain | M | Done on 2026-11-21, as 32 bits everywhere. |
 | D4 | Reject symlinks and unsafe path components on outputs | S | Decided on 2026-11-21: not rejected, and the CLI path trust boundary is documented. |
 | R1 | A verdict from the flow checks | M | Done on 2026-11-21, as a two-way verdict with errors for everything else. |
-| R2 | "No logical error found" as a search outcome, named search options | M | Do. |
+| R2 | "No logical error found" as a search outcome, named search options | M | Done on 2026-11-21. |
 | R3 | `Option` from the gate-data getters | M | Do, together with R9. |
 | R4 | One function per operation taking an options value | L | Do, after R1 and R2, and before any Python binding. |
 | R5 | Engine run progress, status, summary, and error written once | M | Do, in the same pass as the engine half of R4. |
@@ -33,7 +33,7 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 | S5 | Fixed caps in `stab-model` reported an invalid detector error model | S | Done with D2. |
 | N1 | Areas the review did not read | M | Run a second review pass before the next release. |
 
-Suggested order after R1: R2, R10, then R6 with R3 and R9, then R4 with R5 and R7, then R8, with S1 as an independent performance task at any point.
+Suggested order after R1 and R2: R10, then R6 with R3 and R9, then R4 with R5 and R7, then R8, with S1 as an independent performance task at any point.
 R4 goes late on purpose: R1, R2, R3, and R7 each delete or reshape functions that R4 would otherwise rewrite twice.
 
 ## Decided And Done
@@ -150,6 +150,12 @@ The CLI has no command on this path, so only the library surface diverges; it ne
 It is the only open item where the current API returns something false.
 
 ### R2. "No logical error found" as a search outcome
+
+**Outcome, 2026-11-21.** Done as proposed below, with `SymptomGrowth::{Explore, Skip}` and a matching `UngraphlikeErrors::{Ignore, Reject}` for the graphlike search.
+Three statements in the proposal were wrong: the report already held typed facts, no CLI command reaches the searches, and the removed error added an `invalid detector error model: ` prefix that the report does not carry.
+One question is left open: a hypergraph search with both maxima at 2 runs the graphlike search, as in Stim, and that can report "not found" where an error within the stated maxima exists, because the graphlike search drops errors that contain a `^` separator.
+Stab keeps Stim's behavior and documents it on the options; removing the reroute would be a deliberate divergence that trades Stim parity and speed for a search that honors its stated maxima.
+The rest of this section is the proposal as written before the work.
 
 **Today.** `find_undetectable_logical_error(model, usize, usize, bool)` and `shortest_graphlike_undetectable_logical_error(model, bool)`, each with a `_with_limits` twin, return `AnalysisResult<DetectorErrorModel>`.
 When the search finishes without finding an error they return `Err(AnalysisError::NoLogicalErrorFound)`, with the reasons (no observables, no detectors, no errors, no graphlike edges) flattened into message text.

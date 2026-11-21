@@ -109,7 +109,6 @@ fn analysis_error_code(error: &AnalysisError) -> &'static str {
         AnalysisError::UnanalyzableNoise(_) => "unanalyzable-noise",
         AnalysisError::ErrorDecompositionFailed { .. } => "error-decomposition-failed",
         AnalysisError::NonGraphlikeError => "non-graphlike-error",
-        AnalysisError::NoLogicalErrorFound(_) => "no-logical-error-found",
         AnalysisError::InvalidRequest(_) => "invalid-analysis-request",
         AnalysisError::InvalidGeneratorParameter { .. } => "invalid-generator-parameter",
         AnalysisError::GateDataUnavailable { .. } => "gate-data-unavailable",

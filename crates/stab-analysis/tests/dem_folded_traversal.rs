@@ -9,6 +9,9 @@ use stab_analysis::{
 };
 use stab_model::DetectorErrorModel;
 
+#[path = "support/logical_search.rs"]
+mod logical_search;
+
 fn dem(text: &str) -> DetectorErrorModel {
     DetectorErrorModel::from_dem_str(text).expect("valid test DEM")
 }
@@ -34,19 +37,33 @@ fn pfm_b3_folded_traversal_search() {
          error(0.2) D0 L0\n\
          error(0.3) D0 ^ D1\n");
     assert_eq!(
-        shortest_graphlike_undetectable_logical_error(&repeated, false)
-            .expect("folded graphlike search")
-            .to_dem_string(),
-        shortest_graphlike_undetectable_logical_error(&compact, false)
-            .expect("compact graphlike search")
-            .to_dem_string()
+        shortest_graphlike_undetectable_logical_error(
+            &repeated,
+            &logical_search::rejecting_ungraphlike()
+        )
+        .expect("folded graphlike search")
+        .into_found()
+        .expect("the search finds a logical error")
+        .to_dem_string(),
+        shortest_graphlike_undetectable_logical_error(
+            &compact,
+            &logical_search::rejecting_ungraphlike()
+        )
+        .expect("compact graphlike search")
+        .into_found()
+        .expect("the search finds a logical error")
+        .to_dem_string()
     );
     assert_eq!(
-        find_undetectable_logical_error(&repeated, usize::MAX, usize::MAX, false)
+        find_undetectable_logical_error(&repeated, &logical_search::unbounded_hypergraph())
             .expect("folded hypergraph search")
+            .into_found()
+            .expect("the search finds a logical error")
             .to_dem_string(),
-        find_undetectable_logical_error(&compact, usize::MAX, usize::MAX, false)
+        find_undetectable_logical_error(&compact, &logical_search::unbounded_hypergraph())
             .expect("compact hypergraph search")
+            .into_found()
+            .expect("the search finds a logical error")
             .to_dem_string()
     );
 
@@ -54,27 +71,36 @@ fn pfm_b3_folded_traversal_search() {
         "repeat 100001 {\n    error(0.1) D0\n    error(0.1) D0 L0\n    repeat 100001 {\n    }\n}\n",
     );
     assert_eq!(
-        shortest_graphlike_undetectable_logical_error(&neutral_nested, false)
-            .expect("nested neutral repeat is skipped")
-            .to_dem_string(),
+        shortest_graphlike_undetectable_logical_error(
+            &neutral_nested,
+            &logical_search::rejecting_ungraphlike()
+        )
+        .expect("nested neutral repeat is skipped")
+        .into_found()
+        .expect("the search finds a logical error")
+        .to_dem_string(),
         shortest_graphlike_undetectable_logical_error(
             &dem("error(0.1) D0\nerror(0.1) D0 L0\n"),
-            false,
+            &logical_search::rejecting_ungraphlike()
         )
         .expect("compact neutral-repeat reference")
+        .into_found()
+        .expect("the search finds a logical error")
         .to_dem_string()
     );
     assert_eq!(
-        find_undetectable_logical_error(&neutral_nested, usize::MAX, usize::MAX, false)
+        find_undetectable_logical_error(&neutral_nested, &logical_search::unbounded_hypergraph())
             .expect("nested neutral repeat is skipped by hypergraph collection")
+            .into_found()
+            .expect("the search finds a logical error")
             .to_dem_string(),
         find_undetectable_logical_error(
             &dem("error(0.1) D0\nerror(0.1) D0 L0\n"),
-            usize::MAX,
-            usize::MAX,
-            false,
+            &logical_search::unbounded_hypergraph()
         )
         .expect("compact neutral hypergraph reference")
+        .into_found()
+        .expect("the search finds a logical error")
         .to_dem_string()
     );
 
@@ -83,20 +109,30 @@ fn pfm_b3_folded_traversal_search() {
         "repeat 100001 {{\n    error(0.1) D0\n    error(0.1) D0 L0\n    shift_detectors({wide_shift}) 0\n}}\n"
     ));
     assert_eq!(
-        shortest_graphlike_undetectable_logical_error(&coordinate_irrelevant, false)
-            .expect("search does not allocate or update irrelevant coordinate state")
-            .to_dem_string(),
+        shortest_graphlike_undetectable_logical_error(
+            &coordinate_irrelevant,
+            &logical_search::rejecting_ungraphlike()
+        )
+        .expect("search does not allocate or update irrelevant coordinate state")
+        .into_found()
+        .expect("the search finds a logical error")
+        .to_dem_string(),
         shortest_graphlike_undetectable_logical_error(
             &dem("error(0.1) D0\nerror(0.1) D0 L0\n"),
-            false,
+            &logical_search::rejecting_ungraphlike()
         )
         .expect("compact coordinate-irrelevant reference")
+        .into_found()
+        .expect("the search finds a logical error")
         .to_dem_string()
     );
 
     let shifted = dem("repeat 100001 {\n    error(0.1) D0 L0\n    shift_detectors 1\n}\n");
-    let error = shortest_graphlike_undetectable_logical_error(&shifted, false)
-        .expect_err("shifted active repeat exceeds bounded search traversal");
+    let error = shortest_graphlike_undetectable_logical_error(
+        &shifted,
+        &logical_search::rejecting_ungraphlike(),
+    )
+    .expect_err("shifted active repeat exceeds bounded search traversal");
     assert!(
         error.to_string().contains("supports repeat counts"),
         "{error}"

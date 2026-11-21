@@ -12,12 +12,17 @@ use super::{
         SearchGraphTargetPolicy, search_graph_nonzero_error_targets,
         visit_search_graph_errors_with_limits,
     },
+    graphlike::shortest_graphlike_search,
+    outcome::{
+        HypergraphSearchOptions, LogicalErrorSearch, NoLogicalErrorReport, SymptomGrowth,
+        UngraphlikeErrors,
+    },
     traversal::{FoldedDemTraversal, shifted_targets},
     values::{DetectorIndex, ObservableMask, SearchGraphKind},
 };
 use crate::AnalysisOperation;
 use crate::resources::LogicalErrorSearchResource;
-use crate::{AnalysisError, AnalysisResult, NoLogicalErrorReport, ResourceLimitError};
+use crate::{AnalysisError, AnalysisResult, ResourceLimitError};
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Edge {
@@ -456,55 +461,45 @@ impl SearchState {
     }
 }
 
-pub fn find_undetectable_logical_error(
-    model: &DetectorErrorModel,
-    dont_explore_detection_event_sets_with_size_above: usize,
-    dont_explore_edges_with_degree_above: usize,
-    dont_explore_edges_increasing_symptom_degree: bool,
-) -> AnalysisResult<DetectorErrorModel> {
-    find_undetectable_logical_error_with_limits(
-        model,
-        dont_explore_detection_event_sets_with_size_above,
-        dont_explore_edges_with_degree_above,
-        dont_explore_edges_increasing_symptom_degree,
-        LogicalErrorSearchLimits::default(),
-    )
-}
-
-/// Searches the hypergraph of `model` for an undetectable logical error under explicit limits.
+/// Searches the hypergraph of `model` for an undetectable logical error.
+///
+/// This is a heuristic: the size limits and [`SymptomGrowth::Skip`] prune the search, so a
+/// [`LogicalErrorSearch::NotFound`] outcome means none was found within them. When both size
+/// limits are 2 the graphlike search runs instead; [`HypergraphSearchOptions`] says how its
+/// results differ.
 ///
 /// # Errors
 ///
 /// Returns [`AnalysisError::Cancelled`] once the limits' cancellation signal is observed, while
 /// the graph is built or during the search, and [`AnalysisError::ResourceLimit`] when a limit is
-/// exceeded.
-pub fn find_undetectable_logical_error_with_limits(
+/// exceeded; a search stopped by a limit does not report [`LogicalErrorSearch::NotFound`].
+pub fn find_undetectable_logical_error(
     model: &DetectorErrorModel,
-    dont_explore_detection_event_sets_with_size_above: usize,
-    dont_explore_edges_with_degree_above: usize,
-    dont_explore_edges_increasing_symptom_degree: bool,
-    limits: LogicalErrorSearchLimits,
-) -> AnalysisResult<DetectorErrorModel> {
-    if dont_explore_edges_with_degree_above == 2
-        && dont_explore_detection_event_sets_with_size_above == 2
-    {
-        return super::graphlike::shortest_graphlike_undetectable_logical_error_with_limits(
-            model, true, limits,
-        );
+    options: &HypergraphSearchOptions,
+) -> AnalysisResult<LogicalErrorSearch> {
+    let &HypergraphSearchOptions {
+        max_detection_event_set_size,
+        max_edge_degree,
+        symptom_growth,
+        ref limits,
+    } = options;
+    // Stim reroutes this pair to the graphlike search, whose witnesses and report differ.
+    if max_edge_degree == 2 && max_detection_event_set_size == 2 {
+        return shortest_graphlike_search(model, UngraphlikeErrors::Ignore, limits);
     }
 
-    let graph = Graph::from_dem_with_limits(model, dont_explore_edges_with_degree_above, &limits)?;
+    let graph = Graph::from_dem_with_limits(model, max_edge_degree, limits)?;
     let empty = SearchState::new(BTreeSet::new(), ObservableMask::new());
     if !graph.distance_1_error_mask.is_empty() {
         let mut out = DetectorErrorModel::new();
         SearchState::new(BTreeSet::new(), graph.distance_1_error_mask)
             .append_transition_as_error_instruction_to(&empty, &mut out)?;
-        return Ok(out);
+        return Ok(LogicalErrorSearch::Found(out));
     }
 
     let mut queue = VecDeque::new();
     let mut back_map = BTreeMap::new();
-    let mut budget = SearchBudget::new("hypergraph search", &limits);
+    let mut budget = SearchBudget::new("hypergraph search", limits);
     budget.admit_state(0, 0, false)?;
     back_map.insert(empty.clone(), empty.clone());
 
@@ -520,7 +515,7 @@ pub fn find_undetectable_logical_error_with_limits(
             if edge.observables.is_empty() || edge.detectors.iter().next() != Some(&source) {
                 continue;
             }
-            if edge.detectors.len() > dont_explore_detection_event_sets_with_size_above {
+            if edge.detectors.len() > max_detection_event_set_size {
                 continue;
             }
             let start_terms = edge
@@ -576,10 +571,10 @@ pub fn find_undetectable_logical_error_with_limits(
                 .detectors
                 .symmetric_difference(&edge.detectors)
                 .count();
-            if next_detector_terms > dont_explore_detection_event_sets_with_size_above {
+            if next_detector_terms > max_detection_event_set_size {
                 continue;
             }
-            if dont_explore_edges_increasing_symptom_degree
+            if symptom_growth == SymptomGrowth::Skip
                 && next_detector_terms > current.detectors.len()
             {
                 continue;
@@ -616,13 +611,20 @@ pub fn find_undetectable_logical_error_with_limits(
                         "hypergraph search reached an empty logical state unexpectedly",
                     ));
                 }
-                return backtrack_path(&back_map, &next, &mut budget);
+                return backtrack_path(&back_map, &next, &mut budget)
+                    .map(LogicalErrorSearch::Found);
             }
             queue.push_back(next);
         }
     }
 
-    Err(no_hypergraph_logical_error(model, &graph)?)
+    Ok(LogicalErrorSearch::NotFound(
+        NoLogicalErrorReport::hypergraph(
+            graph.num_observables == 0,
+            !graph.has_declared_detectors,
+            model.count_errors()? == 0,
+        ),
+    ))
 }
 
 fn backtrack_path(
@@ -681,19 +683,6 @@ fn sorted_error_model_with_cancelled_pairs(
         sorted.push_instruction(instruction);
     }
     Ok(sorted)
-}
-
-fn no_hypergraph_logical_error(
-    model: &DetectorErrorModel,
-    graph: &Graph,
-) -> AnalysisResult<AnalysisError> {
-    Ok(AnalysisError::NoLogicalErrorFound(
-        NoLogicalErrorReport::hypergraph(
-            graph.num_observables == 0,
-            !graph.has_declared_detectors,
-            model.count_errors()? == 0,
-        ),
-    ))
 }
 
 fn toggled_dem_targets(

@@ -9,9 +9,9 @@ pub use sat::{
     shortest_error_sat_problem, shortest_error_sat_problem_with_limits,
 };
 pub use search::{
-    LogicalErrorSearchLimits, find_undetectable_logical_error,
-    find_undetectable_logical_error_with_limits, shortest_graphlike_undetectable_logical_error,
-    shortest_graphlike_undetectable_logical_error_with_limits,
+    GraphlikeSearchOptions, HypergraphSearchOptions, LogicalErrorSearch, LogicalErrorSearchKind,
+    LogicalErrorSearchLimits, NoLogicalErrorReport, SymptomGrowth, UngraphlikeErrors,
+    find_undetectable_logical_error, shortest_graphlike_undetectable_logical_error,
 };
 pub use transforms::{
     detector_error_model_without_tags, flattened_detector_error_model,

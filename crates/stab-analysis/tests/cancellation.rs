@@ -18,17 +18,18 @@ use stab_analysis::{
     AnalysisError, CircuitFlattenLimits, CircuitPass, CircuitPassContext, CircuitPassError,
     CircuitPassInput, CircuitPassOutput, CircuitPassResources, CodeCircuitParams, CodeDistance,
     CodeTask, DemFlattenLimits, DetectingRegionOptions, ErrorAnalyzerOptions,
-    FeedbackInliningLimits, FlowGeneratorOptions, FlowVerdict, LogicalErrorSearchLimits,
-    MissingDetectorOptions, PauliConjugationOptions, RoundCount, SatMaterializationLimits,
-    SurfaceCodeTask, TimeReversedForFlowsOptions, UnsignedFlowCheckOptions, WithoutNoiseOptions,
+    FeedbackInliningLimits, FlowGeneratorOptions, FlowVerdict, GraphlikeSearchOptions,
+    HypergraphSearchOptions, LogicalErrorSearchLimits, MissingDetectorOptions,
+    PauliConjugationOptions, RoundCount, SatMaterializationLimits, SurfaceCodeTask, SymptomGrowth,
+    TimeReversedForFlowsOptions, UngraphlikeErrors, UnsignedFlowCheckOptions, WithoutNoiseOptions,
     WithoutNoisePass, check_unsigned_stabilizer_flows, circuit_detecting_regions,
     circuit_flow_generators_with_options, circuit_time_reversed_for_flows_with_options,
     circuit_to_detector_error_model, circuit_with_inlined_feedback_with_limits,
-    find_undetectable_logical_error_with_limits, flattened_circuit_operations_with_limits,
+    find_undetectable_logical_error, flattened_circuit_operations_with_limits,
     flattened_circuit_with_limits, flattened_detector_error_model_with_limits,
     likeliest_error_sat_problem_with_limits, missing_detectors, pauli_after_circuit_with_options,
     pauli_before_circuit_with_options, run_circuit_pass, shortest_error_sat_problem_with_limits,
-    shortest_graphlike_undetectable_logical_error_with_limits,
+    shortest_graphlike_undetectable_logical_error,
 };
 use stab_model::advanced::CancellationCountdown;
 use stab_model::{
@@ -308,27 +309,33 @@ fn surface_code_model(distance: u32) -> DetectorErrorModel {
 fn logical_error_searches_are_cancellable() {
     let model = surface_code_model(5);
     let limits = || LogicalErrorSearchLimits::default().with_cancellation(cancelled());
-    assert_cancelled(shortest_graphlike_undetectable_logical_error_with_limits(
+    assert_cancelled(shortest_graphlike_undetectable_logical_error(
         &model,
-        false,
-        limits(),
+        &GraphlikeSearchOptions {
+            ungraphlike_errors: UngraphlikeErrors::Reject,
+            limits: limits(),
+        },
     ));
-    assert_cancelled(find_undetectable_logical_error_with_limits(
+    assert_cancelled(find_undetectable_logical_error(
         &model,
-        4,
-        4,
-        false,
-        limits(),
+        &HypergraphSearchOptions {
+            max_detection_event_set_size: 4,
+            max_edge_degree: 4,
+            symptom_growth: SymptomGrowth::Explore,
+            limits: limits(),
+        },
     ));
     // The weight-4 hypergraph search of a distance-5 surface code examines millions of
     // transitions, far more than the signal's delay.
     assert_cancelled_in_flight(|signal| {
-        find_undetectable_logical_error_with_limits(
+        find_undetectable_logical_error(
             &model,
-            4,
-            4,
-            false,
-            LogicalErrorSearchLimits::default().with_cancellation(signal),
+            &HypergraphSearchOptions {
+                max_detection_event_set_size: 4,
+                max_edge_degree: 4,
+                symptom_growth: SymptomGrowth::Explore,
+                limits: LogicalErrorSearchLimits::default().with_cancellation(signal),
+            },
         )
     });
 }

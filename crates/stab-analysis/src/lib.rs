@@ -77,19 +77,19 @@ pub use circuit_transforms::{
     flattened_circuit_operations_with_limits, flattened_circuit_with_limits,
 };
 pub use dem::{
-    DemFlattenLimits, LogicalErrorSearchLimits, SatMaterializationLimits,
-    detector_error_model_without_tags, find_undetectable_logical_error,
-    find_undetectable_logical_error_with_limits, flattened_detector_error_model,
+    DemFlattenLimits, GraphlikeSearchOptions, HypergraphSearchOptions, LogicalErrorSearch,
+    LogicalErrorSearchKind, LogicalErrorSearchLimits, NoLogicalErrorReport,
+    SatMaterializationLimits, SymptomGrowth, UngraphlikeErrors, detector_error_model_without_tags,
+    find_undetectable_logical_error, flattened_detector_error_model,
     flattened_detector_error_model_with_limits, likeliest_error_sat_problem,
     likeliest_error_sat_problem_with_limits, rounded_detector_error_model,
     shortest_error_sat_problem, shortest_error_sat_problem_with_limits,
     shortest_graphlike_undetectable_logical_error,
-    shortest_graphlike_undetectable_logical_error_with_limits,
 };
 pub use error::{
     AnalysisError, AnalysisOperation, AnalysisRequestError, AnalysisResult, GateData,
-    GeneratorParameter, LogicalErrorSearchKind, NoLogicalErrorReport, NonDeterministicTargets,
-    NonUnitaryReason, PauliCollapse, ThresholdExcess, UnanalyzableNoise,
+    GeneratorParameter, NonDeterministicTargets, NonUnitaryReason, PauliCollapse, ThresholdExcess,
+    UnanalyzableNoise,
 };
 pub use gate::{
     GateUnitaryMatrix, gate_decomposition_to_circuit, gate_flows, gate_h_s_cx_m_r_decomposition,

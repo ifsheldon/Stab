@@ -1,9 +1,7 @@
 mod algo;
 
-pub use algo::{
-    shortest_graphlike_undetectable_logical_error,
-    shortest_graphlike_undetectable_logical_error_with_limits,
-};
+pub(super) use algo::shortest_graphlike_search;
+pub use algo::shortest_graphlike_undetectable_logical_error;
 
 use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
@@ -261,7 +259,12 @@ impl Graph {
                 self.distance_1_error_mask = observables;
             }
             [] => {}
-            _ => unreachable!("detector count was limited above"),
+            _ => {
+                return Err(AnalysisError::internal(
+                    AnalysisOperation::LogicalErrorSearch,
+                    "graphlike edge has more than two detectors after the degree check",
+                ));
+            }
         }
         Ok(())
     }

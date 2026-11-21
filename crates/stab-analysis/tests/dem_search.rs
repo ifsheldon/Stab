@@ -10,13 +10,18 @@ use std::collections::BTreeSet;
 
 use stab_analysis::{
     AnalysisResult, CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions,
-    RepetitionCodeTask, RoundCount, SurfaceCodeTask, circuit_to_detector_error_model,
+    GraphlikeSearchOptions, HypergraphSearchOptions, LogicalErrorSearch, LogicalErrorSearchKind,
+    LogicalErrorSearchLimits, NoLogicalErrorReport, RepetitionCodeTask, RoundCount,
+    SurfaceCodeTask, SymptomGrowth, UngraphlikeErrors, circuit_to_detector_error_model,
     find_undetectable_logical_error, likeliest_error_sat_problem, shortest_error_sat_problem,
     shortest_graphlike_undetectable_logical_error,
 };
 use stab_model::{
     Circuit, DemInstructionKind, DemItem, DemTarget, DemTargetKind, DetectorErrorModel, Probability,
 };
+
+#[path = "support/logical_search.rs"]
+mod logical_search;
 
 #[path = "support/sat_wcnf.rs"]
 mod sat_wcnf;
@@ -30,14 +35,21 @@ fn pf4_dem_search_and_sat_repeat_resource_policy_is_source_owned() {
     let expected = "error(1) D0\nerror(1) D0 D1\nerror(1) D1 D2\nerror(1) D2 L0\n";
 
     assert_eq!(
-        shortest_graphlike_undetectable_logical_error(&allowed, false)
-            .unwrap()
-            .to_dem_string(),
+        shortest_graphlike_undetectable_logical_error(
+            &allowed,
+            &logical_search::rejecting_ungraphlike()
+        )
+        .unwrap()
+        .into_found()
+        .expect("the search finds a logical error")
+        .to_dem_string(),
         expected
     );
     assert_eq!(
-        find_undetectable_logical_error(&allowed, usize::MAX, usize::MAX, false)
+        find_undetectable_logical_error(&allowed, &logical_search::unbounded_hypergraph())
             .unwrap()
+            .into_found()
+            .expect("the search finds a logical error")
             .to_dem_string(),
         expected
     );
@@ -56,18 +68,20 @@ fn pf4_dem_search_and_sat_repeat_resource_policy_is_source_owned() {
     )
     .unwrap();
 
-    let graphlike_error = shortest_graphlike_undetectable_logical_error(&hostile, true)
-        .expect_err("graphlike search should reject hostile repeat expansion")
-        .to_string();
+    let graphlike_error =
+        shortest_graphlike_undetectable_logical_error(&hostile, &GraphlikeSearchOptions::default())
+            .expect_err("graphlike search should reject hostile repeat expansion")
+            .to_string();
     assert!(
         graphlike_error
             .contains("DEM graphlike search currently supports repeat counts up to 100000"),
         "{graphlike_error}"
     );
 
-    let hyper_error = find_undetectable_logical_error(&hostile, usize::MAX, usize::MAX, false)
-        .expect_err("hypergraph search should reject hostile repeat expansion")
-        .to_string();
+    let hyper_error =
+        find_undetectable_logical_error(&hostile, &logical_search::unbounded_hypergraph())
+            .expect_err("hypergraph search should reject hostile repeat expansion")
+            .to_string();
     assert!(
         hyper_error.contains("DEM hypergraph search currently supports repeat counts up to 100000"),
         "{hyper_error}"
@@ -204,22 +218,34 @@ fn dem_search_and_sat_fold_zero_shift_repeat_bodies_like_compact_models() {
 
     // The folded zero-probability body must not perturb the pinned search output.
     assert_eq!(
-        shortest_graphlike_undetectable_logical_error(&dem(ACTIVE), false)
-            .unwrap()
-            .to_dem_string(),
+        shortest_graphlike_undetectable_logical_error(
+            &dem(ACTIVE),
+            &logical_search::rejecting_ungraphlike()
+        )
+        .unwrap()
+        .into_found()
+        .expect("the search finds a logical error")
+        .to_dem_string(),
         "error(1) D0\nerror(1) D0 L0\n"
     );
     // Graphlike and hypergraph search break the logical-only tie differently, like Stim.
     let logical_pair = dem("error(0.1) L0\nerror(0.2) L1\n");
     assert_eq!(
-        shortest_graphlike_undetectable_logical_error(&logical_pair, false)
-            .unwrap()
-            .to_dem_string(),
+        shortest_graphlike_undetectable_logical_error(
+            &logical_pair,
+            &logical_search::rejecting_ungraphlike()
+        )
+        .unwrap()
+        .into_found()
+        .expect("the search finds a logical error")
+        .to_dem_string(),
         "error(1) L0\n"
     );
     assert_eq!(
-        find_undetectable_logical_error(&logical_pair, usize::MAX, usize::MAX, false)
+        find_undetectable_logical_error(&logical_pair, &logical_search::unbounded_hypergraph())
             .unwrap()
+            .into_found()
+            .expect("the search finds a logical error")
             .to_dem_string(),
         "error(1) L1\n"
     );
@@ -233,16 +259,20 @@ fn dem_search_rejects_nonzero_shift_repeat_bodies_beyond_expansion_limit() {
         "repeat 100001 {\n    error(0) D1000000\n    shift_detectors 1\n    error(0.1) D0 L0\n}\n",
     ] {
         let shifted = dem(shifted);
-        let graphlike_error = shortest_graphlike_undetectable_logical_error(&shifted, false)
-            .expect_err("nonzero detector shifts should remain outside the graphlike fold")
-            .to_string();
+        let graphlike_error = shortest_graphlike_undetectable_logical_error(
+            &shifted,
+            &logical_search::rejecting_ungraphlike(),
+        )
+        .expect_err("nonzero detector shifts should remain outside the graphlike fold")
+        .to_string();
         assert!(
             graphlike_error.contains("supports repeat counts"),
             "{graphlike_error}"
         );
-        let hyper_error = find_undetectable_logical_error(&shifted, usize::MAX, usize::MAX, false)
-            .expect_err("nonzero detector shifts should remain outside the hypergraph fold")
-            .to_string();
+        let hyper_error =
+            find_undetectable_logical_error(&shifted, &logical_search::unbounded_hypergraph())
+                .expect_err("nonzero detector shifts should remain outside the hypergraph fold")
+                .to_string();
         assert!(
             hyper_error.contains("supports repeat counts"),
             "{hyper_error}"
@@ -266,20 +296,34 @@ fn assert_search_and_sat_match_compact(
     sat_folds: bool,
 ) {
     assert_eq!(
-        shortest_graphlike_undetectable_logical_error(model, false)
-            .unwrap()
-            .to_dem_string(),
-        shortest_graphlike_undetectable_logical_error(compact, false)
-            .unwrap()
-            .to_dem_string(),
+        shortest_graphlike_undetectable_logical_error(
+            model,
+            &logical_search::rejecting_ungraphlike()
+        )
+        .unwrap()
+        .into_found()
+        .expect("the search finds a logical error")
+        .to_dem_string(),
+        shortest_graphlike_undetectable_logical_error(
+            compact,
+            &logical_search::rejecting_ungraphlike()
+        )
+        .unwrap()
+        .into_found()
+        .expect("the search finds a logical error")
+        .to_dem_string(),
         "{name}: graphlike search"
     );
     assert_eq!(
-        find_undetectable_logical_error(model, usize::MAX, usize::MAX, false)
+        find_undetectable_logical_error(model, &logical_search::unbounded_hypergraph())
             .unwrap()
+            .into_found()
+            .expect("the search finds a logical error")
             .to_dem_string(),
-        find_undetectable_logical_error(compact, usize::MAX, usize::MAX, false)
+        find_undetectable_logical_error(compact, &logical_search::unbounded_hypergraph())
             .unwrap()
+            .into_found()
+            .expect("the search finds a logical error")
             .to_dem_string(),
         "{name}: hypergraph search"
     );
@@ -298,21 +342,120 @@ fn assert_search_and_sat_match_compact(
     );
 }
 
+const NO_OBSERVABLES: &str = "\n    WARNING: NO OBSERVABLES. The circuit or detector error model didn't define any observables, making it vacuously impossible to find a logical error.";
+const NO_DETECTORS: &str =
+    "\n    WARNING: NO DETECTORS. The circuit or detector error model didn't define any detectors.";
+const NO_ERRORS: &str = "\n    WARNING: NO ERRORS. The circuit or detector error model didn't include any errors, making it vacuously impossible to find a logical error.";
+const NO_GRAPHLIKE_ERRORS: &str = "\n    WARNING: NO GRAPHLIKE ERRORS. Although the circuit or detector error model does define some errors, none of them are graphlike (i.e. have at most two detection events), making it vacuously impossible to find a graphlike logical error.";
+
+/// The facts a not-found report carries, in the order of its accessors.
+#[derive(Debug, PartialEq)]
+struct ReportFacts {
+    no_observables: bool,
+    no_detectors: bool,
+    no_errors: bool,
+    no_graphlike_errors: bool,
+}
+
+fn not_found(outcome: AnalysisResult<LogicalErrorSearch>) -> NoLogicalErrorReport {
+    let outcome = outcome.expect("a completed search is not an error");
+    assert!(outcome.found().is_none(), "{outcome:?}");
+    outcome
+        .not_found()
+        .expect("the search finds no logical error")
+}
+
+fn assert_report(
+    report: NoLogicalErrorReport,
+    search: LogicalErrorSearchKind,
+    facts: &ReportFacts,
+    text: &str,
+    label: &str,
+) {
+    assert_eq!(report.search(), search, "{label}");
+    assert_eq!(
+        ReportFacts {
+            no_observables: report.no_observables(),
+            no_detectors: report.no_detectors(),
+            no_errors: report.no_errors(),
+            no_graphlike_errors: report.no_graphlike_errors(),
+        },
+        *facts,
+        "{label}"
+    );
+    assert_eq!(report.to_string(), text, "{label}");
+}
+
 #[test]
 fn dem_search_zero_probability_diagnostics_match_stim() {
     let model = dem("error(0) L0\n");
-    assert_eq!(
-        shortest_graphlike_undetectable_logical_error(&model, false)
-            .expect_err("zero-probability graphlike model has no logical error")
-            .to_string(),
-        "invalid detector error model: Failed to find any graphlike logical errors.\n    WARNING: NO DETECTORS. The circuit or detector error model didn't define any detectors.\n    WARNING: NO GRAPHLIKE ERRORS. Although the circuit or detector error model does define some errors, none of them are graphlike (i.e. have at most two detection events), making it vacuously impossible to find a graphlike logical error."
+    assert_report(
+        not_found(shortest_graphlike_undetectable_logical_error(
+            &model,
+            &logical_search::rejecting_ungraphlike(),
+        )),
+        LogicalErrorSearchKind::Graphlike,
+        &ReportFacts {
+            no_observables: false,
+            no_detectors: true,
+            no_errors: false,
+            no_graphlike_errors: true,
+        },
+        &format!("Failed to find any graphlike logical errors.{NO_DETECTORS}{NO_GRAPHLIKE_ERRORS}"),
+        "graphlike",
     );
-    assert_eq!(
-        find_undetectable_logical_error(&model, usize::MAX, usize::MAX, false)
-            .expect_err("zero-probability hypergraph model has no logical error")
-            .to_string(),
-        "invalid detector error model: Failed to find any logical errors.\n    WARNING: NO DETECTORS. The circuit or detector error model didn't define any detectors."
+    assert_report(
+        not_found(find_undetectable_logical_error(
+            &model,
+            &logical_search::unbounded_hypergraph(),
+        )),
+        LogicalErrorSearchKind::Hypergraph,
+        &ReportFacts {
+            no_observables: false,
+            no_detectors: true,
+            no_errors: false,
+            no_graphlike_errors: false,
+        },
+        &format!("Failed to find any logical errors.{NO_DETECTORS}"),
+        "hypergraph",
     );
+}
+
+/// Stim's three vacuous or unreachable cases: an empty model, an error with no undetectable
+/// partner, and a closed loop with no observable.
+fn upstream_not_found_cases() -> [(&'static str, ReportFacts, String); 3] {
+    [
+        (
+            "",
+            ReportFacts {
+                no_observables: true,
+                no_detectors: true,
+                no_errors: true,
+                no_graphlike_errors: false,
+            },
+            format!("{NO_OBSERVABLES}{NO_DETECTORS}{NO_ERRORS}"),
+        ),
+        (
+            "error(0.1) D0 L0\n",
+            ReportFacts {
+                no_observables: false,
+                no_detectors: false,
+                no_errors: false,
+                no_graphlike_errors: false,
+            },
+            String::new(),
+        ),
+        (
+            "error(0.1) D0\nerror(0.1) D0 D1\nerror(0.1) D1\n",
+            ReportFacts {
+                no_observables: true,
+                no_detectors: false,
+                no_errors: false,
+                no_graphlike_errors: false,
+            },
+            NO_OBSERVABLES.to_owned(),
+        ),
+    ]
 }
 
 #[test]
@@ -326,19 +469,16 @@ fn wcnf_shortest_large_detector_only_is_unsat() {
 
 #[test]
 fn pf6_direct_dem_graphlike_search_matches_upstream_distance_cases() {
-    for dem_text in [
-        "",
-        "error(0.1) D0 L0\n",
-        "error(0.1) D0\nerror(0.1) D0 D1\nerror(0.1) D1\n",
-    ] {
-        let error = shortest_graphlike_undetectable_logical_error(&dem(dem_text), false)
-            .expect_err("model has no undetectable graphlike logical error")
-            .to_string();
-        assert!(
-            error.starts_with(
-                "invalid detector error model: Failed to find any graphlike logical errors."
-            ),
-            "{dem_text:?}: {error}"
+    for (dem_text, facts, warnings) in upstream_not_found_cases() {
+        assert_report(
+            not_found(shortest_graphlike_undetectable_logical_error(
+                &dem(dem_text),
+                &logical_search::rejecting_ungraphlike(),
+            )),
+            LogicalErrorSearchKind::Graphlike,
+            &facts,
+            &format!("Failed to find any graphlike logical errors.{warnings}"),
+            dem_text,
         );
     }
 
@@ -372,9 +512,14 @@ fn pf6_direct_dem_graphlike_search_matches_upstream_distance_cases() {
     for (dem_text, expected) in cases {
         let model = DetectorErrorModel::from_dem_str(dem_text).unwrap();
         assert_eq!(
-            shortest_graphlike_undetectable_logical_error(&model, false)
-                .unwrap()
-                .to_dem_string(),
+            shortest_graphlike_undetectable_logical_error(
+                &model,
+                &logical_search::rejecting_ungraphlike()
+            )
+            .unwrap()
+            .into_found()
+            .expect("the search finds a logical error")
+            .to_dem_string(),
             expected,
             "direct graphlike search mismatch for {dem_text:?}"
         );
@@ -383,17 +528,16 @@ fn pf6_direct_dem_graphlike_search_matches_upstream_distance_cases() {
 
 #[test]
 fn pf6_direct_dem_hypergraph_search_matches_upstream_distance_cases() {
-    for dem_text in [
-        "",
-        "error(0.1) D0 L0\n",
-        "error(0.1) D0\nerror(0.1) D0 D1\nerror(0.1) D1\n",
-    ] {
-        let error = find_undetectable_logical_error(&dem(dem_text), usize::MAX, usize::MAX, false)
-            .expect_err("model has no undetectable logical error")
-            .to_string();
-        assert!(
-            error.starts_with("invalid detector error model: Failed to find any logical errors."),
-            "{dem_text:?}: {error}"
+    for (dem_text, facts, warnings) in upstream_not_found_cases() {
+        assert_report(
+            not_found(find_undetectable_logical_error(
+                &dem(dem_text),
+                &logical_search::unbounded_hypergraph(),
+            )),
+            LogicalErrorSearchKind::Hypergraph,
+            &facts,
+            &format!("Failed to find any logical errors.{warnings}"),
+            dem_text,
         );
     }
 
@@ -403,85 +547,141 @@ fn pf6_direct_dem_hypergraph_search_matches_upstream_distance_cases() {
             "error(1) L0\n",
             usize::MAX,
             usize::MAX,
-            false,
+            SymptomGrowth::Explore,
         ),
         (
             "error(0.1) D0\nerror(0.1) D0 L0\n",
             "error(1) D0\nerror(1) D0 L0\n",
             usize::MAX,
             usize::MAX,
-            false,
+            SymptomGrowth::Explore,
         ),
         (
             "error(0.1) D0 L0\nerror(0.1) D0 L1\n",
             "error(1) D0 L0\nerror(1) D0 L1\n",
             usize::MAX,
             usize::MAX,
-            false,
+            SymptomGrowth::Explore,
         ),
         (
             "error(0.1) D0 D1 L0\nerror(0.1) D0 D1 L1\n",
             "error(1) D0 D1 L0\nerror(1) D0 D1 L1\n",
             usize::MAX,
             usize::MAX,
-            false,
+            SymptomGrowth::Explore,
         ),
         (
             "error(0.1) D0 D1 L1\nerror(0.1) D0 D1 L0\n",
             "error(1) D0 D1 L0\nerror(1) D0 D1 L1\n",
             usize::MAX,
             usize::MAX,
-            false,
+            SymptomGrowth::Explore,
         ),
         (
             "error(0.1) D0\nerror(0.1) D0 D1 L0\nerror(0.1) D1\n",
             "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n",
             usize::MAX,
             usize::MAX,
-            false,
+            SymptomGrowth::Explore,
         ),
         (
             "error(0.1) D1\nerror(0.1) D1 D0 L0\nerror(0.1) D0\n",
             "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n",
             usize::MAX,
             usize::MAX,
-            false,
+            SymptomGrowth::Explore,
         ),
         (
             "error(0.1) D0 D1\nerror(0.1) D0 D1 D2 D3\nerror(0.1) D2 D3 D4 D5 L0\nerror(0.1) D4 D5 D6 D7\nerror(0.1) D6 D7 D8 D9\nerror(0.1) D8\nerror(0.1) D9\n",
             "error(1) D0 D1\nerror(1) D0 D1 D2 D3\nerror(1) D2 D3 D4 D5 L0\nerror(1) D4 D5 D6 D7\nerror(1) D6 D7 D8 D9\nerror(1) D8\nerror(1) D9\n",
             4,
             4,
-            true,
+            SymptomGrowth::Skip,
         ),
     ];
-    for (dem_text, expected, max_event_count, max_edge_degree, allow_increasing_error_degree) in
-        cases
+    for (dem_text, expected, max_detection_event_set_size, max_edge_degree, symptom_growth) in cases
     {
         let model = DetectorErrorModel::from_dem_str(dem_text).unwrap();
+        let options = HypergraphSearchOptions {
+            max_detection_event_set_size,
+            max_edge_degree,
+            symptom_growth,
+            limits: LogicalErrorSearchLimits::default(),
+        };
         assert_eq!(
-            find_undetectable_logical_error(
-                &model,
-                max_event_count,
-                max_edge_degree,
-                allow_increasing_error_degree
-            )
-            .unwrap()
-            .to_dem_string(),
+            find_undetectable_logical_error(&model, &options)
+                .unwrap()
+                .into_found()
+                .expect("the search finds a logical error")
+                .to_dem_string(),
             expected,
             "direct hypergraph search mismatch for {dem_text:?}"
         );
     }
 }
 
+/// Like Stim, both size maxima at 2 run the graphlike search with ungraphlike errors ignored.
+/// That search drops every error that has a `^` separator, so its witnesses and its not-found
+/// report differ from the hypergraph search's, which toggles the whole error into one edge.
+#[test]
+fn hypergraph_search_with_both_maxima_two_runs_the_graphlike_search() {
+    let options = |max_edge_degree| HypergraphSearchOptions {
+        max_detection_event_set_size: 2,
+        max_edge_degree,
+        symptom_growth: SymptomGrowth::Skip,
+        limits: LogicalErrorSearchLimits::default(),
+    };
+    let separated = dem("error(0.1) D0 ^ D1 L0\nerror(0.1) D0\nerror(0.1) D1\n");
+    assert_eq!(
+        find_undetectable_logical_error(&separated, &options(3))
+            .unwrap()
+            .into_found()
+            .expect("the toggled edge D0 D1 L0 closes through D0 and D1")
+            .to_dem_string(),
+        "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n"
+    );
+    assert_report(
+        not_found(find_undetectable_logical_error(&separated, &options(2))),
+        LogicalErrorSearchKind::Graphlike,
+        &ReportFacts {
+            no_observables: false,
+            no_detectors: false,
+            no_errors: false,
+            no_graphlike_errors: false,
+        },
+        "Failed to find any graphlike logical errors.",
+        "the rerouted search drops the separated error",
+    );
+
+    let ungraphlike = dem("error(0.1) D0 D1 D2 L0\n");
+    assert_report(
+        not_found(find_undetectable_logical_error(&ungraphlike, &options(2))),
+        LogicalErrorSearchKind::Graphlike,
+        &ReportFacts {
+            no_observables: false,
+            no_detectors: false,
+            no_errors: false,
+            no_graphlike_errors: true,
+        },
+        &format!("Failed to find any graphlike logical errors.{NO_GRAPHLIKE_ERRORS}"),
+        "rerouted search",
+    );
+}
+
 #[test]
 fn pf6_generated_qec_graphlike_search_has_structural_signature() {
     let surface = generated_rotated_surface_code_dem().unwrap();
-    for ignore_ungraphlike_errors in [false, true] {
+    for ungraphlike_errors in [UngraphlikeErrors::Reject, UngraphlikeErrors::Ignore] {
+        let options = GraphlikeSearchOptions {
+            ungraphlike_errors,
+            ..GraphlikeSearchOptions::default()
+        };
         assert_graphlike_search_signature(
             &surface,
-            &shortest_graphlike_undetectable_logical_error(&surface, ignore_ungraphlike_errors)
-                .unwrap(),
+            &shortest_graphlike_undetectable_logical_error(&surface, &options)
+                .unwrap()
+                .into_found()
+                .expect("the search finds a logical error"),
             5,
         );
     }
@@ -489,19 +689,34 @@ fn pf6_generated_qec_graphlike_search_has_structural_signature() {
     let repetition = generated_repetition_code_dem().unwrap();
     assert_graphlike_search_signature(
         &repetition,
-        &shortest_graphlike_undetectable_logical_error(&repetition, false).unwrap(),
+        &shortest_graphlike_undetectable_logical_error(
+            &repetition,
+            &logical_search::rejecting_ungraphlike(),
+        )
+        .unwrap()
+        .into_found()
+        .expect("the search finds a logical error"),
         7,
     );
 
     let ungraphlike_surface = generated_rotated_surface_code_ungraphlike_dem().unwrap();
     assert_graphlike_search_signature(
         &ungraphlike_surface,
-        &shortest_graphlike_undetectable_logical_error(&ungraphlike_surface, true).unwrap(),
+        &shortest_graphlike_undetectable_logical_error(
+            &ungraphlike_surface,
+            &GraphlikeSearchOptions::default(),
+        )
+        .unwrap()
+        .into_found()
+        .expect("the search finds a logical error"),
         5,
     );
-    let error = shortest_graphlike_undetectable_logical_error(&ungraphlike_surface, false)
-        .expect_err("ungraphlike generated DEM should be rejected without ignore flag")
-        .to_string();
+    let error = shortest_graphlike_undetectable_logical_error(
+        &ungraphlike_surface,
+        &logical_search::rejecting_ungraphlike(),
+    )
+    .expect_err("ungraphlike generated DEM should be rejected without ignore flag")
+    .to_string();
     assert!(error.contains("non-graphlike error mechanism"), "{error}");
 }
 
@@ -510,21 +725,54 @@ fn pf6_generated_qec_hypergraph_search_has_structural_signature() {
     let surface = generated_rotated_surface_code_dem().unwrap();
     assert_hypergraph_search_signature(
         &surface,
-        &find_undetectable_logical_error(&surface, 4, 4, true).unwrap(),
+        &find_undetectable_logical_error(
+            &surface,
+            &HypergraphSearchOptions {
+                max_detection_event_set_size: 4,
+                max_edge_degree: 4,
+                symptom_growth: SymptomGrowth::Skip,
+                limits: LogicalErrorSearchLimits::default(),
+            },
+        )
+        .unwrap()
+        .into_found()
+        .expect("the search finds a logical error"),
         5,
     );
 
     let repetition = generated_repetition_code_dem().unwrap();
     assert_hypergraph_search_signature(
         &repetition,
-        &find_undetectable_logical_error(&repetition, 4, 4, false).unwrap(),
+        &find_undetectable_logical_error(
+            &repetition,
+            &HypergraphSearchOptions {
+                max_detection_event_set_size: 4,
+                max_edge_degree: 4,
+                symptom_growth: SymptomGrowth::Explore,
+                limits: LogicalErrorSearchLimits::default(),
+            },
+        )
+        .unwrap()
+        .into_found()
+        .expect("the search finds a logical error"),
         7,
     );
 
     let ungraphlike_surface = generated_rotated_surface_code_ungraphlike_dem().unwrap();
     assert_hypergraph_search_signature(
         &ungraphlike_surface,
-        &find_undetectable_logical_error(&ungraphlike_surface, 4, 4, true).unwrap(),
+        &find_undetectable_logical_error(
+            &ungraphlike_surface,
+            &HypergraphSearchOptions {
+                max_detection_event_set_size: 4,
+                max_edge_degree: 4,
+                symptom_growth: SymptomGrowth::Skip,
+                limits: LogicalErrorSearchLimits::default(),
+            },
+        )
+        .unwrap()
+        .into_found()
+        .expect("the search finds a logical error"),
         5,
     );
 }
@@ -534,7 +782,13 @@ fn pf6_graphlike_search_many_observables_preserves_high_observable_id() {
     let model = many_observables_dem().unwrap();
     assert_search_result_signature_for_observable(
         &model,
-        &shortest_graphlike_undetectable_logical_error(&model, false).unwrap(),
+        &shortest_graphlike_undetectable_logical_error(
+            &model,
+            &logical_search::rejecting_ungraphlike(),
+        )
+        .unwrap()
+        .into_found()
+        .expect("the search finds a logical error"),
         SourceMechanismShape::GraphlikeComponents,
         5,
         2,
@@ -547,7 +801,18 @@ fn pf6_hypergraph_search_many_observables_preserves_high_observable_id() {
     let model = many_observables_dem().unwrap();
     assert_search_result_signature_for_observable(
         &model,
-        &find_undetectable_logical_error(&model, 4, 4, false).unwrap(),
+        &find_undetectable_logical_error(
+            &model,
+            &HypergraphSearchOptions {
+                max_detection_event_set_size: 4,
+                max_edge_degree: 4,
+                symptom_growth: SymptomGrowth::Explore,
+                limits: LogicalErrorSearchLimits::default(),
+            },
+        )
+        .unwrap()
+        .into_found()
+        .expect("the search finds a logical error"),
         SourceMechanismShape::Hypergraph,
         5,
         4,

@@ -17,6 +17,9 @@ use stab_analysis::{
 };
 use stab_model::{Circuit, DetectorErrorModel, Probability};
 
+#[path = "support/logical_search.rs"]
+mod logical_search;
+
 #[path = "support/sat_wcnf.rs"]
 mod sat_wcnf;
 
@@ -84,14 +87,22 @@ fn shortest_sat_optimum(model: &DetectorErrorModel) -> usize {
 
 fn hypergraph_error_count(model: &DetectorErrorModel) -> usize {
     error_count(
-        &find_undetectable_logical_error(model, usize::MAX, usize::MAX, false)
-            .expect("hypergraph search"),
+        &find_undetectable_logical_error(model, &logical_search::unbounded_hypergraph())
+            .expect("hypergraph search")
+            .into_found()
+            .expect("the search finds a logical error"),
     )
 }
 
 fn graphlike_error_count(model: &DetectorErrorModel) -> usize {
     error_count(
-        &shortest_graphlike_undetectable_logical_error(model, false).expect("graphlike search"),
+        &shortest_graphlike_undetectable_logical_error(
+            model,
+            &logical_search::rejecting_ungraphlike(),
+        )
+        .expect("graphlike search")
+        .into_found()
+        .expect("the search finds a logical error"),
     )
 }
 

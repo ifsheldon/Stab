@@ -5,28 +5,41 @@
 )]
 
 use stab_analysis::{
-    AnalysisOperation, AnalysisResult, LogicalErrorSearchLimits, ResourceKind,
-    find_undetectable_logical_error, find_undetectable_logical_error_with_limits,
-    shortest_graphlike_undetectable_logical_error,
-    shortest_graphlike_undetectable_logical_error_with_limits,
+    AnalysisOperation, AnalysisResult, GraphlikeSearchOptions, HypergraphSearchOptions,
+    LogicalErrorSearch, LogicalErrorSearchLimits, ResourceKind, SymptomGrowth, UngraphlikeErrors,
+    find_undetectable_logical_error, shortest_graphlike_undetectable_logical_error,
 };
 use stab_model::DetectorErrorModel;
 
 type SearchRunner =
-    fn(&DetectorErrorModel, LogicalErrorSearchLimits) -> AnalysisResult<DetectorErrorModel>;
+    fn(&DetectorErrorModel, LogicalErrorSearchLimits) -> AnalysisResult<LogicalErrorSearch>;
 
 fn graphlike(
     model: &DetectorErrorModel,
     limits: LogicalErrorSearchLimits,
-) -> AnalysisResult<DetectorErrorModel> {
-    shortest_graphlike_undetectable_logical_error_with_limits(model, false, limits)
+) -> AnalysisResult<LogicalErrorSearch> {
+    shortest_graphlike_undetectable_logical_error(
+        model,
+        &GraphlikeSearchOptions {
+            ungraphlike_errors: UngraphlikeErrors::Reject,
+            limits,
+        },
+    )
 }
 
 fn hypergraph(
     model: &DetectorErrorModel,
     limits: LogicalErrorSearchLimits,
-) -> AnalysisResult<DetectorErrorModel> {
-    find_undetectable_logical_error_with_limits(model, usize::MAX, usize::MAX, false, limits)
+) -> AnalysisResult<LogicalErrorSearch> {
+    find_undetectable_logical_error(
+        model,
+        &HypergraphSearchOptions {
+            max_detection_event_set_size: usize::MAX,
+            max_edge_degree: usize::MAX,
+            symptom_growth: SymptomGrowth::Explore,
+            limits,
+        },
+    )
 }
 
 fn variable_payload_model(observables: usize, hops: usize) -> String {
@@ -85,23 +98,17 @@ fn assert_search_boundary_admitted(
 #[test]
 fn logical_search_limits_return_typed_failures_without_mutating_source() -> AnalysisResult<()> {
     let defaults = LogicalErrorSearchLimits::default();
-    let ordinary = DetectorErrorModel::from_dem_str("error(0.1) D0\nerror(0.1) D0 L0\n")?;
-    assert_eq!(
-        graphlike(&ordinary, defaults.clone())?,
-        shortest_graphlike_undetectable_logical_error(&ordinary, false)?
-    );
-    assert_eq!(
-        hypergraph(&ordinary, defaults.clone())?,
-        find_undetectable_logical_error(&ordinary, usize::MAX, usize::MAX, false)?
-    );
-
     let annotations = DetectorErrorModel::from_dem_str(
         "repeat 10001 {\ndetector D0\nlogical_observable L0\nshift_detectors 0\n}\nerror(0.1) L0\n",
     )?;
-    graphlike(
-        &annotations,
-        defaults.clone().with_max_expanded_error_mechanisms(1),
-    )?;
+    assert!(
+        graphlike(
+            &annotations,
+            defaults.clone().with_max_expanded_error_mechanisms(1),
+        )?
+        .found()
+        .is_some()
+    );
 
     for (name, run, source, limits) in [
         (
@@ -252,4 +259,33 @@ fn logical_search_limits_return_typed_failures_without_mutating_source() -> Anal
         assert_search_limit(name, run, source, limits, resource);
     }
     Ok(())
+}
+
+/// A search that runs out of budget on a model with no logical error has not shown that none
+/// exists, so it must fail with the typed limit instead of reporting `NotFound`.
+#[test]
+fn exhausted_search_budget_is_not_reported_as_not_found() {
+    let mut source = String::from("error(0.1) D0 L0\n");
+    for detector in 0..32 {
+        source.push_str(&format!("error(0.1) D{detector} D{}\n", detector + 1));
+    }
+    let model = DetectorErrorModel::from_dem_str(&source).expect("valid logical-search fixture");
+    let defaults = LogicalErrorSearchLimits::default();
+    for (name, run) in [
+        ("graphlike", graphlike as SearchRunner),
+        ("hypergraph", hypergraph as SearchRunner),
+    ] {
+        let completed = run(&model, defaults.clone()).expect("the full search completes");
+        assert!(
+            completed.not_found().is_some(),
+            "{name}: the chain never closes, so the full search finds nothing: {completed:?}"
+        );
+        assert_search_limit(
+            name,
+            run,
+            &source,
+            defaults.clone().with_max_search_states(8),
+            ResourceKind::SearchStates,
+        );
+    }
 }

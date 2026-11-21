@@ -383,14 +383,15 @@ Its variants now name the failure, and every message a user can reach keeps its 
 
 | Removed variant | Replacement |
 | --- | --- |
-| `InvalidDetectorErrorModel { message }` | `NonDeterministicTargets`, `NoiseRequiresApproximation`, `UnanalyzableNoise`, `ErrorDecompositionFailed`, `NonGraphlikeError`, `NoLogicalErrorFound`, `InvalidRequest`, `AntiHermitianPauliProduct`, `MeasurementRecordOutOfRange`, `UnsupportedInput`, `CountOverflow`, `AllocationFailed`, or `InternalInvariant`, by meaning |
+| `InvalidDetectorErrorModel { message }` | `NonDeterministicTargets`, `NoiseRequiresApproximation`, `UnanalyzableNoise`, `ErrorDecompositionFailed`, `NonGraphlikeError`, `InvalidRequest`, `AntiHermitianPauliProduct`, `MeasurementRecordOutOfRange`, `UnsupportedInput`, `CountOverflow`, `AllocationFailed`, or `InternalInvariant`, by meaning |
 | `InvalidTableauConversion { message }` | `NonUnitaryOperation`, `PauliNotPreserved`, `GateDataUnavailable`, `InvalidRequest`, `AntiHermitianPauliProduct`, `MeasurementRecordOutOfRange`, `UnsupportedInput`, `CountOverflow`, or `InternalInvariant` |
 | `InvalidCircuitSimplification { message }` | `AntiHermitianPauliProduct` or `InternalInvariant` |
 | `InvalidDomainValue { kind, value }` | `InvalidGeneratorParameter { parameter, value }`, `ResourceLimit` for the generation budget, `CountOverflow`, `AllocationFailed`, or `InternalInvariant` |
 | `InvalidResultFormat { message }` | `NonFiniteCoordinate { operation }` |
 | `stab_analysis::ResourceOperation` | `stab_analysis::AnalysisOperation`, now `#[non_exhaustive]`, with the added operations `CircuitGeneration`, `CircuitInverse`, `CircuitSimplification`, `FlowMeasurementSolving`, `GateData`, `ReverseFrameTracking`, and `TableauSynthesis` |
 
-The typed variants carry data instead of prose: `NonDeterministicTargets` holds the detector and observable targets, `NonUnitaryOperation` the gate and a `NonUnitaryReason`, `PauliNotPreserved` the gate and a `PauliCollapse`, `NoiseRequiresApproximation` the gate and an optional `ThresholdExcess`, `ErrorDecompositionFailed` the component, `InvalidRequest` an `AnalysisRequestError`, `InvalidGeneratorParameter` a `GeneratorParameter`, `GateDataUnavailable` the gate and a `GateData`, and `NoLogicalErrorFound` a `NoLogicalErrorReport`.
+The typed variants carry data instead of prose: `NonDeterministicTargets` holds the detector and observable targets, `NonUnitaryOperation` the gate and a `NonUnitaryReason`, `PauliNotPreserved` the gate and a `PauliCollapse`, `NoiseRequiresApproximation` the gate and an optional `ThresholdExcess`, `ErrorDecompositionFailed` the component, `InvalidRequest` an `AnalysisRequestError`, `InvalidGeneratorParameter` a `GeneratorParameter`, and `GateDataUnavailable` the gate and a `GateData`.
+A search that completes without finding a logical error is not an error; see [Logical Error Search Outcome](#logical-error-search-outcome).
 `CountOverflow`, `AllocationFailed`, `UnsupportedInput`, `MeasurementRecordOutOfRange`, and `InternalInvariant` carry their `AnalysisOperation` and a detail string, and `AnalysisError::operation()` returns the operation of any variant that has one.
 `AnalysisError` is deliberately not `#[non_exhaustive]`, so a consumer that maps it to codes fails to compile when a variant is added.
 
@@ -398,7 +399,7 @@ The generation budget refusal is now `AnalysisError::ResourceLimit` for `Analysi
 `stab_model::ModelError::AllocationFailed { dialect, detail }` is new and replaces the allocator refusals that were reported as an invalid detector error model.
 
 The command line's machine-readable codes follow the variants.
-The analysis use of `invalid-detector-error-model` is split into `non-deterministic-targets`, `approximate-disjoint-errors-required`, `unanalyzable-noise`, `error-decomposition-failed`, `non-graphlike-error`, `no-logical-error-found`, `invalid-analysis-request`, `anti-hermitian-pauli-product`, `measurement-record-out-of-range`, `unsupported-analysis-input`, `analysis-count-overflow`, and `analysis-invariant-failed`, and that code now means only a malformed detector error model.
+The analysis use of `invalid-detector-error-model` is split into `non-deterministic-targets`, `approximate-disjoint-errors-required`, `unanalyzable-noise`, `error-decomposition-failed`, `non-graphlike-error`, `invalid-analysis-request`, `anti-hermitian-pauli-product`, `measurement-record-out-of-range`, `unsupported-analysis-input`, `analysis-count-overflow`, and `analysis-invariant-failed`, and that code now means only a malformed detector error model.
 `invalid-tableau-conversion` and `invalid-circuit-simplification` are removed in favour of `non-unitary-operation`, `pauli-not-preserved`, `gate-data-unavailable`, and the codes above; the analysis uses of `invalid-domain-value` and `invalid-result-format` become `invalid-generator-parameter` and `non-finite-coordinate`; and allocator refusals from analysis and from the model carry `resource-limit-exceeded`.
 The JSON `context` of these diagnostics, which was empty, now carries the typed fields, for example `targets` for non-deterministic targets and `operation`, `gate`, and `reason` for a non-unitary operation.
 
@@ -441,6 +442,25 @@ Refusals that were misreported are now typed:
 - A failed reservation for a detecting region is `AnalysisError::AllocationFailed`, where it was labelled a memory-budget refusal.
 - A budget refusal raised while a sample run is writing reports `resource-limit-exceeded` instead of `sampling-execution-failed`.
 - The JSON `span` of a refusal that has no source position is `null` instead of an empty span at byte zero.
+
+## Logical Error Search Outcome
+
+`find_undetectable_logical_error(model, &HypergraphSearchOptions)` and `shortest_graphlike_undetectable_logical_error(model, &GraphlikeSearchOptions)` return `AnalysisResult<LogicalErrorSearch>`.
+`LogicalErrorSearch` is `Found(DetectorErrorModel)` or `NotFound(NoLogicalErrorReport)`, with `found()`, `into_found()`, and `not_found()` accessors.
+
+| Removed | Replacement |
+| --- | --- |
+| `find_undetectable_logical_error(model, a, b, skip)` | `HypergraphSearchOptions { max_detection_event_set_size: a, max_edge_degree: b, symptom_growth, limits }`, where `skip == true` is `SymptomGrowth::Skip` and `false` is `SymptomGrowth::Explore` |
+| `shortest_graphlike_undetectable_logical_error(model, ignore)` | `GraphlikeSearchOptions { ungraphlike_errors, limits }`, where `ignore == true` is `UngraphlikeErrors::Ignore` and `false` is `UngraphlikeErrors::Reject` |
+| Both `_with_limits` functions | The `limits` field of the options |
+| `Err(AnalysisError::NoLogicalErrorFound(report))` | `Ok(LogicalErrorSearch::NotFound(report))` |
+| `LogicalErrorSearchKind::as_str` | Match on the kind |
+| Diagnostic code `no-logical-error-found` | None; no command emitted it |
+
+`HypergraphSearchOptions` has no default because Stim requires all three search arguments; `GraphlikeSearchOptions::default()` ignores ungraphlike errors, as Stim's Python API does.
+`NoLogicalErrorReport` renders Stim's text exactly; the `invalid detector error model: ` prefix that the removed error added is gone.
+A search budget that runs out is still `AnalysisError::ResourceLimit` and a cancellation is still `AnalysisError::Cancelled`, so neither can read as a completed search that found nothing.
+As in Stim, a hypergraph search whose two maxima are both 2 runs the graphlike search with ungraphlike errors ignored, which can report `NotFound` where larger maxima find an error, because the graphlike search drops every error that contains a `^` separator.
 
 ## One Flow Check With A Verdict
 

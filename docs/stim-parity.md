@@ -23,13 +23,13 @@ Exact parity with Stim is therefore the default, not the top rule. A `divergence
 | done | 88 |
 | missing | 0 |
 | deferred | 13 |
-| divergence | 60 |
+| divergence | 61 |
 
 Status describes implementation only. A `done` row may still need a lean canonical owner before it is qualification-ready; `missing` means the behavior contract itself is incomplete. A `deferred` or `divergence` row states why it is outside exact parity.
 
 | Evidence | Families |
 | --- | ---: |
-| verified | 148 |
+| verified | 149 |
 | needs-owner | 0 |
 | not-applicable | 13 |
 
@@ -257,6 +257,7 @@ Status describes implementation only. A `done` row may still need a lean canonic
 | `search.likeliest-error-wcnf-common` | done | verified | `stab-analysis` | Likeliest-error weighted CNF generation matches Stim variables, clauses, log-odds weights, observables, unsatisfiable behavior, ordinary sparse identifiers, and exact flat and nested repeat expansion. | `cargo test -p stab-analysis --test dem_sat_repeat_folding -- likeliest_error_wcnf_common_matches_stim --exact --include-ignored` | [`src/stim/search/sat/wcnf.test.cc`](../vendor/stim/src/stim/search/sat/wcnf.test.cc) |
 | `search.likeliest-error-wcnf-exhaustive-optimum` | done | verified | `stab-analysis` | Across 360 bounded nested-repeat models, compact and explicit DEMs produce identical WCNF and select the same optimum as direct enumeration. | `cargo test -p stab-analysis --test dem_sat_repeat_semantics -- likeliest_wcnf_repeat_semantics_match_direct_exhaustion --exact --include-ignored` | [`src/stim/search/sat/wcnf.test.cc`](../vendor/stim/src/stim/search/sat/wcnf.test.cc) |
 | `search.likeliest-error-wcnf-zero-probability-sparse-targets` | divergence | verified | `stab-analysis` | Weighted WCNF retains one variable per zero-probability error but omits its parity contribution without serializing internal false sentinels as invalid DIMACS literals. | Stim bug: Pinned Stim serializes SIZE_MAX for untouched sparse observable slots introduced only by zero-probability errors; Stab preserves variable numbering while emitting a valid semantic observable clause. `cargo test -p stab-analysis --test dem_sat_repeat_folding -- likeliest_error_wcnf_avoids_stim_zero_probability_sparse_literal_bug --exact --include-ignored`. Pinned reproduction: `cargo test -p stab-oracle --bin stab-oracle -- parity::tests::pinned_stim::pinned_stim_weighted_wcnf_emits_false_sentinels_for_sparse_zero_probability_targets --exact --include-ignored`. | [`src/stim/search/sat/wcnf.cc`](../vendor/stim/src/stim/search/sat/wcnf.cc), [`src/stim/search/sat/wcnf.test.cc`](../vendor/stim/src/stim/search/sat/wcnf.test.cc) |
+| `search.no-logical-error-outcome` | divergence | verified | `stab-analysis` | A graphlike or hypergraph search that completes without finding a logical error returns a typed not-found outcome whose text is Stim's, while an exhausted search budget or a cancellation is an error. | Stab extension: Pinned Stim throws when a search completes without finding a logical error. By design Stab returns that normal result as a value carrying the same facts and text, and reserves errors for searches that could not complete. `cargo test -p stab-analysis --test dem_search -- dem_search_zero_probability_diagnostics_match_stim --exact --include-ignored`. | [`src/stim/search/graphlike/algo.cc`](../vendor/stim/src/stim/search/graphlike/algo.cc), [`src/stim/search/hyper/algo.cc`](../vendor/stim/src/stim/search/hyper/algo.cc) |
 | `search.shortest-error-wcnf` | done | verified | `stab-analysis` | Shortest-error weighted CNF generation matches Stim variables, clauses, observables, unsatisfiable cases, and exact flat and nested repeat expansion. | `cargo test -p stab-analysis --test dem_sat_repeat_folding -- shortest_error_wcnf_common_matches_stim --exact --include-ignored` | [`src/stim/search/sat/wcnf.test.cc`](../vendor/stim/src/stim/search/sat/wcnf.test.cc) |
 
 ## Stab Extensions

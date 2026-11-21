@@ -241,7 +241,7 @@ Decisions that change the crate graph or a parity surface, each needing its own 
 Larger redesigns the API review proposed and this batch did not do:
 
 - Done on 2026-11-21: one flow check returns a `FlowVerdict` per flow, and a refused budget, a cancellation, or an invalid circuit is an error instead of `false`.
-- Make "no logical error found" a search outcome instead of an error, and give the searches named options.
+- Done on 2026-11-21: "no logical error found" is a `LogicalErrorSearch::NotFound` outcome, and each search takes one named options value.
 - Return `Option` from the gate-data getters instead of `GateDataUnavailable`.
 - Collapse the roughly twenty `f` and `f_with_options` twins in analysis and the telescoping session constructors in the engine into one function per operation taking an options value.
 - Write the engine's run progress, status, summary, and error types once as generic types instead of once per family.

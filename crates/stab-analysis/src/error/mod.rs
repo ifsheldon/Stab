@@ -10,9 +10,8 @@ mod details;
 mod operation;
 
 pub use details::{
-    AnalysisRequestError, GateData, GeneratorParameter, LogicalErrorSearchKind,
-    NoLogicalErrorReport, NonDeterministicTargets, NonUnitaryReason, PauliCollapse,
-    ThresholdExcess, UnanalyzableNoise,
+    AnalysisRequestError, GateData, GeneratorParameter, NonDeterministicTargets, NonUnitaryReason,
+    PauliCollapse, ThresholdExcess, UnanalyzableNoise,
 };
 pub use operation::AnalysisOperation;
 
@@ -93,9 +92,6 @@ pub enum AnalysisError {
 
     /// A graphlike search met an error mechanism with more than two detection events.
     NonGraphlikeError,
-
-    /// A logical-error search exhausted its states without finding a logical error.
-    NoLogicalErrorFound(NoLogicalErrorReport),
 
     /// The caller's request does not fit the analyzed input.
     InvalidRequest(AnalysisRequestError),
@@ -274,11 +270,6 @@ impl Display for AnalysisError {
             Self::NonGraphlikeError => write!(
                 formatter,
                 "{}The detector error model contained a non-graphlike error mechanism.\nYou can ignore such errors using `ignore_ungraphlike_errors`.\nYou can use `decompose_errors` when converting a circuit into a model to ensure no such errors are present.",
-                AnalysisOperation::LogicalErrorSearch.message_prefix()
-            ),
-            Self::NoLogicalErrorFound(report) => write!(
-                formatter,
-                "{}{report}",
                 AnalysisOperation::LogicalErrorSearch.message_prefix()
             ),
             Self::InvalidRequest(request) => request.fmt(formatter),
@@ -480,9 +471,7 @@ impl AnalysisError {
             | Self::ErrorDecompositionFailed { .. } => {
                 Some(AnalysisOperation::CircuitToDetectorErrorModel)
             }
-            Self::NonGraphlikeError | Self::NoLogicalErrorFound(_) => {
-                Some(AnalysisOperation::LogicalErrorSearch)
-            }
+            Self::NonGraphlikeError => Some(AnalysisOperation::LogicalErrorSearch),
             Self::GateDataUnavailable { .. } => Some(AnalysisOperation::GateData),
             Self::InvalidGeneratorParameter { .. } => Some(AnalysisOperation::CircuitGeneration),
             Self::Model(_)

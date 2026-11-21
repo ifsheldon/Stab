@@ -57,13 +57,6 @@ pub(super) fn analysis_error_context(error: &AnalysisError) -> Value {
             "component": dem_target_names(component),
             "remnant_edges_blocked": remnant_edges_blocked,
         }),
-        AnalysisError::NoLogicalErrorFound(report) => json!({
-            "search": report.search().as_str(),
-            "no_observables": report.no_observables(),
-            "no_detectors": report.no_detectors(),
-            "no_errors": report.no_errors(),
-            "no_graphlike_errors": report.no_graphlike_errors(),
-        }),
         AnalysisError::InvalidRequest(request) => json!({
             "request": request.as_str(),
         }),

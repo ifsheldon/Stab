@@ -885,6 +885,23 @@ target = "stab-oracle"
 name = "parity::tests::pinned_stim::pinned_stim_weighted_wcnf_emits_false_sentinels_for_sparse_zero_probability_targets"
 
 [[families]]
+id = "search.no-logical-error-outcome"
+area = "search"
+contract = "A graphlike or hypergraph search that completes without finding a logical error returns a typed not-found outcome whose text is Stim's, while an exhausted search budget or a cancellation is an error."
+stim_refs = ["src/stim/search/graphlike/algo.cc", "src/stim/search/hyper/algo.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "stab-extension"
+rationale = "Pinned Stim throws when a search completes without finding a logical error. By design Stab returns that normal result as a value carrying the same facts and text, and reserves errors for searches that could not complete."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "dem_search"
+name = "dem_search_zero_probability_diagnostics_match_stim"
+
+[[families]]
 id = "search.shortest-error-wcnf"
 area = "search"
 contract = "Shortest-error weighted CNF generation matches Stim variables, clauses, observables, unsatisfiable cases, and exact flat and nested repeat expansion."
