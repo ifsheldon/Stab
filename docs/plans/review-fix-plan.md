@@ -229,11 +229,13 @@ Three Stim divergences were found and fixed along the way: the sparse-form rule 
 
 ### Open After Phase D
 
+[Open after Phase D: details and recommendations](open-after-phase-d.md) expands every item below.
+
 Decisions that change the crate graph or a parity surface, each needing its own answer:
 
 - **One memory-budget type.** `MemoryBudget` and `AlgebraMemoryBudget` are converted by hand in several files; a shared leaf crate would also hold cancellation, estimates, byte spans, and diagnostic severity, which are each defined twice.
 - **One representation of a refused budget.** The engine, analysis, model, and algebra each report "memory budget exceeded" in their own shape, and the CLI still decides budget help from message text for the non-analysis error types.
-- **The observable-id domain.** A circuit `ObservableId` is 64 bits and a `DemObservableId` is 32, so an out-of-range id fails only during circuit-to-DEM conversion.
+- **The observable-id domain.** Done on 2026-11-21: one `ObservableId` with the 32-bit domain of the DEM format, checked where a circuit is parsed or built. A 64-bit domain was considered and rejected because pinned Stim's DEM format refuses ids above `0xFFFFFFFF`.
 - **Symlinks and unsafe path components on outputs.** No command rejects them, and neither does Stim; rejecting them would be a deliberate divergence for every command.
 
 Larger redesigns the API review proposed and this batch did not do:

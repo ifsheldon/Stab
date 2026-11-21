@@ -306,9 +306,9 @@ An instruction's kind is fixed by what it holds: a `detector` holds one detector
 | `DemTarget::Numeric` and `DemTarget::numeric` | Removed; `DemInstruction::detector_shift()` returns the offset of a `shift_detectors` instruction, whose `targets()` is empty |
 | `DemInstruction::new(kind, args, targets, tag)` | The per-kind constructors, which cannot pair a kind with the wrong targets |
 | `DemInstruction::detector(coords, DemTarget, tag)` | `DemInstruction::detector(coords, DemDetectorId, tag)` |
-| `DemInstruction::logical_observable(DemTarget, tag)` returning `ModelResult` | `DemInstruction::logical_observable(DemObservableId, tag)`, which cannot fail |
+| `DemInstruction::logical_observable(DemTarget, tag)` returning `ModelResult` | `DemInstruction::logical_observable(ObservableId, tag)`, which cannot fail |
 | `advanced::dem_instruction_with_tag_bytes` and `advanced::dem_instruction_detector_shift` | `advanced::{dem_detector_instruction_with_tag_bytes, dem_logical_observable_instruction_with_tag_bytes, dem_shift_detectors_instruction_with_tag_bytes}` and `DemInstruction::detector_shift` |
-| None | `DemTarget::{from_detector, from_observable, shifted, SEPARATOR}`, `From<DemDetectorId>`, `From<DemObservableId>`, and `From<DemTargetKind>` for `DemTarget`, and `Hash` on `DemTarget` |
+| None | `DemTarget::{from_detector, from_observable, shifted, SEPARATOR}`, `From<DemDetectorId>`, `From<ObservableId>`, and `From<DemTargetKind>` for `DemTarget`, and `Hash` on `DemTarget` |
 
 Every byte charge derived from a target's or an item's size shrinks with it, so parsing a detector error model, circuit-to-DEM analysis, and the DEM searches accept smaller memory budgets than before, and nothing that fit before is refused.
 A bare number in an `error` line is reported at the number itself instead of at the surrounding target region.
@@ -401,6 +401,27 @@ The command line's machine-readable codes follow the variants.
 The analysis use of `invalid-detector-error-model` is split into `non-deterministic-targets`, `approximate-disjoint-errors-required`, `unanalyzable-noise`, `error-decomposition-failed`, `non-graphlike-error`, `no-logical-error-found`, `invalid-analysis-request`, `anti-hermitian-pauli-product`, `measurement-record-out-of-range`, `unsupported-analysis-input`, `analysis-count-overflow`, and `analysis-invariant-failed`, and that code now means only a malformed detector error model.
 `invalid-tableau-conversion` and `invalid-circuit-simplification` are removed in favour of `non-unitary-operation`, `pauli-not-preserved`, `gate-data-unavailable`, and the codes above; the analysis uses of `invalid-domain-value` and `invalid-result-format` become `invalid-generator-parameter` and `non-finite-coordinate`; and allocator refusals from analysis and from the model carry `resource-limit-exceeded`.
 The JSON `context` of these diagnostics, which was empty, now carries the typed fields, for example `targets` for non-deterministic targets and `operation`, `gate`, and `reason` for a non-unitary operation.
+
+## One Observable Id
+
+A circuit `ObservableId` used to hold 64 bits and a `DemObservableId` 32, so `OBSERVABLE_INCLUDE(4294967296)` parsed and then failed inside circuit-to-DEM conversion as an invalid detector error model.
+There is now one `stab_model::ObservableId` with the domain `0..=u32::MAX`, the range the DEM text format accepts, used by circuits and detector error models alike.
+
+| Removed or changed | Replacement |
+| --- | --- |
+| `DemObservableId` | `ObservableId` |
+| `ObservableId::new(u64)` | `ObservableId::try_new(u64)`, which refuses values above `ObservableId::MAX`, or `ObservableId::from(u32)` |
+| `ObservableId::get() -> u64` and `DemObservableId::get() -> u64` | `ObservableId::get() -> u32` |
+| `DemObservableId::try_new` failing with `InvalidDetectorErrorModel` | `ObservableId::try_new` fails with `InvalidDomainValue { kind: "observable id", value }`; `DemTarget::logical_observable(u64)` keeps its text |
+| `DemTargetKind::LogicalObservable(DemObservableId)`, `DemErrorTarget::Observable`, `DemInstructionView::LogicalObservable`, `DemTarget::{from_observable, observable}`, `DemInstruction::logical_observable` | The same items with `ObservableId` |
+| `AnalysisRequestError::ObservableOutOfRange { observable: DemObservableId }` | The same variant with `ObservableId` |
+
+`ObservableId` now derives `Hash`.
+An `OBSERVABLE_INCLUDE` argument above `4294967295` is refused where the circuit is parsed or built, with `gate OBSERVABLE_INCLUDE received invalid argument 4294967296`, so `sample` and `detect` refuse such a circuit as well as `analyze_errors`.
+Pinned Stim's parser accepts such an argument, and `stim analyze_errors` prints `L2147483647` for it and for `OBSERVABLE_INCLUDE(4294967295)`; Stab keeps `4294967295` exact, and the parity ledger records the divergence as `circuit-model.observable-id-domain`.
+The conversion paths in `stab-analysis` no longer carry an out-of-range failure, and the engine's `OBSERVABLE_INCLUDE has invalid observable index` error is removed with the check that produced it.
+`stab_algebra::Flow` keeps its own `u32` observable index, because `stab-algebra` does not depend on `stab-model`; `ObservableId::from` converts it.
+DEM text diagnostics for an out-of-range `L` target are unchanged.
 
 ## DEM Sampled-Error Streams
 

@@ -457,6 +457,23 @@ target = "lean_parity_contracts"
 name = "circuit_mutation_and_value_lifecycle_preserves_semantics"
 
 [[families]]
+id = "circuit-model.observable-id-domain"
+area = "circuit-model"
+contract = "A circuit observable id has the domain 0 to 4294967295 that the detector-error-model format accepts, is refused above it when the circuit is parsed or built, and converts to the same L id."
+stim_refs = ["src/stim/gates/gates.cc", "src/stim/dem/dem_instruction.cc", "src/stim/simulators/error_analyzer.cc"]
+status = "divergence"
+owner = "stab-model"
+divergence_kind = "stab-extension"
+rationale = "Pinned Stim parses any OBSERVABLE_INCLUDE argument, but its DEM format refuses ids above 0xFFFFFFFF and analyze_errors prints L2147483647 for OBSERVABLE_INCLUDE(4294967295) and for larger ids. By design Stab uses one 32-bit domain, refuses a larger argument at parse time, and keeps 4294967295 exact."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "cq2_circuit_api"
+name = "cq2_circuit_api_instruction_value_contract_matches_stim"
+
+[[families]]
 id = "circuit-model.reference-sample"
 area = "circuit-model"
 contract = "Circuit reference sampling returns the noiseless measurement-indexed reference record used by compiled batch sampling."
