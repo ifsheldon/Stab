@@ -10,12 +10,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use num_complex::Complex32;
 use stab_algebra::{Endianness, Flow, Tableau};
 use stab_analysis::{
-    check_if_circuit_has_unsigned_stabilizer_flows, circuit_to_tableau, circuit_without_noise,
-    decomposed_circuit, flattened_circuit, gate_decomposition_to_circuit, gate_flows,
-    gate_h_s_cx_m_r_decomposition, gate_has_flows, gate_has_h_s_cx_m_r_decomposition,
-    gate_has_tableau, gate_has_unitary_matrix, gate_tableau, gate_unitary_matrix,
+    circuit_to_tableau, circuit_without_noise, decomposed_circuit, flattened_circuit,
+    gate_decomposition_to_circuit, gate_flows, gate_h_s_cx_m_r_decomposition, gate_has_flows,
+    gate_has_h_s_cx_m_r_decomposition, gate_has_tableau, gate_has_unitary_matrix, gate_tableau,
+    gate_unitary_matrix,
 };
 use stab_model::{Circuit, CircuitItem, Gate};
+
+#[path = "support/flow_verdicts.rs"]
+mod flow_verdicts;
+
+use flow_verdicts::flow_holds;
 
 fn circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("valid circuit fixture")
@@ -453,9 +458,7 @@ fn cq2_gate_flow_metadata_contract() {
         );
         let circuit = single_instruction_circuit(gate, gate_name);
         assert!(
-            check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows)
-                .into_iter()
-                .all(|ok| ok),
+            flow_holds(&circuit, &flows).into_iter().all(|ok| ok),
             "{gate_name} flows should be satisfied by the gate"
         );
     }
@@ -464,9 +467,7 @@ fn cq2_gate_flow_metadata_contract() {
         let gate = Gate::from_name(gate_name).expect("gate");
         let flows = gate_flows(gate).expect("gate flows");
         assert!(
-            check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows)
-                .into_iter()
-                .all(|ok| ok),
+            flow_holds(&circuit, &flows).into_iter().all(|ok| ok),
             "{gate_name} flows should be satisfied by the representative circuit"
         );
     }

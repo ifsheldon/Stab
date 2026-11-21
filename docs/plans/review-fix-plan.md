@@ -236,11 +236,11 @@ Decisions that change the crate graph or a parity surface, each needing its own 
 - **One memory-budget type.** Done on 2026-11-21 as the leaf crate `stab-foundation`, which also holds cancellation, the estimate, the byte span, and the diagnostic severity.
 - **One representation of a refused budget.** Done on 2026-11-21: `MemoryBudgetExceeded` in `stab-foundation`, one `memory_budget_exceeded()` accessor on every error type, and no message-text matching in the CLI.
 - **The observable-id domain.** Done on 2026-11-21: one `ObservableId` with the 32-bit domain of the DEM format, checked where a circuit is parsed or built. A 64-bit domain was considered and rejected because pinned Stim's DEM format refuses ids above `0xFFFFFFFF`.
-- **Symlinks and unsafe path components on outputs.** No command rejects them, and neither does Stim; rejecting them would be a deliberate divergence for every command.
+- **Symlinks and unsafe path components on outputs.** Decided on 2026-11-21: no command rejects them, as in Stim, and the architecture README records the path trust boundary that makes this the policy instead of a gap.
 
 Larger redesigns the API review proposed and this batch did not do:
 
-- Return a three-way verdict from the flow checks, which answer `false` when they failed or do not know.
+- Done on 2026-11-21: one flow check returns a `FlowVerdict` per flow, and a refused budget, a cancellation, or an invalid circuit is an error instead of `false`.
 - Make "no logical error found" a search outcome instead of an error, and give the searches named options.
 - Return `Option` from the gate-data getters instead of `GateDataUnavailable`.
 - Collapse the roughly twenty `f` and `f_with_options` twins in analysis and the telescoping session constructors in the engine into one function per operation taking an options value.

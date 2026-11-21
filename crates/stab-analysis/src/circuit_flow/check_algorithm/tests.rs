@@ -12,10 +12,8 @@ use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString};
 use stab_model::Circuit;
 
 use super::FlowCheckAlgorithm;
-use crate::circuit_flow::checker::{
-    UnsignedFlowCheckOptions, UnsignedStabilizerFlowFailure, check_unsigned_flows_using,
-    diagnose_unsigned_flows_using,
-};
+use crate::circuit_flow::checker::{UnsignedFlowCheckOptions, flow_verdicts_using};
+use crate::circuit_flow::{FlowVerdict, FlowViolation};
 use crate::circuit_inverse::{TimeReversedForFlowsOptions, time_reversed_for_flows_using};
 use crate::{
     AnalysisError, AnalysisOperation, AnalysisResult, CircuitToTableauOptions, circuit_to_tableau,
@@ -72,45 +70,29 @@ fn failing_unitary_flows_report_identical_output_mismatches_on_both_algorithms()
         flow("Z -> Z"),
         flow("_Z_ -> ZZZ"),
     ];
-    let [dense_checks, sparse_checks] = ALGORITHMS.map(|algorithm| {
-        diagnose_unsigned_flows_using(
+    let [dense_verdicts, sparse_verdicts] = ALGORITHMS.map(|algorithm| {
+        flow_verdicts_using(
             algorithm,
             &circuit,
             &flows,
             &UnsignedFlowCheckOptions::default(),
         )
-        .expect("default options diagnose every flow")
+        .expect("default options decide every flow")
     });
-    assert_eq!(dense_checks, sparse_checks);
-    let [dense_bools, sparse_bools] = ALGORITHMS.map(|algorithm| {
-        check_unsigned_flows_using(
-            algorithm,
-            &circuit,
-            &flows,
-            &UnsignedFlowCheckOptions::default(),
-        )
-        .expect("default options check every flow")
-    });
-    assert_eq!(dense_bools, vec![true, false, false, false]);
-    assert_eq!(sparse_bools, dense_bools);
-
-    let failures = dense_checks
-        .iter()
-        .map(|check| check.failure().cloned())
-        .collect::<Vec<_>>();
+    assert_eq!(dense_verdicts, sparse_verdicts);
     assert_eq!(
-        failures,
+        dense_verdicts,
         vec![
-            None,
-            Some(UnsignedStabilizerFlowFailure::OutputMismatch {
+            FlowVerdict::Holds,
+            FlowVerdict::Violated(FlowViolation::OutputMismatch {
                 expected_output: pauli("X__"),
                 actual_output: pauli("Z__"),
             }),
-            Some(UnsignedStabilizerFlowFailure::OutputMismatch {
+            FlowVerdict::Violated(FlowViolation::OutputMismatch {
                 expected_output: pauli("Z"),
                 actual_output: pauli("X_X"),
             }),
-            Some(UnsignedStabilizerFlowFailure::OutputMismatch {
+            FlowVerdict::Violated(FlowViolation::OutputMismatch {
                 expected_output: pauli("ZZZ"),
                 actual_output: pauli("Z_Z"),
             }),
@@ -308,24 +290,19 @@ proptest! {
         let circuit = random_circuit(qubit_count, &instructions, repeat, flow_neutral);
         let flows = random_flows(&circuit, qubit_count, &specs).expect("generated flows");
 
-        let [dense_bools, sparse_bools] =
-            ALGORITHMS.map(|algorithm| check_unsigned_flows_using(algorithm, &circuit, &flows, &UnsignedFlowCheckOptions::default())
-                .expect("default options check every flow"));
-        prop_assert_eq!(&dense_bools, &sparse_bools);
-        let [dense_checks, sparse_checks] =
-            ALGORITHMS.map(|algorithm| diagnose_unsigned_flows_using(algorithm, &circuit, &flows, &UnsignedFlowCheckOptions::default())
-                .expect("default options diagnose every flow"));
-        prop_assert_eq!(&dense_checks, &sparse_checks);
-        for (check, has_flow) in dense_checks.iter().zip(&dense_bools) {
-            prop_assert_eq!(check.has_flow(), *has_flow);
-            let output_mismatch = matches!(
-                check.failure(),
-                None | Some(UnsignedStabilizerFlowFailure::OutputMismatch { .. })
+        let [dense_verdicts, sparse_verdicts] =
+            ALGORITHMS.map(|algorithm| flow_verdicts_using(algorithm, &circuit, &flows, &UnsignedFlowCheckOptions::default())
+                .expect("default options decide every flow"));
+        prop_assert_eq!(&dense_verdicts, &sparse_verdicts);
+        for verdict in &dense_verdicts {
+            let decided = matches!(
+                verdict,
+                FlowVerdict::Holds | FlowVerdict::Violated(FlowViolation::OutputMismatch { .. })
             );
-            prop_assert!(output_mismatch, "unexpected failure {:?}", check.failure());
+            prop_assert!(decided, "unexpected verdict {:?}", verdict);
         }
-        for (flow, (has_flow, spec)) in flows.iter().zip(dense_bools.iter().zip(&specs)) {
-            prop_assert!(!spec.3 || *has_flow, "valid flow {} was rejected", flow);
+        for (flow, (verdict, spec)) in flows.iter().zip(dense_verdicts.iter().zip(&specs)) {
+            prop_assert!(!spec.3 || verdict.holds(), "valid flow {} was rejected", flow);
         }
 
         prop_assert_eq!(
@@ -366,22 +343,19 @@ fn a_refused_tableau_falls_back_to_the_sparse_tracker_but_cancellation_does_not(
     );
 
     let defaults = UnsignedFlowCheckOptions::default();
-    let dense_bools = check_unsigned_flows_using(
+    let dense_verdicts = flow_verdicts_using(
         FlowCheckAlgorithm::DenseTableau,
         &circuit,
         &flows,
         &defaults,
     )
     .unwrap();
-    let dense_checks = diagnose_unsigned_flows_using(
-        FlowCheckAlgorithm::DenseTableau,
-        &circuit,
-        &flows,
-        &defaults,
-    )
-    .unwrap();
-    assert!(dense_bools.iter().any(|has_flow| *has_flow));
-    assert!(dense_bools.iter().any(|has_flow| !*has_flow));
+    assert!(dense_verdicts.iter().any(FlowVerdict::holds));
+    assert!(
+        dense_verdicts
+            .iter()
+            .any(|verdict| verdict.violation().is_some())
+    );
     let cancelled = Cancellation::new();
     cancelled.cancel();
     let set = UnsignedFlowCheckOptions {
@@ -390,20 +364,12 @@ fn a_refused_tableau_falls_back_to_the_sparse_tracker_but_cancellation_does_not(
     };
     for algorithm in ALGORITHMS {
         assert_eq!(
-            check_unsigned_flows_using(algorithm, &circuit, &flows, &small).unwrap(),
-            dense_bools
+            flow_verdicts_using(algorithm, &circuit, &flows, &small).unwrap(),
+            dense_verdicts
         );
+        // A set signal is reported, never answered with verdicts.
         assert_eq!(
-            diagnose_unsigned_flows_using(algorithm, &circuit, &flows, &small).unwrap(),
-            dense_checks
-        );
-        // A set signal is reported, never answered with flows that failed closed.
-        assert_eq!(
-            check_unsigned_flows_using(algorithm, &circuit, &flows, &set),
-            Err(AnalysisError::Cancelled(Cancelled))
-        );
-        assert_eq!(
-            diagnose_unsigned_flows_using(algorithm, &circuit, &flows, &set),
+            flow_verdicts_using(algorithm, &circuit, &flows, &set),
             Err(AnalysisError::Cancelled(Cancelled))
         );
     }

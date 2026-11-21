@@ -9,13 +9,10 @@
 
 use stab_algebra::{Flow, PauliString};
 use stab_analysis::{
-    AnalysisError, AnalysisOperation, FlowGeneratorOptions, InverseQecOptions,
+    AnalysisError, AnalysisOperation, FlowGeneratorOptions, FlowVerdict, InverseQecOptions,
     MissingDetectorOptions, PauliConjugationOptions, ResourceKind, TimeReversedForFlowsOptions,
     UnsignedFlowCheckOptions, all_detecting_region_targets_with_budget,
-    all_detecting_region_ticks_with_budget, check_if_circuit_has_unsigned_stabilizer_flows,
-    check_if_circuit_has_unsigned_stabilizer_flows_with_options,
-    check_unsigned_stabilizer_flows_with_diagnostics,
-    check_unsigned_stabilizer_flows_with_diagnostics_with_options,
+    all_detecting_region_ticks_with_budget, check_unsigned_stabilizer_flows,
     circuit_flow_generators_with_options, circuit_inverse_qec_with_options,
     circuit_time_reversed_for_flows_with_options, missing_detectors, pauli_after_circuit,
     pauli_after_circuit_with_options, pauli_before_circuit, pauli_before_circuit_with_options,
@@ -220,52 +217,18 @@ fn sparse_flow_checking_takes_the_caller_budget() {
         ..UnsignedFlowCheckOptions::default()
     };
     let short = MemoryBudget::from_bytes(required - 1);
+    // The refusal is an error, never a verdict about the flow.
     assert_refused(
-        check_if_circuit_has_unsigned_stabilizer_flows_with_options(
-            &source,
-            &flows,
-            &options(required - 1),
-        )
-        .expect_err("one byte short"),
-        AnalysisOperation::FlowCheck,
-        ResourceKind::MaterializedBytes,
-        required,
-        short,
-    );
-    assert_refused(
-        check_unsigned_stabilizer_flows_with_diagnostics_with_options(
-            &source,
-            &flows,
-            &options(required - 1),
-        )
-        .expect_err("diagnostics one byte short"),
+        check_unsigned_stabilizer_flows(&source, &flows, &options(required - 1))
+            .expect_err("one byte short"),
         AnalysisOperation::FlowCheck,
         ResourceKind::MaterializedBytes,
         required,
         short,
     );
     assert_eq!(
-        check_if_circuit_has_unsigned_stabilizer_flows_with_options(
-            &source,
-            &flows,
-            &options(required)
-        ),
-        Ok(vec![true])
-    );
-    assert_eq!(
-        check_unsigned_stabilizer_flows_with_diagnostics_with_options(
-            &source,
-            &flows,
-            &options(required),
-        ),
-        Ok(check_unsigned_stabilizer_flows_with_diagnostics(
-            &source, &flows
-        ))
-    );
-    // The unbudgeted check keeps failing the flow closed rather than reporting the refusal.
-    assert_eq!(
-        check_if_circuit_has_unsigned_stabilizer_flows(&source, &flows),
-        vec![true]
+        check_unsigned_stabilizer_flows(&source, &flows, &options(required)),
+        Ok(vec![FlowVerdict::Holds])
     );
 
     // An intermediate Clifford fan-out and fan-in leaves a 2-qubit final region, so only live
@@ -280,12 +243,8 @@ fn sparse_flow_checking_takes_the_caller_budget() {
     fanout_then_cancel.push_str("H 1\n");
     let transient_wide = circuit(&fanout_then_cancel);
     let flow = ["Z1 -> Z1".parse::<Flow>().expect("flow")];
-    let error = check_if_circuit_has_unsigned_stabilizer_flows_with_options(
-        &transient_wide,
-        &flow,
-        &options(1024),
-    )
-    .expect_err("transient 128-qubit live sensitivity exceeds 1 KiB");
+    let error = check_unsigned_stabilizer_flows(&transient_wide, &flow, &options(1024))
+        .expect_err("transient 128-qubit live sensitivity exceeds 1 KiB");
     let resource = error
         .resource_limit_error()
         .expect("typed live-state refusal");
@@ -294,12 +253,8 @@ fn sparse_flow_checking_takes_the_caller_budget() {
     assert_eq!(resource.limit(), 1024);
     assert!(resource.actual() > 1024);
     assert_eq!(
-        check_if_circuit_has_unsigned_stabilizer_flows_with_options(
-            &transient_wide,
-            &flow,
-            &options(16_384),
-        ),
-        Ok(vec![true])
+        check_unsigned_stabilizer_flows(&transient_wide, &flow, &options(16_384)),
+        Ok(vec![FlowVerdict::Holds])
     );
 }
 

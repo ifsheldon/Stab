@@ -76,7 +76,7 @@ pub struct SampledFlowOptions {
 /// Probabilistically checks signed stabilizer flows by sampling augmented noiseless circuits.
 ///
 /// This is the scoped Rust counterpart to Stim's `sample_if_circuit_has_stabilizer_flows`.
-/// Unlike [`stab_analysis::check_if_circuit_has_unsigned_stabilizer_flows`], signs are meaningful
+/// Unlike [`stab_analysis::check_unsigned_stabilizer_flows`], signs are meaningful
 /// and each queried flow is checked by appending an ancilla witness measurement to a noiseless copy
 /// of the circuit. Each false flow has a 50 percent chance of surviving an individual sample, so
 /// callers should use enough samples for their desired confidence. The effective sample count is

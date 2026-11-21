@@ -13,10 +13,14 @@ use stab_analysis::{
     CodeCircuitParams, CodeDistance, CodeTask, DetectingRegionTargetOptions, RoundCount,
     SurfaceCodeTask, TimeReversedForFlowsOptions, all_detecting_region_targets,
     all_detecting_region_ticks, circuit_detecting_regions_for_targets, circuit_flow_generators,
-    circuit_has_all_unsigned_stabilizer_flows, circuit_time_reversed_for_flows,
-    circuit_time_reversed_for_flows_with_options,
+    circuit_time_reversed_for_flows, circuit_time_reversed_for_flows_with_options,
 };
 use stab_model::{Circuit, CircuitTick, DemTarget};
+
+#[path = "support/flow_verdicts.rs"]
+mod flow_verdicts;
+
+use flow_verdicts::flow_holds;
 
 const GENERATED_REVERSAL_CASES: u32 = 48;
 const GENERATED_REVERSAL_SEED: [u8; 32] = [0xB1; 32];
@@ -336,7 +340,7 @@ fn time_reversal_validates_sparse_high_qubit_flows() {
 
     assert_eq!(inverse, circuit("R 4095\n"));
     assert_eq!(flows, vec![flow("1 -> Z4095")]);
-    assert!(circuit_has_all_unsigned_stabilizer_flows(&inverse, &flows));
+    assert!(flow_holds(&inverse, &flows).into_iter().all(|holds| holds));
 }
 
 #[test]
@@ -358,6 +362,19 @@ fn time_reversal_uses_sparse_validation_above_dense_tableau_width() {
 }
 
 #[test]
+fn time_reversal_validates_flows_beyond_the_target_range() {
+    // Every circuit is the identity on qubits no target can name, so the sparse validation of
+    // the reversed flows accepts a flow that is idle there instead of failing as a Stab bug.
+    let limit = stab_model::advanced::STIM_TARGET_VALUE_LIMIT;
+    let wide = flow(&format!("X{limit} -> X{limit}"));
+    let input = circuit("H 0\n");
+    let (inverse, flows) = circuit_time_reversed_for_flows(&input, &[flow("X -> Z"), wide.clone()])
+        .expect("reverse a unitary circuit with a flow beyond the target range");
+    assert_eq!(inverse, input);
+    assert_eq!(flows, vec![flow("Z -> X"), wide]);
+}
+
+#[test]
 fn time_reversal_uses_sparse_validation_at_the_tableau_boundary() {
     let input = circuit("H 512\n");
     let idle_flow = flow("Z0 -> Z0");
@@ -368,7 +385,7 @@ fn time_reversal_uses_sparse_validation_at_the_tableau_boundary() {
 
     assert_eq!(inverse, input);
     assert_eq!(flows, vec![idle_flow]);
-    assert!(circuit_has_all_unsigned_stabilizer_flows(&inverse, &flows));
+    assert!(flow_holds(&inverse, &flows).into_iter().all(|holds| holds));
 }
 
 #[test]
@@ -383,10 +400,11 @@ fn time_reversal_batches_output_flow_validation() {
 
     assert_eq!(inverse, input);
     assert_eq!(output_flows.len(), input_flows.len());
-    assert!(circuit_has_all_unsigned_stabilizer_flows(
-        &inverse,
-        &output_flows
-    ));
+    assert!(
+        flow_holds(&inverse, &output_flows)
+            .into_iter()
+            .all(|holds| holds)
+    );
 }
 
 #[test]
@@ -450,7 +468,9 @@ fn supported_time_reversal_is_semantically_involutive() {
                         TestCaseError::fail(format!("first reversal failed: {error}\n{text}"))
                     })?;
             prop_assert!(
-                circuit_has_all_unsigned_stabilizer_flows(&inverse, &inverse_flows),
+                flow_holds(&inverse, &inverse_flows)
+                    .into_iter()
+                    .all(|holds| holds),
                 "first reversed flows failed the checker\n{}\n{:?}\n{:?}",
                 text,
                 inverse,
@@ -464,7 +484,9 @@ fn supported_time_reversal_is_semantically_involutive() {
                     })?;
             prop_assert_eq!(&round_trip, &input, "round-trip circuit mismatch\n{}", text);
             prop_assert!(
-                circuit_has_all_unsigned_stabilizer_flows(&round_trip, &round_trip_flows),
+                flow_holds(&round_trip, &round_trip_flows)
+                    .into_iter()
+                    .all(|holds| holds),
                 "round-trip flows failed the checker\n{}\n{:?}",
                 text,
                 round_trip_flows

@@ -7,8 +7,8 @@ use stab_model::{
 use crate::{
     AnalysisError, AnalysisOperation, AnalysisRequestError, AnalysisResult, NonUnitaryReason,
     circuit_flow::{
-        FlowCheckAlgorithm, FlowCheckCost, UnsignedFlowCheckOptions,
-        check_unsigned_flows_with_sparse_tracker, stops_flow_check,
+        FlowCheckAlgorithm, FlowCheckCost, FlowVerdict, UnsignedFlowCheckOptions,
+        sparse_flow_verdicts, stops_flow_check,
     },
     sparse_rev_frame_tracker::folds_unitary_repeat_body,
 };
@@ -290,7 +290,7 @@ pub(crate) fn time_reversed_for_flows_using(
         .iter()
         .map(reversed_pauli_only_flow)
         .collect::<Vec<_>>();
-    let reversed_checks = check_unsigned_flows_with_sparse_tracker(
+    let reversed_checks = sparse_flow_verdicts(
         &inverse,
         &reversed_flows,
         &options.flow_check_options(),
@@ -304,8 +304,8 @@ pub(crate) fn time_reversed_for_flows_using(
             format!("time_reversed_for_flows could not validate reversed unitary flows: {error}"),
         )
     })?;
-    for (index, (flow, satisfied)) in reversed_flows.iter().zip(reversed_checks).enumerate() {
-        if !satisfied {
+    for (index, (flow, verdict)) in reversed_flows.iter().zip(reversed_checks).enumerate() {
+        if !verdict.holds() {
             return Err(AnalysisError::internal(
                 AnalysisOperation::TimeReversal,
                 format!(
@@ -548,18 +548,16 @@ impl FlowValidation {
                     unitary_flow_is_satisfied_by_tableau(tableau, flow)
                 })
                 .collect(),
-            Self::SparseFolded => check_unsigned_flows_with_sparse_tracker(
-                circuit,
-                flows,
-                &reversal.flow_check_options(),
-            )
-            .map_err(|error| {
-                if stops_flow_check(&error) {
-                    error
-                } else {
-                    AnalysisError::internal(AnalysisOperation::TimeReversal, error.to_string())
-                }
-            }),
+            // The caller's circuit is checked here, so a failure of the sparse tracker describes
+            // that circuit and is reported as it is.
+            Self::SparseFolded => {
+                Ok(
+                    sparse_flow_verdicts(circuit, flows, &reversal.flow_check_options())?
+                        .iter()
+                        .map(FlowVerdict::holds)
+                        .collect(),
+                )
+            }
         }
     }
 }

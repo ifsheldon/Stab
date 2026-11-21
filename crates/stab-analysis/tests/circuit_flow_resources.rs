@@ -7,6 +7,11 @@ use stab_algebra::Flow;
 use stab_analysis::{AnalysisOperation, ResourceKind, circuit_flow_generators};
 use stab_model::{Circuit, RepeatBlock, RepeatCount};
 
+#[path = "support/flow_verdicts.rs"]
+mod flow_verdicts;
+
+use flow_verdicts::flow_holds;
+
 #[test]
 fn circuit_flow_generators_admit_owned_rows_and_report_typed_limits() {
     let flows = circuit_flow_generators(&circuit("REPEAT 4097 {\n    M 0\n}\n"))
@@ -168,14 +173,7 @@ fn sparse_flow_check_folds_the_full_nesting_envelope_of_unitary_repeats() {
             );
             let flows = ["Z0 -> Z0", "X0 -> X0", "X0 -> Z0", "Z1 -> Z1"]
                 .map(|flow| flow.parse::<Flow>().expect("flow"));
-            assert_eq!(
-                stab_analysis::check_if_circuit_has_unsigned_stabilizer_flows_with_options(
-                    &nested,
-                    &flows,
-                    &stab_analysis::UnsignedFlowCheckOptions::default(),
-                ),
-                Ok(vec![true, true, false, true])
-            );
+            assert_eq!(flow_holds(&nested, &flows), vec![true, true, false, true]);
         })
         .expect("spawn")
         .join()

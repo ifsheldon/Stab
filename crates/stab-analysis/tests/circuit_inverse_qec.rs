@@ -7,11 +7,16 @@ use std::str::FromStr;
 
 use stab_algebra::Flow;
 use stab_analysis::{
-    InverseQecOptions, TimeReversedForFlowsOptions, circuit_has_all_unsigned_stabilizer_flows,
-    circuit_inverse_qec, circuit_inverse_qec_with_options, circuit_time_reversed_for_flows,
+    InverseQecOptions, TimeReversedForFlowsOptions, circuit_inverse_qec,
+    circuit_inverse_qec_with_options, circuit_time_reversed_for_flows,
     circuit_time_reversed_for_flows_with_options,
 };
 use stab_model::Circuit;
+
+#[path = "support/flow_verdicts.rs"]
+mod flow_verdicts;
+
+use flow_verdicts::flow_holds;
 
 #[test]
 fn inverse_qec_common_semantic_matrix_matches_stim() {
@@ -838,7 +843,9 @@ fn time_reversed_for_flows_matches_stim_and_reversed_flows_hold() {
                 .expect(name);
         assert_eq!(actual_flows.len(), input_flows.len(), "{name}");
         assert!(
-            circuit_has_all_unsigned_stabilizer_flows(&actual, &actual_flows),
+            flow_holds(&actual, &actual_flows)
+                .into_iter()
+                .all(|holds| holds),
             "{name}: reversed circuit must satisfy the reversed flows"
         );
         if let Some((expected_circuit, expected_flows)) = expected {
@@ -947,7 +954,9 @@ fn time_reversed_for_flows_preserves_duplicate_reset_semantics() {
                 .expect("reverse duplicate reset semantics");
         assert_eq!(reversed_flows, vec![flow(expected_flow)], "{circuit_text}");
         assert!(
-            circuit_has_all_unsigned_stabilizer_flows(&inverse, &reversed_flows),
+            flow_holds(&inverse, &reversed_flows)
+                .into_iter()
+                .all(|holds| holds),
             "{circuit_text}: {inverse}\n{reversed_flows:?}"
         );
     }

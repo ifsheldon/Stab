@@ -9,9 +9,10 @@ use std::str::FromStr;
 
 use stab_algebra::{PauliBasis, PauliString, SignIteration, Tableau, TableauIterator};
 use stab_analysis::{
-    circuit_to_tableau, pauli_after_circuit, pauli_before_circuit, tableau_to_circuit,
+    AnalysisError, AnalysisRequestError, circuit_to_tableau, pauli_after_circuit,
+    pauli_before_circuit, tableau_to_circuit,
 };
-use stab_model::{Circuit, CircuitItem};
+use stab_model::{Circuit, CircuitItem, GateKind, QubitId};
 
 #[test]
 fn algebra_circuit_conversions_match_stim() {
@@ -146,6 +147,38 @@ fn assert_pauli_circuit_conjugation() {
     assert_eq!(
         pauli_before_circuit(&expected, &circuit("H 777\n")).expect("wide local inverse"),
         wide
+    );
+}
+
+#[test]
+fn pauli_conjugation_rejects_a_pauli_narrower_than_the_circuit_as_a_request_error() {
+    // Stim v1.16.0 PauliStringRef::do_instruction and undo_instruction refuse an instruction that
+    // targets qubits outside the Pauli string; that is the caller's request, not a Stab bug.
+    // Instructions without an effect on qubits may still name such qubits.
+    for (text, gate, conjugate) in [
+        (
+            "S 0\nS 1\n",
+            GateKind::S,
+            pauli_after_circuit as fn(&_, &_) -> _,
+        ),
+        ("S 0\nS 1\n", GateKind::S, pauli_before_circuit),
+        ("M 1\nS 0\n", GateKind::M, pauli_after_circuit),
+    ] {
+        assert_eq!(
+            conjugate(&pauli("+Z"), &circuit(text)),
+            Err(AnalysisError::InvalidRequest(
+                AnalysisRequestError::PauliNarrowerThanCircuit {
+                    gate,
+                    qubit: QubitId::new(1).expect("qubit"),
+                    width: 1,
+                }
+            )),
+            "{text}"
+        );
+    }
+    assert_eq!(
+        pauli_after_circuit(&pauli("+Z"), &circuit("QUBIT_COORDS(1) 4\nTICK\nS 0\n")),
+        Ok(pauli("+Z"))
     );
 }
 

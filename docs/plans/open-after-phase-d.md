@@ -15,8 +15,8 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 | D1 | One memory-budget type in a shared leaf crate | L | Done on 2026-11-21 as `stab-foundation`. |
 | D2 | One representation of a refused budget | L | Done on 2026-11-21, with the fixed model caps of S5. |
 | D3 | One observable-id domain | M | Done on 2026-11-21, as 32 bits everywhere. |
-| D4 | Reject symlinks and unsafe path components on outputs | S | Do not reject. Document the CLI trust boundary instead. |
-| R1 | Three-way verdict from the flow checks | M | Do first. It is the only item that returns a wrong answer today. |
+| D4 | Reject symlinks and unsafe path components on outputs | S | Decided on 2026-11-21: not rejected, and the CLI path trust boundary is documented. |
+| R1 | A verdict from the flow checks | M | Done on 2026-11-21, as a two-way verdict with errors for everything else. |
 | R2 | "No logical error found" as a search outcome, named search options | M | Do. |
 | R3 | `Option` from the gate-data getters | M | Do, together with R9. |
 | R4 | One function per operation taking an options value | L | Do, after R1 and R2, and before any Python binding. |
@@ -33,7 +33,7 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 | S5 | Fixed caps in `stab-model` reported an invalid detector error model | S | Done with D2. |
 | N1 | Areas the review did not read | M | Run a second review pass before the next release. |
 
-Suggested order: R1, R2, R10, then R6 with R3 and R9, then R4 with R5 and R7, then R8, with S1 as an independent performance task at any point.
+Suggested order after R1: R2, R10, then R6 with R3 and R9, then R4 with R5 and R7, then R8, with S1 as an independent performance task at any point.
 R4 goes late on purpose: R1, R2, R3, and R7 each delete or reshape functions that R4 would otherwise rewrite twice.
 
 ## Decided And Done
@@ -77,9 +77,12 @@ The change is one `ObservableId` type whose domain is `0..=u32::MAX`, used by ci
 `DemObservableId` is removed.
 The divergence is that Stab refuses `OBSERVABLE_INCLUDE` arguments above `4294967295` at parse time where Stim's parser accepts them, and it is recorded in the parity ledger.
 
-## Decision Still Open
+## Decided Without A Code Change
 
 ### D4. Symlinks and unsafe path components on outputs
+
+Decided on 2026-11-21 as recommended below: the [path trust boundary](../architecture/README.md#path-trust-boundary) is written down, the root `AGENTS.md` points at it, and no command changed.
+The section keeps the reasoning.
 
 **Today.** `--out`, `--obs_out`, and the other output flags open the path the caller typed.
 No command checks whether a component is `..`, whether the path is a symlink, or whether the target is outside some directory.
@@ -102,6 +105,13 @@ No Stim divergence.
 ## Larger Redesigns
 
 ### R1. Three-way verdict from the flow checks
+
+**Outcome, 2026-11-21.** Done, with one change from the proposal below.
+`check_unsigned_stabilizer_flows` is the only flow check and returns one `FlowVerdict` per flow.
+Implementing it showed that the checker is complete for valid circuits: every case the old code called unsupported was either an invalid circuit, which pinned Stim also refuses and which is now an error, or a flow with terms on qubits no circuit can address, which is now decided by treating those qubits as idle.
+`FlowVerdict` is therefore `Holds` or `Violated(FlowViolation)` with no `Unsupported` variant, and it stays `#[non_exhaustive]`.
+A refused budget, a cancellation, and an invalid circuit are errors.
+The rest of this section is the proposal as written before the work.
 
 **Today.** `stab-analysis` has eight public flow-check functions in `circuit_flow/checker.rs`: `check_if_circuit_has_unsigned_stabilizer_flows`, `check_unsigned_stabilizer_flows_with_diagnostics`, `circuit_has_unsigned_stabilizer_flow`, `circuit_has_all_unsigned_stabilizer_flows`, and a `_with_options` twin of each.
 The plain forms end in `.unwrap_or_else(|_| vec![false; flows.len()])`.

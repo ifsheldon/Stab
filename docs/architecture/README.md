@@ -196,6 +196,16 @@ A circuit-sampling or detection-sampling session delivers a batch only once it i
 
 The [resource policy inventory](resource-policy-inventory.md) classifies every remaining limit constant and records each removed one.
 
+### Path Trust Boundary
+
+A path named on the `stab` command line (`--in`, `--out`, `--obs_out`, `--circuit`, `--dem`, and the other file flags) carries the authority of the caller who typed it, and the CLI opens it as given.
+The CLI does not reject `..` components, symlinks, devices, or locations outside some directory, because it has no intended output root: the caller can already read or write the same path with any other tool, `/dev/stdout` is itself a symlink, and writing through a symlinked scratch directory is ordinary use.
+Pinned Stim behaves the same way, so this is not a divergence.
+What the CLI does check is that the caller's own flags do not conflict: no output may name the same regular file as an input or another output, an existing output is written in place so its link, mode, and ownership survive, and no output is truncated before every file role has been checked.
+The rule that rejects path traversal, unsafe components, unexpected symlinks, and writes outside an output root applies to every path that Stab derives from input content, such as an archive entry, a manifest row, or a workspace file.
+No product crate derives a path: the library crates take readers, writers, and byte slices, never paths, so an embedding application owns its own path policy, and only `ops/` tooling reads manifests, archives, and workspace contents.
+A service that runs `stab` on behalf of an untrusted user must confine the process with the operating system, since a path filter inside the CLI would not be a sandbox.
+
 Domain errors retain typed context. Applications and the CLI compose them into structured diagnostics only at their workflow boundary.
 
 Human rendering is for people.

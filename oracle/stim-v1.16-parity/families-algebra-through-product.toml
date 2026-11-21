@@ -262,7 +262,7 @@ rationale = "The explain_errors product and full ErrorMatcher provenance are exp
 [[families]]
 id = "analysis.flow-checking-common"
 area = "analysis"
-contract = "Deterministic unsigned flow checking preserves measurement and observable terms, bounded-repeat equivalence, idle qubits, and typed mismatch diagnostics."
+contract = "Deterministic unsigned flow checking preserves measurement and observable terms, bounded-repeat equivalence, and idle qubits, and answers each flow with a verdict whose violations are typed; an invalid circuit, a refused budget, or a cancellation is an error, never a flow reported as not holding."
 stim_refs = ["src/stim/util_top/circuit_flow_generators.test.cc", "src/stim/util_top/has_flow.test.cc"]
 status = "done"
 owner = "stab-analysis"

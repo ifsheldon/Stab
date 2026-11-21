@@ -9,11 +9,13 @@ use std::str::FromStr;
 use proptest::prelude::*;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
 use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString};
-use stab_analysis::{
-    AnalysisError, check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
-    solve_for_flow_measurements,
-};
+use stab_analysis::{AnalysisError, circuit_flow_generators, solve_for_flow_measurements};
 use stab_model::Circuit;
+
+#[path = "support/flow_verdicts.rs"]
+mod flow_verdicts;
+
+use flow_verdicts::flow_holds;
 
 const GENERATED_CASES: u32 = 64;
 const GENERATED_SEED: [u8; 32] = [0xB4; 32];
@@ -44,10 +46,7 @@ fn pfm_b4_flow_solve_over_sixteen() {
             measurements,
             [],
         );
-        assert_eq!(
-            check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &[candidate]),
-            vec![true]
-        );
+        assert_eq!(flow_holds(&circuit, &[candidate]), vec![true]);
     }
 }
 
@@ -166,7 +165,7 @@ fn pfm_b4_flow_solver_small_arbitrary_queries_match_exhaustive_checker() {
                     [],
                 );
                 assert_eq!(
-                    check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &[candidate]),
+                    flow_holds(&circuit, &[candidate]),
                     vec![true],
                     "invalid solver answer for {circuit_text:?} and {query}"
                 );
@@ -241,7 +240,7 @@ fn pfm_b4_flow_solver_generated_cross_engine_corpus() {
                     "generated circuit did not produce flows: {error}\n{text}"
                 ))
             })?;
-            let checks = check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &generators);
+            let checks = flow_holds(&circuit, &generators);
             prop_assert!(
                 checks.iter().all(|check| *check),
                 "generated flow failed checker: {:?}\n{}\n{:?}",
@@ -277,7 +276,7 @@ fn pfm_b4_flow_solver_generated_cross_engine_corpus() {
                     [],
                 );
                 prop_assert_eq!(
-                    check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &[candidate]),
+                    flow_holds(&circuit, &[candidate]),
                     vec![true],
                     "generated solution failed checker\n{}\n{}",
                     text,
@@ -348,7 +347,7 @@ fn exhaustive_checker_solution(circuit: &Circuit, query: &Flow) -> Option<Vec<i3
             measurements.clone(),
             [],
         );
-        if check_if_circuit_has_unsigned_stabilizer_flows(circuit, &[candidate]) == vec![true] {
+        if flow_holds(circuit, &[candidate]) == vec![true] {
             return Some(measurements);
         }
     }

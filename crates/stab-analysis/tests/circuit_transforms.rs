@@ -7,12 +7,16 @@ use std::assert_matches;
 
 use stab_analysis::{
     AnalysisError, AnalysisOperation, AnalysisResult, ErrorAnalyzerOptions, ResourceKind,
-    check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
-    circuit_to_detector_error_model, circuit_with_inlined_feedback, circuit_without_noise,
-    decomposed_circuit, flattened_circuit, flattened_circuit_operations,
+    circuit_flow_generators, circuit_to_detector_error_model, circuit_with_inlined_feedback,
+    circuit_without_noise, decomposed_circuit, flattened_circuit, flattened_circuit_operations,
     flattened_detector_error_model,
 };
 use stab_model::{Circuit, CircuitItem, DetectorErrorModel};
+
+#[path = "support/flow_verdicts.rs"]
+mod flow_verdicts;
+
+use flow_verdicts::flow_holds;
 
 trait CircuitTransformTestExt {
     fn flattened(&self) -> AnalysisResult<Circuit>;
@@ -515,7 +519,7 @@ fn decomposed_preserves_selected_measurement_rich_flows() {
             decomposed.to_stim_string()
         );
         assert_eq!(
-            check_if_circuit_has_unsigned_stabilizer_flows(&decomposed, &input_flows),
+            flow_holds(&decomposed, &input_flows),
             vec![true; input_flows.len()],
             "{text}\n{}",
             decomposed.to_stim_string()

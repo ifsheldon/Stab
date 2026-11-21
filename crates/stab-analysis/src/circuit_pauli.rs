@@ -8,8 +8,9 @@ use stab_model::{
 };
 
 use crate::{
-    AnalysisError, AnalysisOperation, AnalysisResult, CircuitToTableauOptions, PauliCollapse,
-    ResourceKind, ResourceLimitError, circuit_to_tableau_with_options,
+    AnalysisError, AnalysisOperation, AnalysisRequestError, AnalysisResult,
+    CircuitToTableauOptions, PauliCollapse, ResourceKind, ResourceLimitError,
+    circuit_to_tableau_with_options,
 };
 
 /// Options for [`pauli_after_circuit_with_options`] and [`pauli_before_circuit_with_options`].
@@ -136,17 +137,16 @@ fn validate_compact_pauli_circuit(
                     return Err(unsupported_instruction(instruction, "across"));
                 }
                 for target in instruction.targets() {
+                    // Stim refuses an instruction that targets qubits outside the Pauli string.
                     if let Some(qubit) = target.qubit_id()
                         && qubit.get() as usize >= width
                     {
-                        return Err(AnalysisError::internal(
-                            AnalysisOperation::PauliConjugation,
-                            format!(
-                                "{} targets qubit {} outside Pauli width {width}",
-                                instruction.gate().canonical_name(),
-                                qubit.get()
-                            ),
-                        ));
+                        return Err(AnalysisRequestError::PauliNarrowerThanCircuit {
+                            gate: instruction.gate().kind(),
+                            qubit,
+                            width,
+                        }
+                        .into());
                     }
                 }
             }

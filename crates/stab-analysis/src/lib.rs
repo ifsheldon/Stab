@@ -40,14 +40,9 @@ pub use circuit_feedback::{
     circuit_with_inlined_feedback_with_limits,
 };
 pub use circuit_flow::{
-    FlowGeneratorOptions, UnsignedFlowCheckOptions, UnsignedStabilizerFlowCheck,
-    UnsignedStabilizerFlowFailure, check_if_circuit_has_unsigned_stabilizer_flows,
-    check_if_circuit_has_unsigned_stabilizer_flows_with_options,
-    check_unsigned_stabilizer_flows_with_diagnostics,
-    check_unsigned_stabilizer_flows_with_diagnostics_with_options, circuit_flow_generators,
-    circuit_flow_generators_with_options, circuit_has_all_unsigned_stabilizer_flows,
-    circuit_has_all_unsigned_stabilizer_flows_with_options, circuit_has_unsigned_stabilizer_flow,
-    circuit_has_unsigned_stabilizer_flow_with_options, solve_for_flow_measurements,
+    FlowGeneratorOptions, FlowVerdict, FlowViolation, UnsignedFlowCheckOptions,
+    check_unsigned_stabilizer_flows, circuit_flow_generators, circuit_flow_generators_with_options,
+    solve_for_flow_measurements,
 };
 pub use circuit_generation::{
     CodeCircuitParams, CodeDistance, CodeFamily, CodeTask, ColorCodeTask, GeneratedCircuit,

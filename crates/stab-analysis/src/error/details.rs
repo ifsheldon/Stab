@@ -358,6 +358,13 @@ pub enum AnalysisRequestError {
     IrreversibleFlow {
         detail: Cow<'static, str>,
     },
+    /// A Pauli string conjugated through a circuit with an instruction acting on a qubit beyond
+    /// the string's width.
+    PauliNarrowerThanCircuit {
+        gate: GateKind,
+        qubit: QubitId,
+        width: usize,
+    },
 }
 
 impl AnalysisRequestError {
@@ -371,6 +378,7 @@ impl AnalysisRequestError {
             Self::EmptyFlowQuery => "empty-flow-query",
             Self::UnsatisfiedFlow { .. } => "unsatisfied-flow",
             Self::IrreversibleFlow { .. } => "irreversible-flow",
+            Self::PauliNarrowerThanCircuit { .. } => "pauli-narrower-than-circuit",
         }
     }
 }
@@ -416,6 +424,12 @@ impl Display for AnalysisRequestError {
             Self::IrreversibleFlow { detail } => {
                 write!(formatter, "cannot convert circuit to tableau: {detail}")
             }
+            Self::PauliNarrowerThanCircuit { gate, qubit, width } => write!(
+                formatter,
+                "cannot convert circuit to tableau: {} targets qubit {} outside the {width}-qubit Pauli string",
+                gate.canonical_name(),
+                qubit.get()
+            ),
         }
     }
 }

@@ -18,19 +18,16 @@ use stab_analysis::{
     AnalysisError, CircuitFlattenLimits, CircuitPass, CircuitPassContext, CircuitPassError,
     CircuitPassInput, CircuitPassOutput, CircuitPassResources, CodeCircuitParams, CodeDistance,
     CodeTask, DemFlattenLimits, DetectingRegionOptions, ErrorAnalyzerOptions,
-    FeedbackInliningLimits, FlowGeneratorOptions, LogicalErrorSearchLimits, MissingDetectorOptions,
-    PauliConjugationOptions, RoundCount, SatMaterializationLimits, SurfaceCodeTask,
-    TimeReversedForFlowsOptions, UnsignedFlowCheckOptions, WithoutNoiseOptions, WithoutNoisePass,
-    check_if_circuit_has_unsigned_stabilizer_flows_with_options,
-    check_unsigned_stabilizer_flows_with_diagnostics_with_options, circuit_detecting_regions,
-    circuit_flow_generators_with_options, circuit_has_all_unsigned_stabilizer_flows_with_options,
-    circuit_has_unsigned_stabilizer_flow_with_options,
-    circuit_time_reversed_for_flows_with_options, circuit_to_detector_error_model,
-    circuit_with_inlined_feedback_with_limits, find_undetectable_logical_error_with_limits,
-    flattened_circuit_operations_with_limits, flattened_circuit_with_limits,
-    flattened_detector_error_model_with_limits, likeliest_error_sat_problem_with_limits,
-    missing_detectors, pauli_after_circuit_with_options, pauli_before_circuit_with_options,
-    run_circuit_pass, shortest_error_sat_problem_with_limits,
+    FeedbackInliningLimits, FlowGeneratorOptions, FlowVerdict, LogicalErrorSearchLimits,
+    MissingDetectorOptions, PauliConjugationOptions, RoundCount, SatMaterializationLimits,
+    SurfaceCodeTask, TimeReversedForFlowsOptions, UnsignedFlowCheckOptions, WithoutNoiseOptions,
+    WithoutNoisePass, check_unsigned_stabilizer_flows, circuit_detecting_regions,
+    circuit_flow_generators_with_options, circuit_time_reversed_for_flows_with_options,
+    circuit_to_detector_error_model, circuit_with_inlined_feedback_with_limits,
+    find_undetectable_logical_error_with_limits, flattened_circuit_operations_with_limits,
+    flattened_circuit_with_limits, flattened_detector_error_model_with_limits,
+    likeliest_error_sat_problem_with_limits, missing_detectors, pauli_after_circuit_with_options,
+    pauli_before_circuit_with_options, run_circuit_pass, shortest_error_sat_problem_with_limits,
     shortest_graphlike_undetectable_logical_error_with_limits,
 };
 use stab_model::advanced::CancellationCountdown;
@@ -199,28 +196,15 @@ fn flow_checks_report_cancellation_instead_of_failing_flows_closed() {
             ..UnsignedFlowCheckOptions::default()
         };
         assert_eq!(
-            check_if_circuit_has_unsigned_stabilizer_flows_with_options(&fixture, &flows, &unset),
-            Ok(vec![true; flows.len()]),
+            check_unsigned_stabilizer_flows(&fixture, &flows, &unset),
+            Ok(vec![FlowVerdict::Holds; flows.len()]),
             "{text}"
         );
         let set = UnsignedFlowCheckOptions {
             cancellation: cancelled(),
             ..UnsignedFlowCheckOptions::default()
         };
-        assert_cancelled(check_if_circuit_has_unsigned_stabilizer_flows_with_options(
-            &fixture, &flows, &set,
-        ));
-        assert_cancelled(
-            check_unsigned_stabilizer_flows_with_diagnostics_with_options(&fixture, &flows, &set),
-        );
-        assert_cancelled(circuit_has_unsigned_stabilizer_flow_with_options(
-            &fixture,
-            flows.first().expect("fixture flow"),
-            &set,
-        ));
-        assert_cancelled(circuit_has_all_unsigned_stabilizer_flows_with_options(
-            &fixture, &flows, &set,
-        ));
+        assert_cancelled(check_unsigned_stabilizer_flows(&fixture, &flows, &set));
     }
 }
 
@@ -384,7 +368,7 @@ fn wide_flow_regions_and_long_sat_clauses_honor_a_set_signal() {
     flow_text.push_str(&"_".repeat(4094));
     flow_text.push_str("Z xor rec[-1]");
     let wide_flows = flows(&[&flow_text]);
-    assert_cancelled(check_if_circuit_has_unsigned_stabilizer_flows_with_options(
+    assert_cancelled(check_unsigned_stabilizer_flows(
         &wide_circuit,
         &wide_flows,
         &UnsignedFlowCheckOptions {

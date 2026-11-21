@@ -6,10 +6,13 @@
 use std::str::FromStr;
 
 use stab_algebra::{Flow, PauliBasis};
-use stab_analysis::{
-    check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators, decomposed_circuit,
-};
+use stab_analysis::{circuit_flow_generators, decomposed_circuit};
 use stab_model::Circuit;
+
+#[path = "support/flow_verdicts.rs"]
+mod flow_verdicts;
+
+use flow_verdicts::flow_holds;
 
 /// Exact generator strings recorded from pinned Stim v1.16.0 (C++ and Python
 /// `circuit_flow_generators` tests plus direct probes). Rows already owned by the pinned
@@ -331,7 +334,7 @@ fn circuit_flow_generators_measurement_subset_flows_satisfy_checker() {
         let circuit = circuit(text);
         let flows = circuit_flow_generators(&circuit).expect(text);
         assert_eq!(
-            check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
+            flow_holds(&circuit, &flows),
             vec![true; flows.len()],
             "{text}"
         );
@@ -368,7 +371,7 @@ fn circuit_flow_generators_promotes_composed_measurement_subset() {
         let circuit = circuit(text);
         let flows = circuit_flow_generators(&circuit).expect(text);
         assert_eq!(
-            check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
+            flow_holds(&circuit, &flows),
             vec![true; flows.len()],
             "{text}"
         );
@@ -405,7 +408,7 @@ fn circuit_flow_generators_promotes_unitary_mixed_measurement_subset() {
         let circuit = circuit(text);
         let flows = circuit_flow_generators(&circuit).expect(text);
         assert_eq!(
-            check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
+            flow_holds(&circuit, &flows),
             vec![true; flows.len()],
             "{text}"
         );
@@ -492,7 +495,7 @@ fn circuit_flow_generators_measurement_subset_composes_spp_unitaries() {
             "{text}"
         );
         assert_eq!(
-            check_if_circuit_has_unsigned_stabilizer_flows(&original, &flows),
+            flow_holds(&original, &flows),
             vec![true; flows.len()],
             "{text}"
         );
@@ -712,7 +715,7 @@ fn circuit_flow_generators_measurement_subset_promotes_generated_all_operations_
     signed_actual.sort_unstable();
     assert_eq!(signed_actual, expected);
     assert_eq!(
-        check_if_circuit_has_unsigned_stabilizer_flows(&all_operations_circuit, &flows),
+        flow_holds(&all_operations_circuit, &flows),
         vec![true; flows.len()]
     );
 }
@@ -779,7 +782,7 @@ fn circuit_flow_generators_promotes_bounded_repeat_measurement_subset() {
             circuit_flow_generators(&circuit(expanded_text)).expect(expanded_text)
         );
         assert_eq!(
-            check_if_circuit_has_unsigned_stabilizer_flows(&repeat_circuit, &repeat_flows),
+            flow_holds(&repeat_circuit, &repeat_flows),
             vec![true; repeat_flows.len()],
             "{repeat_text}"
         );
@@ -892,10 +895,7 @@ fn circuit_flow_generators_measurement_subset_supports_measurement_free_mixed_sw
             "Z__ -> Z__",
         ]
     );
-    assert_eq!(
-        check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
-        vec![true; flows.len()]
-    );
+    assert_eq!(flow_holds(&circuit, &flows), vec![true; flows.len()]);
 }
 
 #[test]

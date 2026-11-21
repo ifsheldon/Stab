@@ -79,14 +79,14 @@ Every admitted workload produces byte-identical output; only workloads that the 
 | `CircuitPassLimits` item, target, argument, and payload fields, `DEFAULT_MAX_*` constants, and builders | `CircuitPassLimits::new(memory_budget, repeat_nesting)` with `memory_budget` and `with_memory_budget` |
 | Fixed analyzer, feedback-inlining, Pauli-conjugation, time-reversal, flow-generator, missing-detector, detecting-region, and coordinate-query work caps | Removed; retained storage is admitted against a caller budget: `ErrorAnalyzerOptions::memory_budget`, `circuit_with_inlined_feedback_with_limits`, `DetectorErrorModel::detector_coordinates_with_budget`, the generator parameters' `with_memory_budget`, `TimeReversedForFlowsOptions::memory_budget`, `InverseQecOptions::memory_budget`, `FlowGeneratorOptions::memory_budget`, `MissingDetectorOptions::memory_budget`, `DetectingRegionOptions::memory_budget`, `DetectingRegionTargetOptions::memory_budget`, `all_detecting_region_targets_with_budget`, and `all_detecting_region_ticks_with_budget`; the functions without one use `MemoryBudget::DEFAULT` |
 | The generator's 131,072-physical-qubit cap | A projected one mebibyte plus 768 bytes per physical qubit admitted against the generator parameters' budget |
-| Flow checking, Pauli conjugation, and `Flow` text parsing at the default budget only | `check_if_circuit_has_unsigned_stabilizer_flows_with_options`, `check_unsigned_stabilizer_flows_with_diagnostics_with_options`, `circuit_has_unsigned_stabilizer_flow_with_options`, and `circuit_has_all_unsigned_stabilizer_flows_with_options` with `UnsignedFlowCheckOptions`; `pauli_after_circuit_with_options` and `pauli_before_circuit_with_options` with `PauliConjugationOptions`; and `Flow::from_str_with_budget`; the existing functions delegate with the default budget |
+| Flow checking, Pauli conjugation, and `Flow` text parsing at the default budget only | `check_unsigned_stabilizer_flows` with `UnsignedFlowCheckOptions`, which is the only flow check (see [One Flow Check With A Verdict](#one-flow-check-with-a-verdict)); `pauli_after_circuit_with_options` and `pauli_before_circuit_with_options` with `PauliConjugationOptions`; and `Flow::from_str_with_budget`; the existing Pauli conjugation and parsing functions delegate with the default budget |
 | `sample_if_circuit_has_stabilizer_flows` at the default budget only | `sample_if_circuit_has_stabilizer_flows_with_options` with `SampledFlowOptions`, whose `memory_budget` admits each flow's augmented noiseless witness circuit, compiled sampling plan, witness simulator, and session; the existing function delegates with the default budget |
 
 `ErrorAnalyzerOptions`, `TimeReversedForFlowsOptions`, `InverseQecOptions`, `FlowGeneratorOptions`, `MissingDetectorOptions`, `DetectingRegionOptions`, and `DetectingRegionTargetOptions` gained the public `memory_budget` field, so struct literals must add it, for example `memory_budget: MemoryBudget::DEFAULT`, or use `..Default::default()`.
 One caller budget governs each of these operations end to end: flow generation passes it to the Tableau of a unitary circuit, missing-detector discovery to the flow generators it runs, time reversal to the dense Tableau that validates unitary input flows, and detecting regions to the Pauli strings of each output region.
 Measurement-rich time reversal and the QEC inverse now refuse an expansion above the budget with `AnalysisError::ResourceLimit` for the new `stab_analysis::AnalysisOperation::TimeReversal` operation (`time-reversal`, resource `materialized-bytes`) instead of an invalid-conversion message.
 The flow-check and Pauli-conjugation `*_with_options` functions return `AnalysisResult`: a Tableau the budget refuses falls back to the sparse tracker or the expanded instruction walk, and live sparse-tracker sensitivity state or an extracted or conjugated Pauli string the budget refuses is reported as `ResourceLimit` for the new `AnalysisOperation::FlowCheck` (`flow-check`) or for `AnalysisOperation::PauliConjugation`, so exhaustive matches on `AnalysisOperation` must add `FlowCheck`.
-The unbudgeted `check_if_circuit_has_unsigned_stabilizer_flows` family still returns plain values and fails such a flow closed.
+The flow check has no unbudgeted form, so a refusal is always reported as an error and never as a flow that does not hold.
 `Flow` text whose sparse term requests more than the budget, such as `X1000000000000 -> Z0`, now fails with `StabilizerError::MemoryBudgetExceeded` instead of `StabilizerError::InvalidFlowText`, and a detecting region the budget refuses reports `ResourceLimit` for `DetectingRegions` instead of an invalid-model message.
 The CLI's fixed 64 MiB input caps and 1 MiB or 64 MiB per-record caps are replaced by `--memory-budget`, which bounds whole inputs at the budget and streamed records at half of it.
 The CLI applies `--memory-budget` to a whole command instead of to each stage: plan compilation receives the budget less the active model's bytes, sessions and streaming runs receive the budget less the compiled plan's `retained_bytes()` (via `session_with_budget`, `streaming_run_with_budget`, and `DemSamplerLimits`), and input text, parsed models, and pre-inlining circuits are dropped as soon as no later stage reads them.
@@ -109,7 +109,7 @@ See the resource policy inventory's Cooperative Cancellation section for where e
 | `ErrorAnalyzerOptions`, `MissingDetectorOptions`, `DetectingRegionOptions`, `DetectingRegionTargetOptions`, `TimeReversedForFlowsOptions`, `InverseQecOptions` | Gained a public `cancellation` field and are no longer `Copy`; struct literals add `cancellation: Cancellation::never()` or use `..Default::default()`, and `MissingDetectorOptions` now implements `Default` |
 | `circuit_with_inlined_feedback_with_memory_budget(circuit, budget)` | `circuit_with_inlined_feedback_with_limits(circuit, FeedbackInliningLimits::new(budget))` |
 | None | `circuit_flow_generators_with_options` with `FlowGeneratorOptions`, `DemFlattenedInstructionIter::with_cancellation`, the defaulted `FoldedDemVisitor::poll_cancellation` hook, and `stab_model::advanced::CancellationCountdown` |
-| None | `UnsignedFlowCheckOptions::cancellation` for the flow-check `*_with_options` functions and `PauliConjugationOptions::cancellation` for `pauli_after_circuit_with_options` and `pauli_before_circuit_with_options`; a cancelled flow check returns `Cancelled` rather than failing its flows closed |
+| None | `UnsignedFlowCheckOptions::cancellation` for `check_unsigned_stabilizer_flows` and `PauliConjugationOptions::cancellation` for `pauli_after_circuit_with_options` and `pauli_before_circuit_with_options`; a cancelled flow check returns `Cancelled` rather than failing its flows closed |
 | None | `SampledFlowOptions::cancellation` for `sample_if_circuit_has_stabilizer_flows_with_options`, which returns the new `SampledFlowError::Cancelled` variant rather than a verdict from partial samples, so exhaustive matches on `SampledFlowError` must add it |
 | Exhaustive matches on `ModelError`, `AnalysisError`, `SamplingCompileError`, `SamplingExecutionError`, `DetectionError`, `DetectionExecutionError`, and `DemError` | Add the new `Cancelled(Cancelled)` variant; `SamplingCompileErrorCode::Cancelled` reports `cancelled`, and `AnalysisError` converts a model `Cancelled` into its own variant |
 
@@ -140,7 +140,7 @@ Behavior changes for workloads the removed caps admitted:
 - `Tableau::from_stabilizers` now runs Stim's elimination, so its X outputs and the stabilizers it adds to an underconstrained input match Stim exactly; earlier builds returned valid but different destabilizers and completions for most inputs. Its Z outputs are unchanged. An anticommuting input reports the first anticommuting pair in input order, the later generator as `stabilizer` and the earlier as `conflict`, and both fields are indices into the input.
 - `circuit_to_tableau` refuses a Tableau above the memory budget with `AnalysisError::ResourceLimit` for the `tableau-conversion` operation instead of an invalid-conversion message, and no longer caps repeat work.
 - Unitary `circuit_time_reversed_for_flows` validates a wide circuit that the sparse tracker cannot fold against the dense Tableau instead of refusing it.
-- Flow checking and the input-flow validation of unitary time reversal choose between the dense Tableau and the sparse reverse tracker by estimated cost instead of a 512-qubit threshold. `check_unsigned_stabilizer_flows_with_diagnostics` reports `OutputMismatch`, with the circuit's image of the input as wide as the widest of the circuit, the input, and the output, for every failing Pauli-only flow of a circuit made of unitaries, annotations, and noise; wide circuits, repeat blocks, and flows narrower than the circuit previously reported `InputMismatch` there. Other Pauli mismatches still report `InputMismatch`.
+- Flow checking and the input-flow validation of unitary time reversal choose between the dense Tableau and the sparse reverse tracker by estimated cost instead of a 512-qubit threshold. `check_unsigned_stabilizer_flows` reports `FlowViolation::OutputMismatch`, with the circuit's image of the input as wide as the widest of the circuit, the input, and the output, for every failing Pauli-only flow of a circuit made of unitaries, annotations, and noise; wide circuits, repeat blocks, and flows narrower than the circuit previously reported `InputMismatch` there. Other Pauli mismatches still report `InputMismatch`.
 - Ignored-only and unitary `circuit_flow_generators` admit their flow rows in bytes instead of a 4096-qubit bound, and detecting regions no longer refuse an output region wider than 1,048,576 qubits by count.
 - `Tableau::from_unitary` accepts any power-of-two dimension, as Stim does; a matrix that is not Clifford still reports `UnitaryMatrixNotClifford`.
 
@@ -441,6 +441,33 @@ Refusals that were misreported are now typed:
 - A failed reservation for a detecting region is `AnalysisError::AllocationFailed`, where it was labelled a memory-budget refusal.
 - A budget refusal raised while a sample run is writing reports `resource-limit-exceeded` instead of `sampling-execution-failed`.
 - The JSON `span` of a refusal that has no source position is `null` instead of an empty span at byte zero.
+
+## One Flow Check With A Verdict
+
+`stab_analysis::check_unsigned_stabilizer_flows(circuit, flows, options)` is the only unsigned flow check and returns `AnalysisResult<Vec<FlowVerdict>>`.
+`FlowVerdict` is `Holds` or `Violated(FlowViolation)`, with `holds()` and `violation()` accessors.
+The checker decides every flow of a valid circuit; an invalid circuit, a refused memory budget, and a cancellation are errors, never a verdict.
+
+| Removed | Replacement |
+| --- | --- |
+| `check_if_circuit_has_unsigned_stabilizer_flows` and `_with_options` | `check_unsigned_stabilizer_flows`, mapping each verdict with `FlowVerdict::holds` |
+| `check_unsigned_stabilizer_flows_with_diagnostics` and `_with_options` | `check_unsigned_stabilizer_flows` |
+| `circuit_has_unsigned_stabilizer_flow` and `_with_options` | `check_unsigned_stabilizer_flows` with `std::slice::from_ref(&flow)` |
+| `circuit_has_all_unsigned_stabilizer_flows` and `_with_options` | `check_unsigned_stabilizer_flows`, then `.iter().all(FlowVerdict::holds)` |
+| `UnsignedStabilizerFlowCheck::has_flow()` and `failure()` | `FlowVerdict::holds()` and `violation()` |
+| `UnsignedStabilizerFlowFailure::{OutputMismatch, InputMismatch, MeasurementRecordOutOfRange, CollapseAnticommutation}` | The same variants of `FlowViolation` |
+| `UnsignedStabilizerFlowFailure::UnsupportedCircuit { reason }` | An `AnalysisError`, as listed below |
+
+Callers pass `&UnsignedFlowCheckOptions::default()` for the default budget.
+
+Behavior changes:
+
+- The removed functions without options returned `false` for every flow when the default memory budget refused the work. The check now returns `AnalysisError::ResourceLimit`, and `memory_budget_exceeded()` reports the amounts.
+- A circuit with an anti-Hermitian `SPP`, `SPP_DAG`, or `MPP` product returns `AnalysisError::AntiHermitianPauliProduct`, and a circuit record that looks back before the first measurement returns `AnalysisError::MeasurementRecordOutOfRange`. Both read as `false` or `UnsupportedCircuit` before, and pinned Stim refuses both circuits.
+- A flow measurement term outside the circuit's records is still a verdict, `FlowViolation::MeasurementRecordOutOfRange`, where Stim throws; the answer stays per flow so the rest of the batch is decided.
+- A flow with terms on qubit `2^24` or above, which no circuit target can address, is decided by treating those qubits as idle. It was reported as unsupported before, together with every other flow of the batch, and unitary time reversal with such a flow failed with `InternalInvariant`.
+- The Pauli strings in `OutputMismatch` and `InputMismatch` are admitted against the options' memory budget before they are built.
+- `pauli_after_circuit` and `pauli_before_circuit` given a Pauli string narrower than a qubit the circuit acts on return `AnalysisError::InvalidRequest(AnalysisRequestError::PauliNarrowerThanCircuit { gate, qubit, width })` instead of `InternalInvariant`, matching Stim's refusal. The new variant breaks an exhaustive match on `AnalysisRequestError`.
 
 ## One Observable Id
 

@@ -8,9 +8,8 @@ use std::str::FromStr;
 
 use stab_algebra::Flow;
 use stab_analysis::{
-    UnsignedStabilizerFlowFailure, check_if_circuit_has_unsigned_stabilizer_flows,
-    check_unsigned_stabilizer_flows_with_diagnostics, circuit_flow_generators,
-    solve_for_flow_measurements,
+    FlowVerdict, FlowViolation, UnsignedFlowCheckOptions, check_unsigned_stabilizer_flows,
+    circuit_flow_generators, solve_for_flow_measurements,
 };
 use stab_model::Circuit;
 
@@ -301,24 +300,23 @@ fn assert_bounded_repeat_generation_and_checking() {
         circuit_flow_generators(&expanded).expect("expanded generators")
     );
     assert_eq!(
-        check_if_circuit_has_unsigned_stabilizer_flows(&repeated, &flows),
-        vec![true; flows.len()]
+        check_unsigned_stabilizer_flows(&repeated, &flows, &UnsignedFlowCheckOptions::default()),
+        Ok(vec![FlowVerdict::Holds; flows.len()])
     );
 }
 
 fn assert_flow_diagnostics() {
     let circuit = circuit("H 0\n");
     let flows = [flow("X -> Z"), flow("X -> X")];
-    assert_eq!(
-        check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
-        [true, false]
-    );
-
-    let diagnostics = check_unsigned_stabilizer_flows_with_diagnostics(&circuit, &flows);
-    assert!(diagnostics.first().is_some_and(|check| check.has_flow()));
+    let verdicts =
+        check_unsigned_stabilizer_flows(&circuit, &flows, &UnsignedFlowCheckOptions::default())
+            .expect("decide flows");
     assert_matches!(
-        diagnostics.get(1).and_then(|check| check.failure()),
-        Some(UnsignedStabilizerFlowFailure::OutputMismatch { .. })
+        verdicts.as_slice(),
+        [
+            FlowVerdict::Holds,
+            FlowVerdict::Violated(FlowViolation::OutputMismatch { .. })
+        ]
     );
 }
 

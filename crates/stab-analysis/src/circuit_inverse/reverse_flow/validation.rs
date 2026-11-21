@@ -14,9 +14,7 @@ use super::{
     absolute_measurement_index, any_nested_instruction, instruction_text, invalid_flow_request,
 };
 use crate::circuit_flow::transitions::{ReverseFlowTransition, reverse_flow_transition};
-use crate::circuit_flow::{
-    UnsignedFlowCheckOptions, check_unsigned_flows_with_sparse_tracker, stops_flow_check,
-};
+use crate::circuit_flow::{UnsignedFlowCheckOptions, sparse_flow_verdicts, stops_flow_check};
 use crate::controlled_pauli::{ControlSlot, controlled_pauli_form};
 use crate::{AnalysisError, AnalysisOperation, AnalysisResult, ResourceKind, ResourceLimitError};
 
@@ -223,19 +221,18 @@ pub(super) fn validate_output_flows(
     flows: &[Flow],
     options: &UnsignedFlowCheckOptions,
 ) -> AnalysisResult<()> {
-    let checks =
-        check_unsigned_flows_with_sparse_tracker(circuit, flows, options).map_err(|error| {
-            if stops_flow_check(&error) {
-                error
-            } else {
-                AnalysisError::internal(
-                    AnalysisOperation::TimeReversal,
-                    format!("failed to validate reversed flows: {error}"),
-                )
-            }
-        })?;
-    for (index, (flow, satisfied)) in flows.iter().zip(checks).enumerate() {
-        if !satisfied {
+    let checks = sparse_flow_verdicts(circuit, flows, options).map_err(|error| {
+        if stops_flow_check(&error) {
+            error
+        } else {
+            AnalysisError::internal(
+                AnalysisOperation::TimeReversal,
+                format!("failed to validate reversed flows: {error}"),
+            )
+        }
+    })?;
+    for (index, (flow, verdict)) in flows.iter().zip(checks).enumerate() {
+        if !verdict.holds() {
             return Err(AnalysisError::internal(
                 AnalysisOperation::TimeReversal,
                 format!("reversed flow {index} is not satisfied by the reversed circuit: {flow}"),
