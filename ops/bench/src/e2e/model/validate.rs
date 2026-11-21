@@ -3,6 +3,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use super::super::error::{
+    BaselineBound, BaselineProblem, CaseProblem, FamilyProblem, IdKind, PolicyField, RecipeKind,
+    SuiteViolation, SuiteViolations,
+};
 use super::{
     BOOTSTRAP_RESAMPLES, BOOTSTRAP_SEED, COMMAND_TIMEOUT_SECONDS, CONFIDENCE_LEVEL, Case, CaseId,
     Comparator, DataRecipe, Family, FileRole, FileSpec, MAX_RELEASE_CASES, MAX_RELEASE_FAMILIES,
@@ -12,19 +16,42 @@ use super::{
     WorkUnit, Workload,
 };
 
+type Errors = Vec<SuiteViolation>;
+
+/// Records a case-level violation.
+fn case_issue(errors: &mut Errors, case: &CaseId, problem: CaseProblem) {
+    errors.push(SuiteViolation::Case {
+        case: case.clone(),
+        problem,
+    });
+}
+
+/// Records a family-level violation.
+fn family_issue(errors: &mut Errors, family: &str, problem: FamilyProblem) {
+    errors.push(SuiteViolation::Family {
+        family: family.to_string(),
+        problem,
+    });
+}
+
+/// Records a baseline-level violation.
+fn baseline_issue(errors: &mut Errors, case: &CaseId, problem: BaselineProblem) {
+    errors.push(SuiteViolation::Baseline {
+        case: case.clone(),
+        problem,
+    });
+}
+
 impl Suite {
-    pub(in crate::e2e) fn validate(&self) -> Result<(), String> {
+    pub(in crate::e2e) fn validate(&self) -> Result<(), SuiteViolations> {
         let mut errors = Vec::new();
         if self.schema_version != SUITE_SCHEMA_VERSION {
-            errors.push(format!(
-                "schema_version is {}, expected {SUITE_SCHEMA_VERSION}",
-                self.schema_version
-            ));
+            errors.push(SuiteViolation::SchemaVersion {
+                actual: self.schema_version,
+            });
         }
         if self.stim.version != STIM_VERSION || self.stim.commit != STIM_COMMIT {
-            errors.push(format!(
-                "Stim identity must remain {STIM_VERSION} at {STIM_COMMIT}"
-            ));
+            errors.push(SuiteViolation::StimIdentity);
         }
         validate_policy(&self.policy, &mut errors);
         for (tier, expected_warmups, expected_samples) in
@@ -32,27 +59,29 @@ impl Suite {
         {
             match self.tiers.get(&tier) {
                 Some(policy)
-                    if policy.warmups == expected_warmups
-                        && policy.samples == expected_samples => {}
-                Some(policy) => errors.push(format!(
-                    "tier {tier} must use {expected_warmups} warmups and {expected_samples} samples, found {} and {}",
-                    policy.warmups, policy.samples
-                )),
-                None => errors.push(format!("tier {tier} is missing")),
+                    if policy.warmups == expected_warmups && policy.samples == expected_samples => {
+                }
+                Some(policy) => errors.push(SuiteViolation::TierShape {
+                    tier,
+                    expected_warmups,
+                    expected_samples,
+                    warmups: policy.warmups,
+                    samples: policy.samples,
+                }),
+                None => errors.push(SuiteViolation::TierMissing { tier }),
             }
         }
         if self.families.len() > MAX_RELEASE_FAMILIES {
-            errors.push(format!(
-                "release family count {} exceeds {MAX_RELEASE_FAMILIES}",
-                self.families.len()
-            ));
+            errors.push(SuiteViolation::FamilyCap {
+                count: self.families.len(),
+                maximum: MAX_RELEASE_FAMILIES,
+            });
         }
         if self.expected_release_families != self.families.len() {
-            errors.push(format!(
-                "expected_release_families is {}, actual count is {}",
-                self.expected_release_families,
-                self.families.len()
-            ));
+            errors.push(SuiteViolation::FamilyCount {
+                declared: self.expected_release_families,
+                actual: self.families.len(),
+            });
         }
         let case_count = self
             .families
@@ -60,123 +89,130 @@ impl Suite {
             .map(|family| family.cases.len())
             .sum::<usize>();
         if case_count > MAX_RELEASE_CASES {
-            errors.push(format!(
-                "release case count {case_count} exceeds {MAX_RELEASE_CASES}"
-            ));
+            errors.push(SuiteViolation::CaseCap {
+                count: case_count,
+                maximum: MAX_RELEASE_CASES,
+            });
         }
         if self.expected_release_cases != case_count {
-            errors.push(format!(
-                "expected_release_cases is {}, actual count is {case_count}",
-                self.expected_release_cases
-            ));
+            errors.push(SuiteViolation::CaseCount {
+                declared: self.expected_release_cases,
+                actual: case_count,
+            });
         }
         validate_families(&self.families, &mut errors);
         validate_baselines(&self.self_baselines, &self.families, &mut errors);
-        errors.is_empty().ok_or_else(|| errors.join("\n"))
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(SuiteViolations(errors))
+        }
     }
 }
 
-fn validate_policy(policy: &Policy, errors: &mut Vec<String>) {
-    if policy.timing_boundary != TIMING_BOUNDARY {
-        errors.push(format!("timing_boundary must be {TIMING_BOUNDARY}"));
-    }
-    if policy.parity_max_ratio != PARITY_MAX_RATIO {
-        errors.push(format!("parity_max_ratio must remain {PARITY_MAX_RATIO}"));
-    }
-    if policy.self_regression_max_ratio != SELF_REGRESSION_MAX_RATIO {
-        errors.push(format!(
-            "self_regression_max_ratio must remain {SELF_REGRESSION_MAX_RATIO}"
-        ));
-    }
-    if policy.bootstrap_seed != BOOTSTRAP_SEED {
-        errors.push(format!("bootstrap_seed must remain {BOOTSTRAP_SEED}"));
-    }
-    if policy.bootstrap_resamples != BOOTSTRAP_RESAMPLES {
-        errors.push(format!(
-            "bootstrap_resamples must remain {BOOTSTRAP_RESAMPLES}"
-        ));
-    }
-    if policy.confidence_level != CONFIDENCE_LEVEL {
-        errors.push(format!("confidence_level must remain {CONFIDENCE_LEVEL}"));
-    }
-    if policy.maximum_temperature_millidegrees != MAXIMUM_TEMPERATURE_MILLIDEGREES {
-        errors.push(format!(
-            "maximum_temperature_millidegrees must remain {MAXIMUM_TEMPERATURE_MILLIDEGREES}"
-        ));
-    }
-    if policy.maximum_output_bytes != MAXIMUM_OUTPUT_BYTES {
-        errors.push(format!(
-            "maximum_output_bytes must remain {MAXIMUM_OUTPUT_BYTES}"
-        ));
-    }
-    if policy.command_timeout_seconds != COMMAND_TIMEOUT_SECONDS {
-        errors.push(format!(
-            "command_timeout_seconds must remain {COMMAND_TIMEOUT_SECONDS}"
-        ));
+fn validate_policy(policy: &Policy, errors: &mut Errors) {
+    for (field, holds) in [
+        (
+            PolicyField::TimingBoundary,
+            policy.timing_boundary == TIMING_BOUNDARY,
+        ),
+        (
+            PolicyField::ParityMaxRatio,
+            policy.parity_max_ratio == PARITY_MAX_RATIO,
+        ),
+        (
+            PolicyField::SelfRegressionMaxRatio,
+            policy.self_regression_max_ratio == SELF_REGRESSION_MAX_RATIO,
+        ),
+        (
+            PolicyField::BootstrapSeed,
+            policy.bootstrap_seed == BOOTSTRAP_SEED,
+        ),
+        (
+            PolicyField::BootstrapResamples,
+            policy.bootstrap_resamples == BOOTSTRAP_RESAMPLES,
+        ),
+        (
+            PolicyField::ConfidenceLevel,
+            policy.confidence_level == CONFIDENCE_LEVEL,
+        ),
+        (
+            PolicyField::MaximumTemperature,
+            policy.maximum_temperature_millidegrees == MAXIMUM_TEMPERATURE_MILLIDEGREES,
+        ),
+        (
+            PolicyField::MaximumOutputBytes,
+            policy.maximum_output_bytes == MAXIMUM_OUTPUT_BYTES,
+        ),
+        (
+            PolicyField::CommandTimeout,
+            policy.command_timeout_seconds == COMMAND_TIMEOUT_SECONDS,
+        ),
+    ] {
+        if !holds {
+            errors.push(SuiteViolation::Policy(field));
+        }
     }
 }
 
-fn validate_families(families: &[Family], errors: &mut Vec<String>) {
+fn validate_families(families: &[Family], errors: &mut Errors) {
     let mut family_ids = BTreeSet::new();
     let mut case_ids = BTreeSet::new();
     for family in families {
-        validate_id("family", &family.id, errors);
+        validate_id(IdKind::Family, &family.id, errors);
         if !family_ids.insert(family.id.as_str()) {
-            errors.push(format!("duplicate family id {}", family.id));
+            errors.push(SuiteViolation::DuplicateFamily {
+                family: family.id.clone(),
+            });
         }
         if family.description.trim().is_empty() {
-            errors.push(format!("family {} has an empty description", family.id));
+            family_issue(errors, &family.id, FamilyProblem::EmptyDescription);
         }
         if family.prerequisites.is_empty() {
-            errors.push(format!(
-                "family {} has no correctness prerequisites",
-                family.id
-            ));
+            family_issue(errors, &family.id, FamilyProblem::NoPrerequisites);
         }
         let mut prerequisites = BTreeSet::new();
         for prerequisite in &family.prerequisites {
             if !prerequisites.insert(prerequisite) {
-                errors.push(format!(
-                    "family {} repeats prerequisite {prerequisite}",
-                    family.id
-                ));
+                family_issue(
+                    errors,
+                    &family.id,
+                    FamilyProblem::RepeatedPrerequisite(prerequisite.clone()),
+                );
             }
         }
         match (family.runner, family.comparator) {
             (RunnerKind::Cli, Comparator::StimCli) | (RunnerKind::Rust, Comparator::SelfOnly) => {}
-            _ => errors.push(format!(
-                "family {} has inconsistent runner and comparator",
-                family.id
-            )),
+            _ => family_issue(errors, &family.id, FamilyProblem::InconsistentRunner),
         }
         if family.cases.is_empty() {
-            errors.push(format!("family {} has no cases", family.id));
+            family_issue(errors, &family.id, FamilyProblem::NoCases);
         }
         for case in &family.cases {
-            validate_id("case", &case.id, errors);
-            let qualified = CaseId::new(&family.id, &case.id).to_string();
+            validate_id(IdKind::Case, &case.id, errors);
+            let qualified = CaseId::new(&family.id, &case.id);
             if !case_ids.insert(qualified.clone()) {
-                errors.push(format!("duplicate case id {qualified}"));
+                errors.push(SuiteViolation::DuplicateCase {
+                    case: qualified.clone(),
+                });
             }
             if case.batch == 0 {
-                errors.push(format!("case {qualified} has a zero batch"));
+                case_issue(errors, &qualified, CaseProblem::ZeroBatch);
             }
             if case.work.amount == 0 {
-                errors.push(format!("case {qualified} has zero semantic work"));
+                case_issue(errors, &qualified, CaseProblem::ZeroWork);
             }
             if case.maximum_stab_peak_rss_bytes == 0 {
-                errors.push(format!("case {qualified} has a zero RSS limit"));
+                case_issue(errors, &qualified, CaseProblem::ZeroRss);
             } else if case.maximum_stab_peak_rss_bytes > MAXIMUM_CASE_RSS_BYTES {
-                errors.push(format!(
-                    "case {qualified} exceeds the {MAXIMUM_CASE_RSS_BYTES}-byte RSS policy cap"
-                ));
+                case_issue(errors, &qualified, CaseProblem::RssCap);
             }
             validate_workload(family, case, &qualified, errors);
         }
     }
 }
 
-fn validate_workload(family: &Family, case: &Case, qualified: &str, errors: &mut Vec<String>) {
+fn validate_workload(family: &Family, case: &Case, qualified: &CaseId, errors: &mut Errors) {
     match (&case.workload, family.runner) {
         (
             Workload::Cli {
@@ -196,9 +232,7 @@ fn validate_workload(family: &Family, case: &Case, qualified: &str, errors: &mut
         }
         (Workload::CliPipeline { steps, stdout }, RunnerKind::Cli) => {
             if steps.len() < 2 {
-                errors.push(format!(
-                    "case {qualified} pipeline needs at least two steps"
-                ));
+                case_issue(errors, qualified, CaseProblem::ShortPipeline);
             }
             for step in steps {
                 validate_args(&step.args, qualified, errors);
@@ -207,18 +241,14 @@ fn validate_workload(family: &Family, case: &Case, qualified: &str, errors: &mut
                 .first()
                 .is_some_and(|step| step.stdin != PipelineInput::Empty)
             {
-                errors.push(format!(
-                    "case {qualified} first pipeline step needs empty stdin"
-                ));
+                case_issue(errors, qualified, CaseProblem::FirstStepStdin);
             }
             if steps
                 .iter()
                 .skip(1)
                 .any(|step| step.stdin != PipelineInput::Previous)
             {
-                errors.push(format!(
-                    "case {qualified} later pipeline steps need previous stdout"
-                ));
+                case_issue(errors, qualified, CaseProblem::LaterStepStdin);
             }
             if let Some(last) = steps.last() {
                 validate_cli_semantic_work(case, &last.args, qualified, errors);
@@ -241,18 +271,14 @@ fn validate_workload(family: &Family, case: &Case, qualified: &str, errors: &mut
                 || case.work.unit != WorkUnit::Shots
                 || case.work.amount != *shots
             {
-                errors.push(format!(
-                    "case {qualified} Rust pipeline needs matching positive work and a nontrivial logical-failure band"
-                ));
+                case_issue(errors, qualified, CaseProblem::RustPipelineBand);
             }
         }
-        _ => errors.push(format!(
-            "case {qualified} workload does not match its family runner"
-        )),
+        _ => case_issue(errors, qualified, CaseProblem::RunnerMismatch),
     }
 }
 
-fn validate_data(recipe: &DataRecipe, qualified: &str, errors: &mut Vec<String>) {
+fn validate_data(recipe: &DataRecipe, qualified: &CaseId, errors: &mut Errors) {
     let probability_is_valid = |value: f64| value.is_finite() && (0.0..=1.0).contains(&value);
     match recipe {
         DataRecipe::Empty => {}
@@ -261,9 +287,7 @@ fn validate_data(recipe: &DataRecipe, qualified: &str, errors: &mut Vec<String>)
             validate_args(circuit, qualified, errors);
             validate_args(analyze, qualified, errors);
             if analyze.first().map(String::as_str) != Some("analyze_errors") {
-                errors.push(format!(
-                    "case {qualified} DEM recipe must run analyze_errors"
-                ));
+                case_issue(errors, qualified, CaseProblem::DemWithoutAnalysis);
             }
         }
         DataRecipe::SampledRecords {
@@ -280,9 +304,7 @@ fn validate_data(recipe: &DataRecipe, qualified: &str, errors: &mut Vec<String>)
                 || shots != u64::try_from(*records).ok()
                 || *records == 0
             {
-                errors.push(format!(
-                    "case {qualified} sampled-record recipe needs seeded sample with --shots equal to records"
-                ));
+                case_issue(errors, qualified, CaseProblem::SampledRecords);
             }
         }
         DataRecipe::FoldedCircuit {
@@ -296,9 +318,11 @@ fn validate_data(recipe: &DataRecipe, qualified: &str, errors: &mut Vec<String>)
                 || *repeat_count == 0
                 || !probability_is_valid(*error_probability)
             {
-                errors.push(format!(
-                    "case {qualified} has an invalid folded-circuit recipe"
-                ));
+                case_issue(
+                    errors,
+                    qualified,
+                    CaseProblem::InvalidRecipe(RecipeKind::FoldedCircuit),
+                );
             }
         }
         DataRecipe::Records {
@@ -312,7 +336,11 @@ fn validate_data(recipe: &DataRecipe, qualified: &str, errors: &mut Vec<String>)
                 || (*format == RecordFormat::Ptb64 && !records.is_multiple_of(64))
                 || *format == RecordFormat::Dets
             {
-                errors.push(format!("case {qualified} has an invalid record recipe"));
+                case_issue(
+                    errors,
+                    qualified,
+                    CaseProblem::InvalidRecipe(RecipeKind::Records),
+                );
             }
         }
         DataRecipe::TypedDets {
@@ -328,12 +356,16 @@ fn validate_data(recipe: &DataRecipe, qualified: &str, errors: &mut Vec<String>)
                 || detector_hits > detectors
                 || observable_hits > observables
             {
-                errors.push(format!("case {qualified} has an invalid typed-DETS recipe"));
+                case_issue(
+                    errors,
+                    qualified,
+                    CaseProblem::InvalidRecipe(RecipeKind::TypedDets),
+                );
             }
         }
         DataRecipe::M2dCircuit { bits } => {
             if *bits == 0 {
-                errors.push(format!("case {qualified} has a zero-width m2d circuit"));
+                case_issue(errors, qualified, CaseProblem::ZeroWidthM2d);
             }
         }
         DataRecipe::Dem {
@@ -347,19 +379,21 @@ fn validate_data(recipe: &DataRecipe, qualified: &str, errors: &mut Vec<String>)
                 || *repeat_count == 0
                 || !probability_is_valid(*error_probability)
             {
-                errors.push(format!("case {qualified} has an invalid DEM recipe"));
+                case_issue(
+                    errors,
+                    qualified,
+                    CaseProblem::InvalidRecipe(RecipeKind::Dem),
+                );
             }
         }
     }
 }
 
-fn validate_output(output: &OutputContract, qualified: &str, errors: &mut Vec<String>) {
+fn validate_output(output: &OutputContract, qualified: &CaseId, errors: &mut Errors) {
     match output {
         OutputContract::Exact { minimum_bytes } => {
             if *minimum_bytes == 0 {
-                errors.push(format!(
-                    "case {qualified} has a vacuous exact-output contract"
-                ));
+                case_issue(errors, qualified, CaseProblem::VacuousExactOutput);
             }
         }
         OutputContract::Records {
@@ -382,9 +416,7 @@ fn validate_output(output: &OutputContract, qualified: &str, errors: &mut Vec<St
                 || !maximum_one_fraction.is_finite()
                 || !(0.0..=1.0).contains(maximum_one_fraction)
             {
-                errors.push(format!(
-                    "case {qualified} has an invalid record-output contract"
-                ));
+                case_issue(errors, qualified, CaseProblem::InvalidRecordOutput);
             }
         }
     }
@@ -393,8 +425,8 @@ fn validate_output(output: &OutputContract, qualified: &str, errors: &mut Vec<St
 fn validate_cli_semantic_work(
     case: &Case,
     measured_args: &[String],
-    qualified: &str,
-    errors: &mut Vec<String>,
+    qualified: &CaseId,
+    errors: &mut Errors,
 ) {
     let declared_output_records = match &case.workload {
         Workload::Cli { stdout, .. } | Workload::CliPipeline { stdout, .. } => {
@@ -410,21 +442,15 @@ fn validate_cli_semantic_work(
                 Workload::CliPipeline { .. } | Workload::RustPipeline { .. } => None,
             };
             if declared_input_records != Some(case.work.amount) {
-                errors.push(format!(
-                    "case {qualified} record work does not equal its input recipe"
-                ));
+                case_issue(errors, qualified, CaseProblem::RecordWork);
             }
         }
         WorkUnit::Shots => {
             if argument_u64(measured_args, "--shots") != Some(case.work.amount) {
-                errors.push(format!(
-                    "case {qualified} shot work does not equal its --shots argument"
-                ));
+                case_issue(errors, qualified, CaseProblem::ShotArgument);
             }
             if declared_output_records != Some(case.work.amount) {
-                errors.push(format!(
-                    "case {qualified} shot work does not equal its output record count"
-                ));
+                case_issue(errors, qualified, CaseProblem::ShotRecords);
             }
         }
     }
@@ -455,37 +481,37 @@ fn argument_u64(args: &[String], name: &str) -> Option<u64> {
     values.next().is_none().then_some(value)
 }
 
-fn validate_args(args: &[String], qualified: &str, errors: &mut Vec<String>) {
+fn validate_args(args: &[String], qualified: &CaseId, errors: &mut Errors) {
     if args.is_empty() || args.first().is_none_or(|arg| arg.starts_with('-')) {
-        errors.push(format!(
-            "case {qualified} command args need a named subcommand"
-        ));
+        case_issue(errors, qualified, CaseProblem::MissingSubcommand);
     }
     if args.iter().any(|arg| arg.contains('\0')) {
-        errors.push(format!("case {qualified} command args contain NUL"));
+        case_issue(errors, qualified, CaseProblem::NulArgument);
     }
 }
 
-fn validate_files(files: &[FileSpec], qualified: &str, errors: &mut Vec<String>) {
+fn validate_files(files: &[FileSpec], qualified: &CaseId, errors: &mut Errors) {
     let mut names = BTreeSet::new();
     for file in files {
-        validate_id("file", &file.name, errors);
+        validate_id(IdKind::File, &file.name, errors);
         if !names.insert(file.name.as_str()) {
-            errors.push(format!("case {qualified} repeats file {}", file.name));
+            case_issue(
+                errors,
+                qualified,
+                CaseProblem::RepeatedFile(file.name.clone()),
+            );
         }
         match file.role {
-            FileRole::Input if file.data.is_none() || file.output.is_some() => {
-                errors.push(format!(
-                    "case {qualified} input file {} needs data and no output contract",
-                    file.name
-                ))
-            }
-            FileRole::Output if file.data.is_some() || file.output.is_none() => {
-                errors.push(format!(
-                    "case {qualified} output file {} needs an output contract and no data",
-                    file.name
-                ))
-            }
+            FileRole::Input if file.data.is_none() || file.output.is_some() => case_issue(
+                errors,
+                qualified,
+                CaseProblem::InputFileShape(file.name.clone()),
+            ),
+            FileRole::Output if file.data.is_some() || file.output.is_none() => case_issue(
+                errors,
+                qualified,
+                CaseProblem::OutputFileShape(file.name.clone()),
+            ),
             _ => {}
         }
         if let Some(data) = &file.data {
@@ -500,8 +526,8 @@ fn validate_files(files: &[FileSpec], qualified: &str, errors: &mut Vec<String>)
 fn validate_file_placeholders(
     args: &[String],
     files: &[FileSpec],
-    qualified: &str,
-    errors: &mut Vec<String>,
+    qualified: &CaseId,
+    errors: &mut Errors,
 ) {
     let expected = files
         .iter()
@@ -516,29 +542,30 @@ fn validate_file_placeholders(
         .iter()
         .any(|placeholder| !expected.contains(placeholder))
     {
-        errors.push(format!(
-            "case {qualified} has an unknown or partial file placeholder"
-        ));
+        case_issue(errors, qualified, CaseProblem::UnknownPlaceholder);
     }
     for file in files {
         let placeholder = format!("{{file:{}}}", file.name);
         if !args.contains(&placeholder) {
-            errors.push(format!(
-                "case {qualified} does not route file {} into its command",
-                file.name
-            ));
+            case_issue(
+                errors,
+                qualified,
+                CaseProblem::UnroutedFile(file.name.clone()),
+            );
         }
     }
 }
 
-fn validate_baselines(baselines: &[SelfBaseline], families: &[Family], errors: &mut Vec<String>) {
+fn validate_baselines(baselines: &[SelfBaseline], families: &[Family], errors: &mut Errors) {
     let cases = families
         .iter()
         .flat_map(|family| {
-            family
-                .cases
-                .iter()
-                .map(|case| (CaseId::new(&family.id, &case.id), case.digest(&family.id)))
+            family.cases.iter().map(|case| {
+                (
+                    CaseId::new(&family.id, &case.id),
+                    (family.id.as_str(), case),
+                )
+            })
         })
         .collect::<BTreeMap<_, _>>();
     let mut keys = BTreeSet::new();
@@ -552,26 +579,21 @@ fn validate_baselines(baselines: &[SelfBaseline], families: &[Family], errors: &
             baseline.case_id.as_str(),
             baseline.case_digest.as_str(),
         );
+        let case = &baseline.case_id;
         if !keys.insert(key) {
-            errors.push(format!(
-                "duplicate self baseline for {} on {}",
-                baseline.case_id, baseline.architecture
-            ));
+            errors.push(SuiteViolation::DuplicateBaseline {
+                case: case.clone(),
+                architecture: baseline.architecture.clone(),
+            });
         }
-        match cases.get(&baseline.case_id) {
-            Some(Ok(digest)) if digest == &baseline.case_digest => {}
-            Some(Ok(_)) => errors.push(format!(
-                "self baseline {} has a stale case digest",
-                baseline.case_id
-            )),
-            Some(Err(reason)) => errors.push(format!(
-                "self baseline {} cannot digest its case: {reason}",
-                baseline.case_id
-            )),
-            None => errors.push(format!(
-                "self baseline {} has no active release case",
-                baseline.case_id
-            )),
+        match cases
+            .get(case)
+            .map(|(family_id, definition)| definition.digest(family_id))
+        {
+            Some(Ok(digest)) if digest == baseline.case_digest => {}
+            Some(Ok(_)) => baseline_issue(errors, case, BaselineProblem::StaleDigest),
+            Some(Err(source)) => baseline_issue(errors, case, BaselineProblem::Digest(source)),
+            None => baseline_issue(errors, case, BaselineProblem::NoCase),
         }
         if baseline.architecture.is_empty()
             || baseline.cpu_model.is_empty()
@@ -580,32 +602,23 @@ fn validate_baselines(baselines: &[SelfBaseline], families: &[Family], errors: &
             || baseline.timing_boundary != TIMING_BOUNDARY
             || baseline.case_digest.len() != 64
         {
-            errors.push(format!(
-                "self baseline {} has an incomplete identity",
-                baseline.case_id
-            ));
+            baseline_issue(errors, case, BaselineProblem::IncompleteIdentity);
         }
-        for (name, value) in [
-            ("median", baseline.median_seconds_per_work),
-            ("upper", baseline.upper_seconds_per_work),
+        for (bound, value) in [
+            (BaselineBound::Median, baseline.median_seconds_per_work),
+            (BaselineBound::Upper, baseline.upper_seconds_per_work),
         ] {
             if !value.is_finite() || value <= 0.0 {
-                errors.push(format!(
-                    "self baseline {} has invalid {name}",
-                    baseline.case_id
-                ));
+                baseline_issue(errors, case, BaselineProblem::InvalidBound(bound));
             }
         }
         if baseline.upper_seconds_per_work < baseline.median_seconds_per_work {
-            errors.push(format!(
-                "self baseline {} upper bound is below its median",
-                baseline.case_id
-            ));
+            baseline_issue(errors, case, BaselineProblem::UpperBelowMedian);
         }
     }
 }
 
-fn validate_id(kind: &str, value: &str, errors: &mut Vec<String>) {
+fn validate_id(kind: IdKind, value: &str, errors: &mut Errors) {
     if value.is_empty()
         || value.starts_with('-')
         || value.ends_with('-')
@@ -613,6 +626,9 @@ fn validate_id(kind: &str, value: &str, errors: &mut Vec<String>) {
             .bytes()
             .any(|byte| !byte.is_ascii_lowercase() && !byte.is_ascii_digit() && byte != b'-')
     {
-        errors.push(format!("{kind} id {value:?} is not lowercase kebab-case"));
+        errors.push(SuiteViolation::InvalidId {
+            kind,
+            value: value.to_string(),
+        });
     }
 }

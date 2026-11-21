@@ -83,12 +83,12 @@ fn minimal_suite() -> Suite {
 #[test]
 fn suite_rejects_duplicate_ids_caps_and_inconsistent_work() {
     let mut suite = minimal_suite();
-    assert_eq!(suite.validate(), Ok(()));
+    suite.validate().expect("minimal suite is valid");
 
     let duplicate = suite.families[0].cases[0].clone();
     suite.families[0].cases.push(duplicate);
     suite.expected_release_cases = 2;
-    let error = suite.validate().expect_err("duplicate case");
+    let error = suite.validate().expect_err("duplicate case").to_string();
     assert!(error.contains("duplicate case id"));
 
     let mut suite = minimal_suite();
@@ -99,6 +99,7 @@ fn suite_rejects_duplicate_ids_caps_and_inconsistent_work() {
         suite
             .validate()
             .expect_err("empty command")
+            .to_string()
             .contains("named subcommand")
     );
 }
@@ -107,7 +108,7 @@ fn suite_rejects_duplicate_ids_caps_and_inconsistent_work() {
 fn semantic_work_must_match_cli_records_and_shots() {
     let mut suite = minimal_suite();
     suite.families[0].cases[0].work.amount = 63;
-    let error = suite.validate().expect_err("mismatched shots");
+    let error = suite.validate().expect_err("mismatched shots").to_string();
     assert!(error.contains("--shots"));
     assert!(error.contains("output record count"));
 
@@ -115,7 +116,8 @@ fn semantic_work_must_match_cli_records_and_shots() {
     case.work.unit = WorkUnit::Records;
     let error = suite
         .validate()
-        .expect_err("records without an input recipe");
+        .expect_err("records without an input recipe")
+        .to_string();
     assert!(error.contains("input recipe"));
 }
 
@@ -150,7 +152,7 @@ fn suite_rejects_weakened_evidence_policy() {
     suite.tiers.get_mut(&Tier::Full).expect("full tier").samples = 1;
     suite.policy.bootstrap_resamples = 1;
     suite.families[0].cases[0].maximum_stab_peak_rss_bytes = MAXIMUM_CASE_RSS_BYTES + 1;
-    let error = suite.validate().expect_err("weakened policy");
+    let error = suite.validate().expect_err("weakened policy").to_string();
     assert!(error.contains("Stim identity"));
     assert!(error.contains("tier full"));
     assert!(error.contains("bootstrap_resamples"));

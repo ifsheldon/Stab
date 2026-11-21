@@ -56,6 +56,7 @@ fn witness(byte: u8) -> OutputWitness {
         bytes: 1,
         sha256: byte.to_string(),
         one_bits: None,
+        census: None,
     }
 }
 

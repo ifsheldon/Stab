@@ -19,6 +19,8 @@ use stab_records::{
 };
 use stab_reference_decoder::ExactMlDecoderSession;
 
+use super::error::{PipelineError, PipelineStage};
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct RustWorkerReceipt {
@@ -34,53 +36,53 @@ pub(super) fn execute(
     minimum_logical_failures: u64,
     maximum_logical_failures: u64,
     seed: u64,
-) -> Result<RustWorkerReceipt, String> {
+) -> Result<RustWorkerReceipt, PipelineError> {
     let mut barrier = [0_u8; 1];
     std::io::stdin()
         .read_exact(&mut barrier)
-        .map_err(|source| format!("cannot read start barrier: {source}"))?;
+        .map_err(PipelineError::Barrier)?;
     if barrier != *b"\n" {
-        return Err("start barrier must be one newline".to_string());
+        return Err(PipelineError::BarrierByte);
     }
 
     let params = CodeCircuitParams::try_new(
         CodeTask::Repetition(RepetitionCodeTask::Memory),
-        CodeDistance::try_new(3).map_err(|source| source.to_string())?,
-        RoundCount::try_new(3).map_err(|source| source.to_string())?,
+        CodeDistance::try_new(3).map_err(PipelineError::stage(PipelineStage::CodeParameters))?,
+        RoundCount::try_new(3).map_err(PipelineError::stage(PipelineStage::CodeParameters))?,
     )
-    .map_err(|source| source.to_string())?
+    .map_err(PipelineError::stage(PipelineStage::CodeParameters))?
     .with_before_round_data_depolarization(probability(0.05)?)
     .with_before_measure_flip_probability(probability(0.025)?)
     .with_after_reset_flip_probability(probability(0.0125)?)
     .with_after_clifford_depolarization(probability(0.00625)?);
     let generated = params
         .generate(&CircuitGenerationOptions::default())
-        .map_err(|source| source.to_string())?;
+        .map_err(PipelineError::stage(PipelineStage::CircuitGeneration))?;
     let circuit = generated.circuit();
     let model = circuit_to_detector_error_model(circuit, &ErrorAnalyzerOptions::default())
-        .map_err(|source| source.to_string())?;
-    let mut decoder =
-        ExactMlDecoderSession::try_compile_model(&model).map_err(|source| source.to_string())?;
+        .map_err(PipelineError::stage(PipelineStage::ErrorAnalysis))?;
+    let mut decoder = ExactMlDecoderSession::try_compile_model(&model)
+        .map_err(PipelineError::stage(PipelineStage::DecoderCompilation))?;
     let sampling_plan = SamplingCompiler::default()
         .compile(circuit)
-        .map_err(|source| source.to_string())?;
+        .map_err(PipelineError::stage(PipelineStage::SamplingCompilation))?;
     let detection_plan = MeasurementToDetectionCompiler::default()
         .compile(circuit)
-        .map_err(|source| source.to_string())?;
+        .map_err(PipelineError::stage(PipelineStage::DetectionCompilation))?;
     if detection_plan.detector_width() != decoder.layout().detector_width()
         || detection_plan.observable_width() != decoder.layout().observable_width()
     {
-        return Err("compiled sampling and decoder layouts disagree".to_string());
+        return Err(PipelineError::LayoutMismatch);
     }
     let mut sampling = sampling_plan
         .session(&SamplingSessionOptions {
             random: RandomPolicy::Seeded(Seed::new(seed)),
             ..SamplingSessionOptions::default()
         })
-        .map_err(|source| source.to_string())?;
+        .map_err(PipelineError::stage(PipelineStage::SamplingSession))?;
     let mut conversion = detection_plan
         .session(&Default::default())
-        .map_err(|source| source.to_string())?;
+        .map_err(PipelineError::stage(PipelineStage::DetectionSession))?;
     let mut report = PipelineReport::default();
     let mut sink = LogicalFailureSink::new(&mut decoder, &mut report)?;
 
@@ -88,30 +90,33 @@ pub(super) fn execute(
     {
         let mut transaction = conversion
             .start_transaction(&mut sink)
-            .map_err(|source| source.to_string())?;
+            .map_err(PipelineError::stage(PipelineStage::Transaction))?;
         let summary = sampling
             .run(ShotCount::new(shots), &mut transaction)
-            .map_err(|source| source.to_string())?;
+            .map_err(PipelineError::stage(PipelineStage::Sampling))?;
         if summary.committed_shots().get() != shots {
-            return Err(format!(
-                "sampling committed {} of {shots} shots",
-                summary.committed_shots().get()
-            ));
+            return Err(PipelineError::CommittedShots {
+                committed: summary.committed_shots().get(),
+                shots,
+            });
         }
     }
     let elapsed_seconds = started.elapsed().as_secs_f64();
     if !sink.finished {
-        return Err("detection sink did not finish".to_string());
+        return Err(PipelineError::SinkUnfinished);
     }
     drop(sink);
     if report.shots != shots
         || report.logical_failures < minimum_logical_failures
         || report.logical_failures > maximum_logical_failures
     {
-        return Err(format!(
-            "pipeline produced {} failures in {} shots, expected {minimum_logical_failures}..={maximum_logical_failures} in {shots}",
-            report.logical_failures, report.shots
-        ));
+        return Err(PipelineError::FailureBand {
+            failures: report.logical_failures,
+            observed_shots: report.shots,
+            minimum: minimum_logical_failures,
+            maximum: maximum_logical_failures,
+            shots,
+        });
     }
     let output = format!("{}:{}", report.shots, report.logical_failures);
     Ok(RustWorkerReceipt {
@@ -123,16 +128,14 @@ pub(super) fn execute(
     })
 }
 
-pub(super) fn write_receipt(receipt: &RustWorkerReceipt) -> Result<(), String> {
+pub(super) fn write_receipt(receipt: &RustWorkerReceipt) -> Result<(), PipelineError> {
     let mut stdout = std::io::stdout().lock();
-    serde_json::to_writer(&mut stdout, receipt).map_err(|source| source.to_string())?;
-    stdout
-        .write_all(b"\n")
-        .map_err(|source| format!("cannot write worker receipt: {source}"))
+    serde_json::to_writer(&mut stdout, receipt).map_err(PipelineError::ReceiptJson)?;
+    stdout.write_all(b"\n").map_err(PipelineError::ReceiptWrite)
 }
 
-fn probability(value: f64) -> Result<Probability, String> {
-    Probability::try_new(value).map_err(|source| source.to_string())
+fn probability(value: f64) -> Result<Probability, PipelineError> {
+    Probability::try_new(value).map_err(PipelineError::stage(PipelineStage::CodeParameters))
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -153,7 +156,7 @@ impl<'a> LogicalFailureSink<'a> {
     fn new(
         decoder: &'a mut ExactMlDecoderSession,
         report: &'a mut PipelineReport,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, PipelineError> {
         let correction_width = CorrectionWidth::new(decoder.layout().observable_width().get());
         Ok(Self {
             decoder,
@@ -162,7 +165,7 @@ impl<'a> LogicalFailureSink<'a> {
                 stab_engine::MAX_BATCH_SHOTS,
                 correction_width,
             )
-            .map_err(|source| source.to_string())?,
+            .map_err(PipelineError::stage(PipelineStage::PredictionBatch))?,
             cancellation: Cancellation::new(),
             finished: false,
         })
@@ -170,7 +173,7 @@ impl<'a> LogicalFailureSink<'a> {
 }
 
 impl DetectionSink for LogicalFailureSink<'_> {
-    type Error = String;
+    type Error = PipelineError;
 
     fn write_batch(&mut self, batch: DetectionBatchView<'_>) -> Result<(), Self::Error> {
         let summary = decode_batch(
@@ -179,40 +182,36 @@ impl DetectionSink for LogicalFailureSink<'_> {
             &mut self.predictions,
             &self.cancellation,
         )
-        .map_err(|source| source.to_string())?;
+        .map_err(PipelineError::stage(PipelineStage::Decoding))?;
         if summary.status() != DecodeBatchStatus::Completed
             || summary.completed_shots() != batch.shot_count()
         {
-            return Err(format!(
-                "decoder completed {} of {} records",
-                summary.completed_shots(),
-                batch.shot_count()
-            ));
+            return Err(PipelineError::DecoderIncomplete {
+                completed: summary.completed_shots(),
+                records: batch.shot_count(),
+            });
         }
         for shot_index in 0..batch.shot_count() {
             let predicted = self
                 .predictions
                 .records()
                 .get(ShotIndex(shot_index), BitIndex(0))
-                .ok_or_else(|| format!("prediction bit is missing for shot {shot_index}"))?;
+                .ok_or(PipelineError::MissingPrediction { shot: shot_index })?;
             let actual = batch
                 .observables()
                 .get(ShotIndex(shot_index), BitIndex(0))
-                .ok_or_else(|| format!("observable bit is missing for shot {shot_index}"))?;
+                .ok_or(PipelineError::MissingObservable { shot: shot_index })?;
             self.report.logical_failures = self
                 .report
                 .logical_failures
                 .checked_add(u64::from(predicted != actual))
-                .ok_or_else(|| "logical failure count overflow".to_string())?;
+                .ok_or(PipelineError::FailureOverflow)?;
         }
         self.report.shots = self
             .report
             .shots
-            .checked_add(
-                u64::try_from(batch.shot_count())
-                    .map_err(|_| "batch shot count does not fit in u64".to_string())?,
-            )
-            .ok_or_else(|| "pipeline shot count overflow".to_string())?;
+            .checked_add(u64::try_from(batch.shot_count()).map_err(|_| PipelineError::BatchShots)?)
+            .ok_or(PipelineError::ShotOverflow)?;
         Ok(())
     }
 

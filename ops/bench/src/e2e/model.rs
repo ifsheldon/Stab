@@ -58,7 +58,7 @@ pub(super) struct Policy {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize, ValueEnum)]
 #[serde(rename_all = "kebab-case")]
-pub(super) enum Tier {
+pub(crate) enum Tier {
     Smoke,
     Full,
     Soak,
@@ -136,7 +136,7 @@ pub(super) struct SemanticWork {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub(super) enum WorkUnit {
+pub(crate) enum WorkUnit {
     GeneratedBytes,
     InputBytes,
     Records,
@@ -296,7 +296,7 @@ pub(super) struct SelfBaseline {
 /// The `family.case` identity of one release case.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(transparent)]
-pub(super) struct CaseId(String);
+pub(crate) struct CaseId(String);
 
 impl CaseId {
     pub(super) fn new(family_id: &str, case_id: &str) -> Self {
@@ -336,7 +336,7 @@ impl Suite {
     }
 
     /// Digest of the workload contract, excluding the reviewed self-regression baselines.
-    pub(super) fn contract_digest(&self) -> Result<String, String> {
+    pub(super) fn contract_digest(&self) -> Result<String, serde_json::Error> {
         let bytes = serde_json::to_vec(&(
             self.schema_version,
             &self.stim,
@@ -345,16 +345,15 @@ impl Suite {
             self.expected_release_families,
             self.expected_release_cases,
             &self.families,
-        ))
-        .map_err(|source| source.to_string())?;
+        ))?;
         Ok(hex::encode(Sha256::digest(bytes)))
     }
 }
 
 impl Case {
     /// Digest binding this case's full definition to its family id.
-    pub(super) fn digest(&self, family_id: &str) -> Result<String, String> {
-        let bytes = serde_json::to_vec(&(family_id, self)).map_err(|source| source.to_string())?;
+    pub(super) fn digest(&self, family_id: &str) -> Result<String, serde_json::Error> {
+        let bytes = serde_json::to_vec(&(family_id, self))?;
         Ok(hex::encode(Sha256::digest(bytes)))
     }
 }

@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::data::{OutputKey, OutputWitness};
+use super::data::{OutputKey, OutputWitness, compare_witness_censuses};
+use super::error::ReportError;
 use super::host::HostProfile;
 use super::model::{Case, CaseId, Comparator, Suite, TIMING_BOUNDARY, Tier};
 use super::statistics::{
@@ -126,31 +127,32 @@ impl DerivedReport {
         metadata: &RunMetadata,
         correctness: &CorrectnessReport,
         samples: &RawSamples,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, ReportError> {
         if metadata.schema_version != RUN_SCHEMA_VERSION {
-            return Err(format!(
-                "run schema is {}, expected {RUN_SCHEMA_VERSION}",
-                metadata.schema_version
-            ));
+            return Err(ReportError::RunSchema {
+                actual: metadata.schema_version,
+            });
         }
         if samples.schema_version != SAMPLES_SCHEMA_VERSION {
-            return Err(format!(
-                "sample schema is {}, expected {SAMPLES_SCHEMA_VERSION}",
-                samples.schema_version
-            ));
+            return Err(ReportError::SampleSchema {
+                actual: samples.schema_version,
+            });
         }
         let tier_policy = suite
             .tiers
             .get(&metadata.tier)
-            .ok_or_else(|| format!("suite omits tier {}", metadata.tier))?;
+            .ok_or(ReportError::MissingTier {
+                tier: metadata.tier,
+            })?;
         if metadata
             .warmups
             .is_some_and(|warmups| warmups != tier_policy.warmups)
         {
-            return Err(format!(
-                "run recorded {:?} warmups, tier {} requires {}",
-                metadata.warmups, metadata.tier, tier_policy.warmups
-            ));
+            return Err(ReportError::Warmups {
+                recorded: metadata.warmups,
+                tier: metadata.tier,
+                required: tier_policy.warmups,
+            });
         }
         let mut sample_map = samples
             .cases
@@ -158,45 +160,60 @@ impl DerivedReport {
             .map(|case| (case.case_id.as_str(), case))
             .collect::<BTreeMap<_, _>>();
         if sample_map.len() != samples.cases.len() {
-            return Err("raw samples repeat a case id".to_string());
+            return Err(ReportError::RepeatedSampleCase);
         }
         let witnesses = correctness
             .cases
             .iter()
             .map(|case| (case.case_id.as_str(), case))
             .collect::<BTreeMap<_, _>>();
-        let selected = metadata
-            .selected_cases
-            .iter()
-            .map(CaseId::as_str)
-            .collect::<BTreeSet<_>>();
+        let selected = metadata.selected_cases.iter().collect::<BTreeSet<_>>();
         if selected.is_empty() || selected.len() != metadata.selected_cases.len() {
-            return Err("run selection is empty or repeats a case id".to_string());
+            return Err(ReportError::Selection);
         }
         let known = suite.cases().map(|(_, _, id)| id).collect::<BTreeSet<_>>();
         if let Some(unknown) = selected.iter().find(|case| !known.contains(**case)) {
-            return Err(format!("run selection names unknown case {unknown}"));
+            return Err(ReportError::UnknownCase {
+                case: (*unknown).clone(),
+            });
         }
         let mut reports = Vec::new();
         for (family, case, case_id) in suite.cases() {
-            if !selected.contains(case_id.as_str()) {
+            if !selected.contains(&&case_id) {
                 continue;
             }
-            let raw = sample_map
-                .remove(case_id.as_str())
-                .ok_or_else(|| format!("raw samples omit {case_id}"))?;
-            let expected_digest = case.digest(&family.id)?;
+            let Some(raw) = sample_map.remove(case_id.as_str()) else {
+                return Err(ReportError::MissingSamples { case: case_id });
+            };
+            let expected_digest = match case.digest(&family.id) {
+                Ok(digest) => digest,
+                Err(source) => {
+                    return Err(ReportError::Digest {
+                        case: case_id,
+                        source,
+                    });
+                }
+            };
             if raw.case_digest != expected_digest {
-                return Err(format!("case digest mismatch for {case_id}"));
+                return Err(ReportError::DigestMismatch { case: case_id });
             }
-            let witness = witnesses
-                .get(case_id.as_str())
-                .ok_or_else(|| format!("correctness report omits {case_id}"))?;
+            let Some(witness) = witnesses.get(case_id.as_str()) else {
+                return Err(ReportError::MissingWitness { case: case_id });
+            };
+            if let Err((key, source)) =
+                compare_witness_censuses(&witness.stim_outputs, &witness.stab_outputs)
+            {
+                return Err(ReportError::Census {
+                    case: case_id,
+                    key,
+                    source,
+                });
+            }
             let shape = SampleShape::new(&case_id, case, tier_policy.samples, witness)?;
             let timing = match family.comparator {
                 Comparator::StimCli => {
                     if !raw.stab_only.is_empty() {
-                        return Err(format!("paired case {case_id} has Stab-only rows"));
+                        return Err(ReportError::StabOnlyRows { case: case_id });
                     }
                     shape.check_paired(&raw.paired)?;
                     summarize_paired(
@@ -208,7 +225,7 @@ impl DerivedReport {
                 }
                 Comparator::SelfOnly => {
                     if !raw.paired.is_empty() {
-                        return Err(format!("self-only case {case_id} has paired rows"));
+                        return Err(ReportError::PairedRows { case: case_id });
                     }
                     shape.check_stab_only(&raw.stab_only)?;
                     summarize_stab(
@@ -239,9 +256,11 @@ impl DerivedReport {
             });
         }
         if !sample_map.is_empty() {
-            return Err(format!(
-                "raw samples contain unselected cases: {}",
-                sample_map.keys().copied().collect::<Vec<_>>().join(", ")
+            return Err(ReportError::UnselectedSamples(
+                sample_map
+                    .values()
+                    .map(|case| case.case_id.clone())
+                    .collect(),
             ));
         }
         let parity = aggregate(reports.iter().map(|report| report.parity));
@@ -286,9 +305,11 @@ impl<'a> SampleShape<'a> {
         case: &Case,
         samples: usize,
         witness: &CaseCorrectness,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, ReportError> {
         let batch = u64::from(case.batch);
-        let overflow = || format!("{case_id} expected sample shape overflows");
+        let overflow = || ReportError::ShapeOverflow {
+            case: case_id.clone(),
+        };
         let per_batch = |outputs: &BTreeMap<OutputKey, OutputWitness>| {
             measured_output_bytes(outputs)
                 .and_then(|bytes| bytes.checked_mul(batch))
@@ -307,58 +328,63 @@ impl<'a> SampleShape<'a> {
         })
     }
 
-    fn check_count(&self, actual: usize) -> Result<(), String> {
+    fn check_count(&self, actual: usize) -> Result<(), ReportError> {
         if actual == self.samples {
             Ok(())
         } else {
-            Err(format!(
-                "{} has {actual} samples, its tier requires {}",
-                self.case_id, self.samples
-            ))
+            Err(ReportError::SampleCount {
+                case: self.case_id.clone(),
+                actual,
+                required: self.samples,
+            })
         }
     }
 
-    fn check_paired(&self, samples: &[PairedTiming]) -> Result<(), String> {
+    fn check_paired(&self, samples: &[PairedTiming]) -> Result<(), ReportError> {
         self.check_count(samples.len())?;
-        let stim_output_bytes = self
-            .stim_output_bytes
-            .ok_or_else(|| format!("{} paired samples have no Stim witness", self.case_id))?;
+        let stim_output_bytes =
+            self.stim_output_bytes
+                .ok_or_else(|| ReportError::NoStimWitness {
+                    case: self.case_id.clone(),
+                })?;
         for sample in samples {
             if sample.stim_work != self.work || sample.stab_work != self.work {
-                return Err(format!(
-                    "{} paired sample {} records work {}/{}, the case requires {}",
-                    self.case_id, sample.index, sample.stim_work, sample.stab_work, self.work
-                ));
+                return Err(ReportError::PairedWork {
+                    case: self.case_id.clone(),
+                    index: sample.index,
+                    stim_work: sample.stim_work,
+                    stab_work: sample.stab_work,
+                    required: self.work,
+                });
             }
             if sample.stim_output_bytes != stim_output_bytes
                 || sample.stab_output_bytes != self.stab_output_bytes
             {
-                return Err(format!(
-                    "{} paired sample {} records output bytes {}/{}, the witnesses require {stim_output_bytes}/{}",
-                    self.case_id,
-                    sample.index,
-                    sample.stim_output_bytes,
-                    sample.stab_output_bytes,
-                    self.stab_output_bytes
-                ));
+                return Err(ReportError::PairedOutput {
+                    case: self.case_id.clone(),
+                    index: sample.index,
+                    stim_bytes: sample.stim_output_bytes,
+                    stab_bytes: sample.stab_output_bytes,
+                    required_stim: stim_output_bytes,
+                    required_stab: self.stab_output_bytes,
+                });
             }
         }
         Ok(())
     }
 
-    fn check_stab_only(&self, samples: &[StabTiming]) -> Result<(), String> {
+    fn check_stab_only(&self, samples: &[StabTiming]) -> Result<(), ReportError> {
         self.check_count(samples.len())?;
         for sample in samples {
             if sample.work != self.work || sample.output_bytes != self.stab_output_bytes {
-                return Err(format!(
-                    "{} Stab sample {} records work {} and output bytes {}, the case and witness require {} and {}",
-                    self.case_id,
-                    sample.index,
-                    sample.work,
-                    sample.output_bytes,
-                    self.work,
-                    self.stab_output_bytes
-                ));
+                return Err(ReportError::StabSample {
+                    case: self.case_id.clone(),
+                    index: sample.index,
+                    work: sample.work,
+                    output_bytes: sample.output_bytes,
+                    required_work: self.work,
+                    required_output_bytes: self.stab_output_bytes,
+                });
             }
         }
         Ok(())
@@ -487,6 +513,7 @@ mod tests {
                 bytes,
                 sha256: "0".repeat(64),
                 one_bits: None,
+                census: None,
             },
         )])
     }
@@ -498,7 +525,7 @@ mod tests {
             CorrectnessReport,
             RawSamples,
         ),
-    ) -> Result<DerivedReport, String> {
+    ) -> Result<DerivedReport, ReportError> {
         DerivedReport::derive(suite, metadata, correctness, samples)
     }
 
@@ -685,30 +712,35 @@ mod tests {
 
         let mut short = valid.clone();
         short.3.cases[0].paired.pop();
-        assert!(derive(&short).is_err_and(|error| error.contains("has 2 samples")));
+        assert!(derive(&short).is_err_and(|error| error.to_string().contains("has 2 samples")));
 
         let mut work = valid.clone();
         work.3.cases[0].paired[1].stab_work = 99;
         work.3.cases[0].paired[1].stim_work = 99;
-        assert!(derive(&work).is_err_and(|error| error.contains("records work 99/99")));
+        assert!(derive(&work).is_err_and(|error| error.to_string().contains("records work 99/99")));
 
         let mut bytes = valid.clone();
         bytes.3.cases[0].paired[0].stab_output_bytes = 11;
-        assert!(derive(&bytes).is_err_and(|error| error.contains("output bytes 10/11")));
+        assert!(
+            derive(&bytes).is_err_and(|error| error.to_string().contains("output bytes 10/11"))
+        );
 
         let mut witness = valid.clone();
         witness.2.cases[0].stab_outputs = stdout_witness(12);
-        assert!(derive(&witness).is_err_and(|error| error.contains("require 10/12")));
+        assert!(derive(&witness).is_err_and(|error| error.to_string().contains("require 10/12")));
 
         let mut warmups = valid.clone();
         warmups.1.warmups = Some(1);
-        assert!(derive(&warmups).is_err_and(|error| error.contains("warmups")));
+        assert!(derive(&warmups).is_err_and(|error| error.to_string().contains("warmups")));
         let mut unrecorded = valid.clone();
         unrecorded.1.warmups = None;
         derive(&unrecorded).expect("bundles that predate the warmup field stay valid");
 
         let mut missing = valid;
         missing.2.cases.clear();
-        assert!(derive(&missing).is_err_and(|error| error.contains("correctness report omits")));
+        assert!(
+            derive(&missing)
+                .is_err_and(|error| error.to_string().contains("correctness report omits"))
+        );
     }
 }

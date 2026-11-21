@@ -2,6 +2,8 @@ use rand::rngs::SmallRng;
 use rand::{RngExt as _, SeedableRng as _};
 use serde::{Deserialize, Serialize};
 
+use super::error::{Implementation, MedianPart, QuantileSide, StatisticsError};
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum PairOrder {
@@ -71,18 +73,16 @@ pub(super) fn summarize_paired(
     seed: u64,
     resamples: usize,
     confidence: f64,
-) -> Result<TimingSummary, String> {
+) -> Result<TimingSummary, StatisticsError> {
     if samples.is_empty() {
-        return Err("paired timing has no samples".to_string());
+        return Err(StatisticsError::NoPairedSamples);
     }
     let mut ratios = Vec::with_capacity(samples.len());
     let mut stab_seconds_per_work = Vec::with_capacity(samples.len());
     let mut stim_seconds_per_work = Vec::with_capacity(samples.len());
     for (position, sample) in samples.iter().enumerate() {
         if sample.index != position || sample.order != PairOrder::for_index(position) {
-            return Err(format!(
-                "paired sample {position} has the wrong identity or order"
-            ));
+            return Err(StatisticsError::PairIdentity { position });
         }
         validate_sample(
             sample.stim_seconds,
@@ -95,10 +95,11 @@ pub(super) fn summarize_paired(
             sample.stab_peak_rss_bytes,
         )?;
         if sample.stim_work != sample.stab_work {
-            return Err(format!(
-                "paired sample {position} has unequal semantic work {} versus {}",
-                sample.stim_work, sample.stab_work
-            ));
+            return Err(StatisticsError::UnequalWork {
+                position,
+                stim: sample.stim_work,
+                stab: sample.stab_work,
+            });
         }
         let stim = sample.stim_seconds / sample.stim_work as f64;
         let stab = sample.stab_seconds / sample.stab_work as f64;
@@ -127,16 +128,16 @@ pub(super) fn summarize_paired(
             .iter()
             .map(|sample| sample.stab_peak_rss_bytes)
             .max()
-            .ok_or_else(|| "paired timing has no Stab RSS".to_string())?,
+            .ok_or(StatisticsError::NoPairedRss)?,
         stim_output_bytes: constant_output(
             samples.iter().map(|sample| sample.stim_output_bytes),
-            "Stim",
+            Implementation::Stim,
         )?,
         stab_output_bytes: constant_output(
             samples.iter().map(|sample| sample.stab_output_bytes),
-            "Stab",
+            Implementation::Stab,
         )?
-        .ok_or_else(|| "paired timing has no Stab output size".to_string())?,
+        .ok_or(StatisticsError::NoPairedOutput)?,
     })
 }
 
@@ -145,14 +146,14 @@ pub(super) fn summarize_stab(
     seed: u64,
     resamples: usize,
     confidence: f64,
-) -> Result<TimingSummary, String> {
+) -> Result<TimingSummary, StatisticsError> {
     if samples.is_empty() {
-        return Err("Stab timing has no samples".to_string());
+        return Err(StatisticsError::NoStabSamples);
     }
     let mut seconds_per_work = Vec::with_capacity(samples.len());
     for (position, sample) in samples.iter().enumerate() {
         if sample.index != position {
-            return Err(format!("Stab sample {position} has the wrong index"));
+            return Err(StatisticsError::StabIndex { position });
         }
         validate_sample(sample.seconds, sample.work, sample.peak_rss_bytes)?;
         seconds_per_work.push(sample.seconds / sample.work as f64);
@@ -168,13 +169,13 @@ pub(super) fn summarize_stab(
             .iter()
             .map(|sample| sample.peak_rss_bytes)
             .max()
-            .ok_or_else(|| "Stab timing has no RSS".to_string())?,
+            .ok_or(StatisticsError::NoStabRss)?,
         stim_output_bytes: None,
         stab_output_bytes: constant_output(
             samples.iter().map(|sample| sample.output_bytes),
-            "Stab",
+            Implementation::Stab,
         )?
-        .ok_or_else(|| "Stab timing has no output size".to_string())?,
+        .ok_or(StatisticsError::NoStabOutput)?,
     })
 }
 
@@ -188,13 +189,13 @@ fn distribution(
     seed: u64,
     resamples: usize,
     confidence: f64,
-) -> Result<DistributionSummary, String> {
+) -> Result<DistributionSummary, StatisticsError> {
     validate_values(values)?;
     if resamples == 0 {
-        return Err("bootstrap resample count must be positive".to_string());
+        return Err(StatisticsError::ZeroResamples);
     }
     if !confidence.is_finite() || confidence <= 0.0 || confidence >= 1.0 {
-        return Err("bootstrap confidence must be between zero and one".to_string());
+        return Err(StatisticsError::Confidence);
     }
     let mut rng = SmallRng::seed_from_u64(seed);
     let mut medians = Vec::with_capacity(resamples);
@@ -207,7 +208,7 @@ fn distribution(
                 values
                     .get(index)
                     .copied()
-                    .ok_or_else(|| "bootstrap index escaped values".to_string())?,
+                    .ok_or(StatisticsError::BootstrapIndex)?,
             );
         }
         medians.push(median(&resample)?);
@@ -222,40 +223,40 @@ fn distribution(
         median: median(values)?,
         confidence_lower: *medians
             .get(lower.min(last))
-            .ok_or_else(|| "bootstrap lower quantile is missing".to_string())?,
+            .ok_or(StatisticsError::MissingQuantile(QuantileSide::Lower))?,
         confidence_upper: *medians
             .get(upper.min(last))
-            .ok_or_else(|| "bootstrap upper quantile is missing".to_string())?,
+            .ok_or(StatisticsError::MissingQuantile(QuantileSide::Upper))?,
     })
 }
 
-fn validate_sample(seconds: f64, work: u64, peak_rss_bytes: u64) -> Result<(), String> {
+fn validate_sample(seconds: f64, work: u64, peak_rss_bytes: u64) -> Result<(), StatisticsError> {
     if !seconds.is_finite() || seconds <= 0.0 {
-        return Err(format!("invalid elapsed seconds {seconds}"));
+        return Err(StatisticsError::Seconds(seconds));
     }
     if work == 0 {
-        return Err("semantic work must be positive".to_string());
+        return Err(StatisticsError::ZeroWork);
     }
     if peak_rss_bytes == 0 {
-        return Err("peak RSS must be positive".to_string());
+        return Err(StatisticsError::ZeroRss);
     }
     Ok(())
 }
 
-fn validate_values(values: &[f64]) -> Result<(), String> {
+fn validate_values(values: &[f64]) -> Result<(), StatisticsError> {
     if values.is_empty() {
-        return Err("distribution has no values".to_string());
+        return Err(StatisticsError::NoValues);
     }
     if values
         .iter()
         .any(|value| !value.is_finite() || *value <= 0.0)
     {
-        return Err("distribution contains a nonpositive or nonfinite value".to_string());
+        return Err(StatisticsError::InvalidValue);
     }
     Ok(())
 }
 
-fn median(values: &[f64]) -> Result<f64, String> {
+fn median(values: &[f64]) -> Result<f64, StatisticsError> {
     validate_values(values)?;
     let mut sorted = values.to_vec();
     sorted.sort_by(f64::total_cmp);
@@ -263,30 +264,28 @@ fn median(values: &[f64]) -> Result<f64, String> {
     if sorted.len().is_multiple_of(2) {
         let lower = sorted
             .get(middle.saturating_sub(1))
-            .ok_or_else(|| "median lower value is missing".to_string())?;
+            .ok_or(StatisticsError::MissingMedian(MedianPart::Lower))?;
         let upper = sorted
             .get(middle)
-            .ok_or_else(|| "median upper value is missing".to_string())?;
+            .ok_or(StatisticsError::MissingMedian(MedianPart::Upper))?;
         Ok((lower + upper) / 2.0)
     } else {
         sorted
             .get(middle)
             .copied()
-            .ok_or_else(|| "median value is missing".to_string())
+            .ok_or(StatisticsError::MissingMedian(MedianPart::Middle))
     }
 }
 
 fn constant_output(
     mut values: impl Iterator<Item = u64>,
-    implementation: &str,
-) -> Result<Option<u64>, String> {
+    implementation: Implementation,
+) -> Result<Option<u64>, StatisticsError> {
     let Some(first) = values.next() else {
         return Ok(None);
     };
     if values.any(|value| value != first) {
-        return Err(format!(
-            "{implementation} output byte count changed across samples"
-        ));
+        return Err(StatisticsError::OutputDrift(implementation));
     }
     Ok(Some(first))
 }

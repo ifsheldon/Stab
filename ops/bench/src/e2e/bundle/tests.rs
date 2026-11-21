@@ -1,16 +1,17 @@
 use super::*;
-use crate::e2e::data::OutputWitness;
+use crate::e2e::data::{OutputKey, OutputWitness, RecordCensus};
 use crate::e2e::host::{HostProfile, SwapSnapshot};
 use crate::e2e::model::{
     BOOTSTRAP_RESAMPLES, BOOTSTRAP_SEED, COMMAND_TIMEOUT_SECONDS, CONFIDENCE_LEVEL, Case,
-    Comparator, Family, MAXIMUM_CASE_RSS_BYTES, MAXIMUM_OUTPUT_BYTES,
-    MAXIMUM_TEMPERATURE_MILLIDEGREES, Policy, RunnerKind, STIM_COMMIT, STIM_VERSION, SemanticWork,
-    SizeClass, StimIdentity, TierPolicy, WorkUnit, Workload,
+    Comparator, DataRecipe, Family, MAXIMUM_CASE_RSS_BYTES, MAXIMUM_OUTPUT_BYTES,
+    MAXIMUM_TEMPERATURE_MILLIDEGREES, OutputContract, Policy, RecordFormat, RunnerKind,
+    STIM_COMMIT, STIM_VERSION, SemanticWork, SizeClass, StimIdentity, TierPolicy, WorkUnit,
+    Workload,
 };
 use crate::e2e::report::{
     CaseCorrectness, CaseSamples, RUN_SCHEMA_VERSION, SAMPLES_SCHEMA_VERSION,
 };
-use crate::e2e::statistics::StabTiming;
+use crate::e2e::statistics::{PairOrder, PairedTiming, StabTiming};
 
 #[test]
 fn replay_verifies_every_source_byte_and_rejects_extra_entries() {
@@ -171,6 +172,55 @@ fn publish_fixture(directory: &Path) {
             seed: 7,
         },
     };
+    let family = Family {
+        id: "pipeline".to_string(),
+        description: "reusable pipeline".to_string(),
+        runner: RunnerKind::Rust,
+        comparator: Comparator::SelfOnly,
+        prerequisites: vec!["sampling.test".to_string()],
+        cases: vec![case],
+    };
+    let stab_outputs = BTreeMap::from([(
+        OutputKey::Pipeline,
+        OutputWitness {
+            bytes: 4,
+            sha256: hex::encode(Sha256::digest(b"64:1")),
+            one_bits: None,
+            census: None,
+        },
+    )]);
+    let stab_only = vec![StabTiming {
+        index: 0,
+        seconds: 0.01,
+        work: 64,
+        peak_rss_bytes: 1 << 20,
+        output_bytes: 4,
+    }];
+    publish_single_case(
+        directory,
+        family,
+        BTreeMap::new(),
+        stab_outputs,
+        Vec::new(),
+        stab_only,
+    );
+}
+
+/// Publishes a smoke bundle holding one case with the given witnesses and samples. The report is
+/// derived from the witnesses without their censuses, so a fixture can carry censuses that the
+/// replay derivation must reject.
+fn publish_single_case(
+    directory: &Path,
+    family: Family,
+    stim_outputs: BTreeMap<OutputKey, OutputWitness>,
+    stab_outputs: BTreeMap<OutputKey, OutputWitness>,
+    paired: Vec<PairedTiming>,
+    stab_only: Vec<StabTiming>,
+) {
+    assert_eq!(family.cases.len(), 1, "a single-case fixture");
+    let case = &family.cases[0];
+    let case_id = crate::e2e::model::CaseId::new(&family.id, &case.id);
+    let digest = case.digest(&family.id).expect("case digest");
     let suite = Suite {
         schema_version: 1,
         stim: StimIdentity {
@@ -214,14 +264,7 @@ fn publish_fixture(directory: &Path) {
         expected_release_families: 1,
         expected_release_cases: 1,
         self_baselines: Vec::new(),
-        families: vec![Family {
-            id: "pipeline".to_string(),
-            description: "reusable pipeline".to_string(),
-            runner: RunnerKind::Rust,
-            comparator: Comparator::SelfOnly,
-            prerequisites: vec!["sampling.test".to_string()],
-            cases: vec![case.clone()],
-        }],
+        families: vec![family],
     };
     suite.validate().expect("fixture suite");
     let suite_bytes = toml::to_string_pretty(&suite)
@@ -240,8 +283,6 @@ fn publish_fixture(directory: &Path) {
             pages_out: 0,
         },
     };
-    let case_id = crate::e2e::model::CaseId::new("pipeline", "small");
-    let digest = case.digest("pipeline").expect("case digest");
     let metadata = RunMetadata {
         schema_version: RUN_SCHEMA_VERSION,
         suite_sha256: hex::encode(Sha256::digest(&suite_bytes)),
@@ -265,15 +306,8 @@ fn publish_fixture(directory: &Path) {
         cases: vec![CaseCorrectness {
             case_id: case_id.clone(),
             input_sha256: hex::encode(Sha256::digest([])),
-            stim_outputs: BTreeMap::new(),
-            stab_outputs: BTreeMap::from([(
-                crate::e2e::data::OutputKey::Pipeline,
-                OutputWitness {
-                    bytes: 4,
-                    sha256: hex::encode(Sha256::digest(b"64:1")),
-                    one_bits: None,
-                },
-            )]),
+            stim_outputs,
+            stab_outputs,
         }],
     };
     let samples = RawSamples {
@@ -281,18 +315,22 @@ fn publish_fixture(directory: &Path) {
         cases: vec![CaseSamples {
             case_id,
             case_digest: digest,
-            paired: Vec::new(),
-            stab_only: vec![StabTiming {
-                index: 0,
-                seconds: 0.01,
-                work: 64,
-                peak_rss_bytes: 1 << 20,
-                output_bytes: 4,
-            }],
+            paired,
+            stab_only,
         }],
     };
-    let report =
-        DerivedReport::derive(&suite, &metadata, &correctness, &samples).expect("derived report");
+    let mut without_census = correctness.clone();
+    for case in &mut without_census.cases {
+        for witness in case
+            .stim_outputs
+            .values_mut()
+            .chain(case.stab_outputs.values_mut())
+        {
+            witness.census = None;
+        }
+    }
+    let report = DerivedReport::derive(&suite, &metadata, &without_census, &samples)
+        .expect("derived report");
     publish_bundle(
         directory,
         &suite_bytes,
@@ -302,4 +340,121 @@ fn publish_fixture(directory: &Path) {
         &report,
     )
     .expect("publish bundle");
+}
+
+/// A Stim-paired smoke case whose stdout is 4096 one-bit B8 records.
+fn publish_record_fixture(
+    directory: &Path,
+    stim: Option<RecordCensus>,
+    stab: Option<RecordCensus>,
+) {
+    const RECORDS: u64 = 4096;
+    const RECORD_COUNT: usize = 4096;
+    let family = Family {
+        id: "sample".to_string(),
+        description: "sample records".to_string(),
+        runner: RunnerKind::Cli,
+        comparator: Comparator::StimCli,
+        prerequisites: vec!["cli.sample".to_string()],
+        cases: vec![Case {
+            id: "small".to_string(),
+            size_class: SizeClass::Small,
+            batch: 1,
+            work: SemanticWork {
+                amount: RECORDS,
+                unit: WorkUnit::Shots,
+            },
+            maximum_stab_peak_rss_bytes: MAXIMUM_CASE_RSS_BYTES,
+            workload: Workload::Cli {
+                args: vec![
+                    "sample".to_string(),
+                    "--shots".to_string(),
+                    RECORDS.to_string(),
+                ],
+                stdin: DataRecipe::Empty,
+                files: Vec::new(),
+                stdout: OutputContract::Records {
+                    format: RecordFormat::B8,
+                    records: RECORD_COUNT,
+                    bits: 1,
+                    minimum_one_bits: 0,
+                    maximum_one_fraction: 1.0,
+                },
+            },
+        }],
+    };
+    let witness = |census: Option<RecordCensus>, digit: char| {
+        BTreeMap::from([(
+            OutputKey::Stdout,
+            OutputWitness {
+                bytes: RECORDS,
+                sha256: digit.to_string().repeat(64),
+                one_bits: Some(census.map_or(2048, |census| census.ones)),
+                census,
+            },
+        )])
+    };
+    let paired = vec![PairedTiming {
+        index: 0,
+        order: PairOrder::for_index(0),
+        stim_seconds: 0.01,
+        stab_seconds: 0.01,
+        stim_work: RECORDS,
+        stab_work: RECORDS,
+        stim_peak_rss_bytes: 1 << 20,
+        stab_peak_rss_bytes: 1 << 20,
+        stim_output_bytes: RECORDS,
+        stab_output_bytes: RECORDS,
+    }];
+    publish_single_case(
+        directory,
+        family,
+        witness(stim, 'a'),
+        witness(stab, 'b'),
+        paired,
+        Vec::new(),
+    );
+}
+
+#[test]
+fn replay_repeats_the_recorded_one_bit_census_comparison() {
+    let census = |ones: u64| RecordCensus {
+        records: 4096,
+        ones,
+        // One bit per record, so every per-record count is 0 or 1 and squares sum to the ones.
+        sum_squares: u128::from(ones),
+    };
+    let replay = |stim: Option<RecordCensus>, stab: Option<RecordCensus>| {
+        let directory = tempfile::tempdir().expect("bundle directory");
+        publish_record_fixture(directory.path(), stim, stab);
+        let correctness =
+            fs::read_to_string(directory.path().join("correctness.json")).expect("correctness");
+        (
+            verify_bundle(directory.path()).map(|_| ()),
+            correctness.contains("\"census\""),
+        )
+    };
+
+    let (agreeing, written) = replay(Some(census(2048)), Some(census(2060)));
+    agreeing.expect("a census inside six standard errors replays");
+    assert!(written, "a recorded census is serialized");
+
+    let (disagreeing, _) = replay(Some(census(2048)), Some(census(3000)));
+    let error = disagreeing
+        .expect_err("an edited census must fail replay")
+        .to_string();
+    assert!(
+        error.contains("sample.small output stdout") && error.contains("standard errors"),
+        "{error}"
+    );
+
+    let (one_sided, _) = replay(Some(census(2048)), None);
+    let error = one_sided
+        .expect_err("a census on one side only must fail replay")
+        .to_string();
+    assert!(error.contains("only the Stim witness"), "{error}");
+
+    let (legacy, written) = replay(None, None);
+    legacy.expect("bundles that predate the census field still verify");
+    assert!(!written, "an absent census is not serialized");
 }

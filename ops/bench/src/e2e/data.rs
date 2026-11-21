@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
 use serde::{Deserialize, Serialize};
@@ -7,6 +8,9 @@ use stab_records::{
     RecordFormat as StabRecordFormat, RecordStreamReader, RecordStreamStorage, ShotIndex,
 };
 
+use super::error::{
+    CensusError, CensusMismatch, CommandError, DataError, Implementation, InvalidOutputKey,
+};
 use super::model::{
     DataRecipe, OutputContract, RecordFormat, RecordPattern, SemanticWork, WorkUnit,
 };
@@ -21,7 +25,7 @@ const TEXT_RECORD_BUFFER_BYTES: u128 = 256 * 1024 * 1024;
 /// Names one witnessed output of a case: `stdout`, `file:NAME`, `step-INDEX` for a pipeline
 /// intermediate, or `pipeline` for the Rust worker's semantic output.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) enum OutputKey {
+pub(crate) enum OutputKey {
     Stdout,
     File(String),
     Step(usize),
@@ -48,7 +52,7 @@ impl std::fmt::Display for OutputKey {
 }
 
 impl std::str::FromStr for OutputKey {
-    type Err = String;
+    type Err = InvalidOutputKey;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         match text {
@@ -67,7 +71,7 @@ impl std::str::FromStr for OutputKey {
                         (index.to_string() == digits).then_some(index)
                     })
                     .map(Self::Step)
-                    .ok_or_else(|| format!("unknown output key {text:?}"))
+                    .ok_or_else(|| InvalidOutputKey(text.to_string()))
             }
         }
     }
@@ -105,6 +109,11 @@ pub(super) struct OutputWitness {
     pub(super) bytes: u64,
     pub(super) sha256: String,
     pub(super) one_bits: Option<u64>,
+    /// Per-record one-bit statistics of a record output, so replay can repeat the preflight
+    /// comparison with pinned Stim. Bundles written before this field existed omit it, and an
+    /// exact output never has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) census: Option<RecordCensus>,
 }
 
 /// Bound, in standard errors, on the difference between Stim's and Stab's mean per-record one-bit
@@ -115,7 +124,8 @@ pub(super) struct OutputWitness {
 pub(super) const ONE_BIT_TWO_SAMPLE_SIGMA: f64 = 6.0;
 
 /// Per-record one-bit statistics of one record output.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct RecordCensus {
     pub(super) records: u64,
     pub(super) ones: u64,
@@ -126,12 +136,12 @@ pub(super) struct RecordCensus {
 impl RecordCensus {
     /// Rejects Stab's per-record one-bit mean when it is more than [`ONE_BIT_TWO_SAMPLE_SIGMA`]
     /// standard errors from Stim's.
-    pub(super) fn compare_with_stim(self, stim: Self) -> Result<(), String> {
+    pub(super) fn compare_with_stim(self, stim: Self) -> Result<(), CensusMismatch> {
         if self.records != stim.records || self.records == 0 {
-            return Err(format!(
-                "one-bit comparison needs equal positive record counts, got Stim {} and Stab {}",
-                stim.records, self.records
-            ));
+            return Err(CensusMismatch::RecordCounts {
+                stim_records: stim.records,
+                stab_records: self.records,
+            });
         }
         let records = self.records as f64;
         let moments = |census: Self| {
@@ -149,41 +159,74 @@ impl RecordCensus {
             self.ones != stim.ones
         };
         if rejected {
-            return Err(format!(
-                "Stab one bits {} differ from pinned Stim's {} over {} records by more than {ONE_BIT_TWO_SAMPLE_SIGMA} standard errors ({standard_error:.6} per record)",
-                self.ones, stim.ones, self.records
-            ));
+            return Err(CensusMismatch::OneBits {
+                stab_ones: self.ones,
+                stim_ones: stim.ones,
+                records: self.records,
+                standard_error,
+            });
         }
         Ok(())
     }
 }
 
-/// A validated output: its committed witness and, for a record contract, its census.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct CheckedOutput {
-    pub(super) witness: OutputWitness,
-    pub(super) census: Option<RecordCensus>,
+/// Compares Stab's per-record one-bit statistics with pinned Stim's for every output both sides
+/// witnessed with a census. Preflight runs it on fresh outputs and report derivation reruns it on
+/// the committed witnesses; witnesses that predate the census field carry none and are skipped.
+pub(super) fn compare_witness_censuses(
+    stim: &BTreeMap<OutputKey, OutputWitness>,
+    stab: &BTreeMap<OutputKey, OutputWitness>,
+) -> Result<(), (OutputKey, CensusError)> {
+    for (key, stim_witness) in stim {
+        let Some(stab_witness) = stab.get(key) else {
+            continue;
+        };
+        let fail = |error: CensusError| (key.clone(), error);
+        match (stim_witness.census, stab_witness.census) {
+            (Some(stim_census), Some(stab_census)) => {
+                for (implementation, witness, census) in [
+                    (Implementation::Stim, stim_witness, stim_census),
+                    (Implementation::Stab, stab_witness, stab_census),
+                ] {
+                    if witness.one_bits != Some(census.ones) {
+                        return Err(fail(CensusError::OneBits(implementation)));
+                    }
+                }
+                stab_census
+                    .compare_with_stim(stim_census)
+                    .map_err(|mismatch| fail(mismatch.into()))?;
+            }
+            (Some(_), None) => return Err(fail(CensusError::OneSided(Implementation::Stim))),
+            (None, Some(_)) => return Err(fail(CensusError::OneSided(Implementation::Stab))),
+            (None, None) => {}
+        }
+    }
+    Ok(())
 }
 
 /// Produces case inputs that come from running the pinned binaries.
 pub(super) trait PinnedInputs {
     /// A circuit generated identically by pinned Stim and Stab.
-    fn circuit(&mut self, args: &[String]) -> Result<Vec<u8>, String>;
+    fn circuit(&mut self, args: &[String]) -> Result<Vec<u8>, CommandError>;
     /// A generated circuit analyzed into identical DEM text by both binaries.
-    fn dem(&mut self, circuit: &[String], analyze: &[String]) -> Result<Vec<u8>, String>;
+    fn dem(&mut self, circuit: &[String], analyze: &[String]) -> Result<Vec<u8>, CommandError>;
     /// Records sampled once by pinned Stim from a generated circuit.
-    fn stim_records(&mut self, circuit: &[String], sample: &[String]) -> Result<Vec<u8>, String>;
+    fn stim_records(
+        &mut self,
+        circuit: &[String],
+        sample: &[String],
+    ) -> Result<Vec<u8>, CommandError>;
 }
 
 impl DataRecipe {
-    pub(super) fn materialize(&self, pinned: &mut impl PinnedInputs) -> Result<Vec<u8>, String> {
+    pub(super) fn materialize(&self, pinned: &mut impl PinnedInputs) -> Result<Vec<u8>, DataError> {
         match self {
             Self::Empty => Ok(Vec::new()),
-            Self::GeneratedCircuit { args } => pinned.circuit(args),
-            Self::GeneratedDem { circuit, analyze } => pinned.dem(circuit, analyze),
+            Self::GeneratedCircuit { args } => Ok(pinned.circuit(args)?),
+            Self::GeneratedDem { circuit, analyze } => Ok(pinned.dem(circuit, analyze)?),
             Self::SampledRecords {
                 circuit, sample, ..
-            } => pinned.stim_records(circuit, sample),
+            } => Ok(pinned.stim_records(circuit, sample)?),
             Self::FoldedCircuit {
                 qubits,
                 repeat_blocks,
@@ -222,33 +265,36 @@ impl DataRecipe {
 
 impl SemanticWork {
     /// Checks byte-denominated work against the case's actual input or generated output.
-    pub(super) fn check(&self, stdin: &[u8], stdout: &OutputWitness) -> Result<(), String> {
+    pub(super) fn check(&self, stdin: &[u8], stdout: &OutputWitness) -> Result<(), DataError> {
         let actual = match self.unit {
             WorkUnit::GeneratedBytes => stdout.bytes,
-            WorkUnit::InputBytes => u64::try_from(stdin.len())
-                .map_err(|_| "input byte count does not fit in u64".to_string())?,
+            WorkUnit::InputBytes => {
+                u64::try_from(stdin.len()).map_err(|_| DataError::InputTooLarge)?
+            }
             WorkUnit::Records | WorkUnit::Shots => return Ok(()),
         };
         if actual == self.amount {
             Ok(())
         } else {
-            Err(format!(
-                "semantic work declares {} {:?}, actual value is {actual}",
-                self.amount, self.unit
-            ))
+            Err(DataError::WorkMismatch {
+                declared: self.amount,
+                unit: self.unit,
+                actual,
+            })
         }
     }
 }
 
 impl OutputContract {
-    pub(super) fn validate(&self, bytes: &[u8]) -> Result<CheckedOutput, String> {
+    /// Validates one output and returns its witness, with a census for a record contract.
+    pub(super) fn validate(&self, bytes: &[u8]) -> Result<OutputWitness, DataError> {
         let census = match self {
             Self::Exact { minimum_bytes } => {
                 if bytes.len() < *minimum_bytes {
-                    return Err(format!(
-                        "output has {} bytes, expected at least {minimum_bytes}",
-                        bytes.len()
-                    ));
+                    return Err(DataError::OutputTooShort {
+                        actual: bytes.len(),
+                        minimum: *minimum_bytes,
+                    });
                 }
                 None
             }
@@ -262,15 +308,16 @@ impl OutputContract {
                 let census = record_census(bytes, stab_format(*format)?, *bits)?;
                 let ones = census.ones;
                 if usize::try_from(census.records).ok() != Some(*records) {
-                    return Err(format!(
-                        "record output has {} records, expected {records}",
-                        census.records
-                    ));
+                    return Err(DataError::RecordCount {
+                        actual: census.records,
+                        expected: *records,
+                    });
                 }
                 if ones < *minimum_one_bits {
-                    return Err(format!(
-                        "record output has {ones} one bits, expected at least {minimum_one_bits}"
-                    ));
+                    return Err(DataError::TooFewOnes {
+                        ones,
+                        minimum: *minimum_one_bits,
+                    });
                 }
                 let total_bits = u128::try_from(*records)
                     .ok()
@@ -279,7 +326,7 @@ impl OutputContract {
                             .ok()
                             .and_then(|bits| records.checked_mul(bits))
                     })
-                    .ok_or_else(|| "record bit count overflow".to_string())?;
+                    .ok_or(DataError::BitCountOverflow)?;
                 let fraction = if total_bits == 0 {
                     0.0
                 } else {
@@ -290,20 +337,18 @@ impl OutputContract {
                     || *maximum_one_fraction > 1.0
                     || fraction > *maximum_one_fraction
                 {
-                    return Err(format!(
-                        "record one fraction {fraction:.6} exceeds {maximum_one_fraction:.6}"
-                    ));
+                    return Err(DataError::OneFraction {
+                        fraction,
+                        maximum: *maximum_one_fraction,
+                    });
                 }
                 Some(census)
             }
         };
-        Ok(CheckedOutput {
-            witness: OutputWitness {
-                bytes: u64::try_from(bytes.len())
-                    .map_err(|_| "output byte count does not fit in u64".to_string())?,
-                sha256: hex::encode(Sha256::digest(bytes)),
-                one_bits: census.map(|census| census.ones),
-            },
+        Ok(OutputWitness {
+            bytes: u64::try_from(bytes.len()).map_err(|_| DataError::OutputTooLarge)?,
+            sha256: hex::encode(Sha256::digest(bytes)),
+            one_bits: census.map(|census| census.ones),
             census,
         })
     }
@@ -315,8 +360,7 @@ fn record_census(
     bytes: &[u8],
     format: StabRecordFormat,
     bits: usize,
-) -> Result<RecordCensus, String> {
-    let invalid = |source: &dyn std::fmt::Display| format!("record output is invalid: {source}");
+) -> Result<RecordCensus, DataError> {
     let mut reader = RecordStreamReader::measurements(
         bytes,
         format,
@@ -328,28 +372,30 @@ fn record_census(
         ones: 0,
         sum_squares: 0,
     };
-    let overflow = || "record census overflow".to_string();
     while let Some(batch) = reader
         .read_batch(RECORD_BATCH)
-        .map_err(|source| invalid(&source))?
+        .map_err(DataError::InvalidRecordStream)?
     {
         census.records = u64::try_from(batch.shot_count())
             .ok()
             .and_then(|count| census.records.checked_add(count))
-            .ok_or_else(overflow)?;
+            .ok_or(DataError::CensusOverflow)?;
         for shot in 0..batch.shot_count() {
             let record_ones = u64::try_from(
                 batch
                     .shot(shot)
-                    .map_err(|source| invalid(&source))?
+                    .map_err(DataError::InvalidRecords)?
                     .popcount(),
             )
-            .map_err(|_| overflow())?;
-            census.ones = census.ones.checked_add(record_ones).ok_or_else(overflow)?;
+            .map_err(|_| DataError::CensusOverflow)?;
+            census.ones = census
+                .ones
+                .checked_add(record_ones)
+                .ok_or(DataError::CensusOverflow)?;
             census.sum_squares = census
                 .sum_squares
                 .checked_add(u128::from(record_ones) * u128::from(record_ones))
-                .ok_or_else(overflow)?;
+                .ok_or(DataError::CensusOverflow)?;
         }
     }
     Ok(census)
@@ -360,16 +406,14 @@ fn records(
     record_count: usize,
     bits: usize,
     pattern: RecordPattern,
-) -> Result<Vec<u8>, String> {
+) -> Result<Vec<u8>, DataError> {
     if record_count == 0 || bits == 0 {
-        return Err("record recipes require positive records and bits".to_string());
+        return Err(DataError::RecordDimensions);
     }
-    let encode_error =
-        |source: &dyn std::fmt::Display| format!("cannot encode record fixture: {source}");
-    let mut encoder = RecordEncoder::try_new(stab_format(format)?, bits)
-        .map_err(|source| encode_error(&source))?;
+    let mut encoder =
+        RecordEncoder::try_new(stab_format(format)?, bits).map_err(DataError::Encode)?;
     let mut batch = PackedShotBatch::zeros(RECORD_BATCH.min(record_count), bits)
-        .map_err(|source| format!("cannot reserve record fixture batch: {source}"))?;
+        .map_err(DataError::ReserveBatch)?;
     let mut output = Vec::new();
     for batch_start in (0..record_count).step_by(RECORD_BATCH) {
         let batch_records = RECORD_BATCH.min(record_count - batch_start);
@@ -382,31 +426,29 @@ fn records(
                 };
                 batch
                     .set(ShotIndex(shot), BitIndex(bit_index), bit)
-                    .map_err(|source| encode_error(&source))?;
+                    .map_err(DataError::Encode)?;
             }
             if pattern == RecordPattern::Sparse {
                 for hit in 0..bits.min(4) {
                     let index = (record_index * 17 + hit * 97) % bits;
                     batch
                         .set(ShotIndex(shot), BitIndex(index), true)
-                        .map_err(|source| encode_error(&source))?;
+                        .map_err(DataError::Encode)?;
                 }
             }
         }
         let view = batch
             .view_prefix(batch_records)
-            .map_err(|source| encode_error(&source))?;
+            .map_err(DataError::Encode)?;
         encoder
             .write_batch(
                 &[RecordBatchPart::new(DetsResultType::Measurement, view)],
                 &mut output,
             )
-            .map_err(|source| encode_error(&source))?;
+            .map_err(DataError::EncodeWrite)?;
     }
     if encoder.pending_group_records() != 0 {
-        return Err(encode_error(
-            &"ptb64 record recipes require a multiple of 64 records",
-        ));
+        return Err(DataError::PartialPtb64Group);
     }
     Ok(output)
 }
@@ -417,23 +459,23 @@ fn typed_dets(
     observables: usize,
     detector_hits: usize,
     observable_hits: usize,
-) -> Result<Vec<u8>, String> {
+) -> Result<Vec<u8>, DataError> {
     if record_count == 0 || detectors == 0 || observables == 0 {
-        return Err("typed DETS recipes require positive dimensions".to_string());
+        return Err(DataError::TypedDetsDimensions);
     }
     if detector_hits > detectors || observable_hits > observables {
-        return Err("typed DETS hit count exceeds its namespace".to_string());
+        return Err(DataError::TypedDetsHits);
     }
     let mut text = String::new();
     for record in 0..record_count {
         text.push_str("shot");
         for hit in 0..detector_hits {
             let index = (record * 17 + hit * 31) % detectors;
-            write!(text, " D{index}").map_err(|source| source.to_string())?;
+            write!(text, " D{index}")?;
         }
         for hit in 0..observable_hits {
             let index = (record * 7 + hit * 11) % observables;
-            write!(text, " L{index}").map_err(|source| source.to_string())?;
+            write!(text, " L{index}")?;
         }
         text.push('\n');
     }
@@ -445,41 +487,40 @@ fn folded_circuit(
     repeat_blocks: usize,
     repeat_count: u64,
     error_probability: f64,
-) -> Result<Vec<u8>, String> {
+) -> Result<Vec<u8>, DataError> {
     if qubits == 0 || repeat_blocks == 0 || repeat_count == 0 {
-        return Err("folded circuit dimensions must be positive".to_string());
+        return Err(DataError::FoldedDimensions);
     }
     valid_probability(error_probability)?;
     let targets = joined_indices(qubits);
     let mut text = format!("R {targets}\n");
     for _ in 0..repeat_blocks {
-        writeln!(text, "REPEAT {repeat_count} {{").map_err(|source| source.to_string())?;
-        writeln!(text, "    X_ERROR({error_probability}) {targets}")
-            .map_err(|source| source.to_string())?;
-        writeln!(text, "    M {targets}").map_err(|source| source.to_string())?;
+        writeln!(text, "REPEAT {repeat_count} {{")?;
+        writeln!(text, "    X_ERROR({error_probability}) {targets}")?;
+        writeln!(text, "    M {targets}")?;
         for qubit in 0..qubits {
             let offset = qubits - qubit;
-            writeln!(text, "    DETECTOR rec[-{offset}]").map_err(|source| source.to_string())?;
+            writeln!(text, "    DETECTOR rec[-{offset}]")?;
         }
-        writeln!(text, "    R {targets}").map_err(|source| source.to_string())?;
+        writeln!(text, "    R {targets}")?;
         text.push_str("    SHIFT_COORDS(0, 1)\n}\n");
     }
     Ok(text.into_bytes())
 }
 
-fn m2d_circuit(bits: usize) -> Result<Vec<u8>, String> {
+fn m2d_circuit(bits: usize) -> Result<Vec<u8>, DataError> {
     if bits == 0 {
-        return Err("m2d circuit width must be positive".to_string());
+        return Err(DataError::M2dWidth);
     }
     let targets = joined_indices(bits);
     let mut text = format!("R {targets}\n");
     for bit in 0..bits {
-        writeln!(text, "CX sweep[{bit}] {bit}").map_err(|source| source.to_string())?;
+        writeln!(text, "CX sweep[{bit}] {bit}")?;
     }
-    writeln!(text, "M {targets}").map_err(|source| source.to_string())?;
+    writeln!(text, "M {targets}")?;
     for bit in 0..bits {
         let offset = bits - bit;
-        writeln!(text, "DETECTOR rec[-{offset}]").map_err(|source| source.to_string())?;
+        writeln!(text, "DETECTOR rec[-{offset}]")?;
     }
     text.push_str("OBSERVABLE_INCLUDE(0) rec[-1]\n");
     Ok(text.into_bytes())
@@ -490,9 +531,9 @@ fn dem(
     mechanisms: usize,
     repeat_count: u64,
     error_probability: f64,
-) -> Result<Vec<u8>, String> {
+) -> Result<Vec<u8>, DataError> {
     if detectors == 0 || mechanisms == 0 || repeat_count == 0 {
-        return Err("DEM recipe dimensions must be positive".to_string());
+        return Err(DataError::DemDimensions);
     }
     valid_probability(error_probability)?;
     let mut text = format!("repeat {repeat_count} {{\n");
@@ -500,14 +541,12 @@ fn dem(
         let first = (mechanism * 17) % detectors;
         let second = (mechanism * 97 + 1) % detectors;
         if mechanism.is_multiple_of(17) {
-            writeln!(text, "    error({error_probability}) D{first} D{second} L0")
-                .map_err(|source| source.to_string())?;
+            writeln!(text, "    error({error_probability}) D{first} D{second} L0")?;
         } else {
-            writeln!(text, "    error({error_probability}) D{first} D{second}")
-                .map_err(|source| source.to_string())?;
+            writeln!(text, "    error({error_probability}) D{first} D{second}")?;
         }
     }
-    writeln!(text, "    shift_detectors {detectors}").map_err(|source| source.to_string())?;
+    writeln!(text, "    shift_detectors {detectors}")?;
     text.push_str("}\n");
     Ok(text.into_bytes())
 }
@@ -519,21 +558,21 @@ fn joined_indices(count: usize) -> String {
         .join(" ")
 }
 
-fn valid_probability(value: f64) -> Result<(), String> {
+fn valid_probability(value: f64) -> Result<(), DataError> {
     if value.is_finite() && (0.0..=1.0).contains(&value) {
         Ok(())
     } else {
-        Err(format!("invalid probability {value}"))
+        Err(DataError::Probability(value))
     }
 }
 
-fn stab_format(format: RecordFormat) -> Result<StabRecordFormat, String> {
+fn stab_format(format: RecordFormat) -> Result<StabRecordFormat, DataError> {
     match format {
         RecordFormat::ZeroOne => Ok(StabRecordFormat::ZeroOne),
         RecordFormat::B8 => Ok(StabRecordFormat::B8),
         RecordFormat::R8 => Ok(StabRecordFormat::R8),
         RecordFormat::Hits => Ok(StabRecordFormat::Hits),
-        RecordFormat::Dets => Err("generic records cannot infer typed DETS namespaces".to_string()),
+        RecordFormat::Dets => Err(DataError::DetsFormat),
         RecordFormat::Ptb64 => Ok(StabRecordFormat::Ptb64),
     }
 }
@@ -578,15 +617,13 @@ mod tests {
         let checked = records_contract(RecordFormat::B8, 8, 16)
             .validate(&b8)
             .expect("matching contract");
-        assert_eq!(checked.witness.bytes, b8.len() as u64);
-        assert_eq!(
-            checked.witness.one_bits,
-            checked.census.map(|census| census.ones)
-        );
+        assert_eq!(checked.bytes, b8.len() as u64);
+        assert_eq!(checked.one_bits, checked.census.map(|census| census.ones));
 
         let wrong_count = records_contract(RecordFormat::B8, 9, 16)
             .validate(&b8)
-            .expect_err("record count mismatch");
+            .expect_err("record count mismatch")
+            .to_string();
         assert!(
             wrong_count.contains("has 8 records, expected 9"),
             "{wrong_count}"
@@ -594,7 +631,8 @@ mod tests {
 
         let truncated_b8 = records_contract(RecordFormat::B8, 8, 16)
             .validate(&b8[..b8.len() - 1])
-            .expect_err("truncated b8");
+            .expect_err("truncated b8")
+            .to_string();
         assert!(
             truncated_b8.contains("record output is invalid"),
             "{truncated_b8}"
@@ -603,7 +641,8 @@ mod tests {
         let ptb64 = records(RecordFormat::Ptb64, 64, 3, RecordPattern::Alternating).expect("ptb64");
         let truncated_ptb64 = records_contract(RecordFormat::Ptb64, 64, 3)
             .validate(&ptb64[..ptb64.len() - 8])
-            .expect_err("truncated ptb64");
+            .expect_err("truncated ptb64")
+            .to_string();
         assert!(
             truncated_ptb64.contains("record output is invalid"),
             "{truncated_ptb64}"
@@ -612,19 +651,22 @@ mod tests {
         let dense = b"1111\n1111\n".to_vec();
         let fraction = records_contract(RecordFormat::ZeroOne, 2, 4)
             .validate(&dense)
-            .expect_err("one fraction above the bound");
+            .expect_err("one fraction above the bound")
+            .to_string();
         assert!(fraction.contains("exceeds 0.750000"), "{fraction}");
 
         let empty_records = records_contract(RecordFormat::ZeroOne, 2, 4)
             .validate(b"")
-            .expect_err("empty record output");
+            .expect_err("empty record output")
+            .to_string();
         assert!(
             empty_records.contains("has 0 records, expected 2"),
             "{empty_records}"
         );
         let empty_exact = OutputContract::Exact { minimum_bytes: 1 }
             .validate(b"")
-            .expect_err("empty exact output");
+            .expect_err("empty exact output")
+            .to_string();
         assert!(empty_exact.contains("expected at least 1"), "{empty_exact}");
     }
 

@@ -38,7 +38,7 @@ pub(crate) enum BenchError {
     BenchmarkOutputEscaped { path: PathBuf, root: PathBuf },
 
     #[error("end-to-end benchmark validation failed:\n{0}")]
-    E2e(String),
+    E2e(#[from] crate::e2e::E2eError),
 
     #[error("failed to process benchmark JSON: {0}")]
     Json(#[from] serde_json::Error),

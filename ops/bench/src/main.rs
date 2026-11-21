@@ -84,9 +84,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
     };
     let root = RepoRoot::resolve(&root)?;
     match command {
-        Command::Worker(_) | Command::Launch => Err(BenchError::E2e(
-            "internal subprocess dispatch reached the repository controller".to_string(),
-        )),
+        Command::Worker(_) | Command::Launch => Err(e2e::RunError::InternalDispatch.into()),
         Command::E2eCheck(args) => e2e::check(&root, args),
         Command::E2eRun(args) => e2e::run(&root, args),
         Command::E2eReplay(args) => e2e::replay(&root, args),

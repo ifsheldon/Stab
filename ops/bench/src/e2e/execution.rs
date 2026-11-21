@@ -10,6 +10,7 @@ use tempfile::TempDir;
 
 use super::bundle::{file_sha256, publish_bundle};
 use super::commands::command_output;
+use super::error::{MeasuredProgram, RunError};
 use super::host::{CompetitorScan, HostProfile, validate_host_after};
 use super::model::{Case, CaseId, Family, Suite, Tier};
 use super::report::{
@@ -72,29 +73,23 @@ pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), BenchError> {
         args.minimum_logical_failures,
         args.maximum_logical_failures,
         args.seed,
-    )
-    .map_err(BenchError::E2e)?;
-    write_receipt(&receipt).map_err(BenchError::E2e)
+    )?;
+    Ok(write_receipt(&receipt)?)
 }
 
 /// Fails once SIGINT or SIGTERM has been received, so an interrupted run stops at the next phase
 /// boundary and never publishes a bundle.
 fn check_cancelled(cancellation: &Cancellation) -> Result<(), BenchError> {
     if cancellation.is_cancelled() {
-        return Err(BenchError::E2e(
-            "interrupted by SIGINT or SIGTERM; no bundle was published".to_string(),
-        ));
+        return Err(RunError::Interrupted.into());
     }
     Ok(())
 }
 
 pub(crate) fn run(root: &RepoRoot, args: RunArgs) -> Result<(), BenchError> {
-    let cancellation = Cancellation::for_signals()
-        .map_err(|source| BenchError::E2e(format!("cannot install signal handlers: {source}")))?;
+    let cancellation = Cancellation::for_signals().map_err(RunError::SignalHandlers)?;
     if args.tier != Tier::Smoke && args.allow_dirty {
-        return Err(BenchError::E2e(
-            "--allow-dirty is available only for smoke diagnostics".to_string(),
-        ));
+        return Err(RunError::AllowDirtyFormal.into());
     }
     let loaded = load_suite(root)?;
     validate_prerequisites(root, &loaded.suite)?;
@@ -102,27 +97,23 @@ pub(crate) fn run(root: &RepoRoot, args: RunArgs) -> Result<(), BenchError> {
     let formal = args.tier != Tier::Smoke;
     let source = SourceIdentity::capture(root)?;
     if !source.clean && !args.allow_dirty {
-        return Err(BenchError::E2e(
-            "source tree is dirty; commit it or use --allow-dirty for smoke".to_string(),
-        ));
+        return Err(RunError::DirtySource.into());
     }
     let tier_policy = loaded
         .suite
         .tiers
         .get(&args.tier)
-        .ok_or_else(|| BenchError::E2e(format!("suite omits tier {}", args.tier)))?;
+        .ok_or(RunError::MissingTier { tier: args.tier })?;
     let binaries = Binaries::build(root, &loaded)?;
     check_cancelled(&cancellation)?;
     // The host profile and competitor scan start after the builds, so neither sees the build.
     let competitors = CompetitorScan::new(binaries.measured_paths());
-    let host_before = HostProfile::capture(args.affinity_cpu).map_err(BenchError::E2e)?;
+    let host_before = HostProfile::capture(args.affinity_cpu)?;
     if formal {
-        host_before
-            .validate_formal(
-                loaded.suite.policy.maximum_temperature_millidegrees,
-                &competitors,
-            )
-            .map_err(BenchError::E2e)?;
+        host_before.validate_formal(
+            loaded.suite.policy.maximum_temperature_millidegrees,
+            &competitors,
+        )?;
     }
     let output = root.create_new_benchmark_output_dir(&args.out)?;
 
@@ -131,7 +122,7 @@ pub(crate) fn run(root: &RepoRoot, args: RunArgs) -> Result<(), BenchError> {
     for selected_case in selected {
         check_cancelled(&cancellation)?;
         if formal {
-            competitors.check().map_err(BenchError::E2e)?;
+            competitors.check()?;
         }
         println!("[stab-bench] E2E preflight {}", selected_case.id);
         let prepared = PreparedCase::new(
@@ -155,20 +146,17 @@ pub(crate) fn run(root: &RepoRoot, args: RunArgs) -> Result<(), BenchError> {
     }
 
     check_cancelled(&cancellation)?;
-    let host_after = HostProfile::capture(args.affinity_cpu).map_err(BenchError::E2e)?;
+    let host_after = HostProfile::capture(args.affinity_cpu)?;
     validate_host_after(
         &host_before,
         &host_after,
         loaded.suite.policy.maximum_temperature_millidegrees,
         formal,
         &competitors,
-    )
-    .map_err(BenchError::E2e)?;
+    )?;
     binaries.verify_unchanged()?;
     if SourceIdentity::capture(root)? != source {
-        return Err(BenchError::E2e(
-            "source commit or cleanliness changed during the run".to_string(),
-        ));
+        return Err(RunError::SourceChanged.into());
     }
     let metadata = RunMetadata {
         schema_version: RUN_SCHEMA_VERSION,
@@ -196,8 +184,7 @@ pub(crate) fn run(root: &RepoRoot, args: RunArgs) -> Result<(), BenchError> {
         schema_version: SAMPLES_SCHEMA_VERSION,
         cases: raw_cases,
     };
-    let report = DerivedReport::derive(&loaded.suite, &metadata, &correctness, &samples)
-        .map_err(BenchError::E2e)?;
+    let report = DerivedReport::derive(&loaded.suite, &metadata, &correctness, &samples)?;
     check_cancelled(&cancellation)?;
     publish_bundle(
         &output,
@@ -219,11 +206,11 @@ pub(crate) fn run(root: &RepoRoot, args: RunArgs) -> Result<(), BenchError> {
     if report.passed {
         Ok(())
     } else {
-        Err(BenchError::E2e(format!(
-            "E2E {} report failed; retained bundle {}",
-            args.tier,
-            output.display()
-        )))
+        Err(RunError::ReportFailed {
+            tier: args.tier,
+            bundle: output,
+        }
+        .into())
     }
 }
 
@@ -256,12 +243,13 @@ fn select_cases<'a>(
         .iter()
         .find(|filter| !matched.contains(filter.as_str()))
     {
-        return Err(BenchError::E2e(format!(
-            "E2E filter {unmatched} matched no family or case"
-        )));
+        return Err(RunError::UnmatchedFilter {
+            filter: unmatched.clone(),
+        }
+        .into());
     }
     if selected.is_empty() {
-        return Err(BenchError::E2e("E2E selection is empty".to_string()));
+        return Err(RunError::EmptySelection.into());
     }
     Ok(selected)
 }
@@ -295,7 +283,10 @@ impl SourceIdentity {
         )?;
         Ok(Self {
             commit: String::from_utf8(commit)
-                .map_err(|source| BenchError::E2e(source.to_string()))?
+                .map_err(|source| RunError::NonUtf8Output {
+                    program: "git rev-parse HEAD",
+                    source,
+                })?
                 .trim()
                 .to_string(),
             clean: status.is_empty(),
@@ -332,26 +323,23 @@ impl Binaries {
         ensure_stim_cli(root, &stim_source)?;
         let built_stim = root.stim_binary();
         let built_stab = build_release_stab(root)?;
-        let bench = std::env::current_exe().map_err(|source| {
-            BenchError::E2e(format!("cannot resolve benchmark binary: {source}"))
-        })?;
+        let bench = std::env::current_exe().map_err(RunError::ResolveBench)?;
         if !bench.is_file() {
-            return Err(BenchError::E2e(format!(
-                "benchmark binary is missing at {}",
-                bench.display()
-            )));
+            return Err(RunError::MissingBench { path: bench }.into());
         }
         let (rustc, target) = rustc_identity(root)?;
         let scratch = root.benchmark_root().join("e2e-scratch");
-        fs::create_dir_all(&scratch).map_err(|source| {
-            BenchError::E2e(format!("failed to create {}: {source}", scratch.display()))
-        })?;
+        if let Err(source) = fs::create_dir_all(&scratch) {
+            return Err(RunError::CreateDirectory {
+                path: scratch,
+                source,
+            }
+            .into());
+        }
         let directory = tempfile::Builder::new()
             .prefix("binaries-")
             .tempdir_in(&scratch)
-            .map_err(|source| {
-                BenchError::E2e(format!("cannot create measured binary directory: {source}"))
-            })?;
+            .map_err(RunError::BinaryDirectory)?;
         let stim = private_copy(&built_stim, &directory.path().join("stim"))?;
         let stab = private_copy(&built_stab, &directory.path().join("stab"))?;
         Ok(Self {
@@ -381,16 +369,17 @@ impl Binaries {
 
     /// Fails if a measured program changed after its preflight hash.
     fn verify_unchanged(&self) -> Result<(), BenchError> {
-        for (name, path, expected) in [
-            ("Stim", &self.stim, &self.stim_sha256),
-            ("Stab", &self.stab, &self.stab_sha256),
-            ("benchmark", &self.bench, &self.bench_sha256),
+        for (implementation, path, expected) in [
+            (MeasuredProgram::Stim, &self.stim, &self.stim_sha256),
+            (MeasuredProgram::Stab, &self.stab, &self.stab_sha256),
+            (MeasuredProgram::Benchmark, &self.bench, &self.bench_sha256),
         ] {
             if file_sha256(path)? != *expected {
-                return Err(BenchError::E2e(format!(
-                    "{name} binary {} changed during the run",
-                    path.display()
-                )));
+                return Err(RunError::BinaryChanged {
+                    implementation,
+                    path: path.clone(),
+                }
+                .into());
             }
         }
         Ok(())
@@ -424,18 +413,16 @@ fn build_release_stab(root: &RepoRoot) -> Result<PathBuf, BenchError> {
 fn stab_executable_from_cargo_messages(messages: &[u8]) -> Result<PathBuf, BenchError> {
     let mut executable = None;
     for message in cargo_metadata::Message::parse_stream(messages) {
-        if let cargo_metadata::Message::CompilerArtifact(artifact) = message.map_err(|source| {
-            BenchError::E2e(format!("cargo wrote an unreadable message: {source}"))
-        })? && artifact.target.name == "stab"
+        if let cargo_metadata::Message::CompilerArtifact(artifact) =
+            message.map_err(RunError::CargoMessage)?
+            && artifact.target.name == "stab"
             && artifact.target.is_bin()
             && let Some(path) = artifact.executable
         {
             executable = Some(path.into_std_path_buf());
         }
     }
-    executable.ok_or_else(|| {
-        BenchError::E2e("cargo build reported no executable for the stab binary".to_string())
-    })
+    executable.ok_or_else(|| RunError::NoStabExecutable.into())
 }
 
 /// Copies `source` to the new owner-only file `destination` and leaves it read and execute only.
@@ -443,10 +430,13 @@ fn private_copy(source: &Path, destination: &Path) -> Result<PathBuf, BenchError
     use std::io::Write as _;
     use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
 
-    let bytes = fs::read(source)
-        .map_err(|error| BenchError::E2e(format!("cannot read {}: {error}", source.display())))?;
-    let failed = |error: std::io::Error| {
-        BenchError::E2e(format!("cannot write {}: {error}", destination.display()))
+    let bytes = fs::read(source).map_err(|error| RunError::ReadBinary {
+        path: source.to_path_buf(),
+        source: error,
+    })?;
+    let failed = |error: std::io::Error| RunError::WriteBinary {
+        path: destination.to_path_buf(),
+        source: error,
     };
     let mut file = fs::OpenOptions::new()
         .write(true)
@@ -472,17 +462,19 @@ fn rustc_identity(root: &RepoRoot) -> Result<(String, String), BenchError> {
         None,
         60,
     )?;
-    let verbose =
-        String::from_utf8(verbose).map_err(|source| BenchError::E2e(source.to_string()))?;
+    let verbose = String::from_utf8(verbose).map_err(|source| RunError::NonUtf8Output {
+        program: "rustc -vV",
+        source,
+    })?;
     let target = verbose
         .lines()
         .find_map(|line| line.strip_prefix("host: "))
-        .ok_or_else(|| BenchError::E2e("rustc -vV omitted host target".to_string()))?
+        .ok_or(RunError::RustcHost)?
         .to_string();
     let rustc = verbose
         .lines()
         .next()
-        .ok_or_else(|| BenchError::E2e("rustc -vV is empty".to_string()))?
+        .ok_or(RunError::RustcEmpty)?
         .to_string();
     Ok((rustc, target))
 }

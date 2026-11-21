@@ -6,8 +6,8 @@ use std::path::Path;
 use std::time::Duration;
 
 use super::data::PinnedInputs;
+use super::error::{AgreedOutput, CommandError};
 use super::model::Policy;
-use crate::error::BenchError;
 use crate::process::{
     OutputPolicy, ProcessLimits, ProcessRequest, ProcessResult, bench_launcher, run_bounded_process,
 };
@@ -41,7 +41,7 @@ impl<'a> PinnedCommands<'a> {
         }
     }
 
-    fn run(&self, binary: &Path, args: &[String], stdin: &[u8]) -> Result<Vec<u8>, String> {
+    fn run(&self, binary: &Path, args: &[String], stdin: &[u8]) -> Result<Vec<u8>, CommandError> {
         let args = args.iter().map(OsString::from).collect::<Vec<_>>();
         let result = run_command(
             binary,
@@ -51,34 +51,42 @@ impl<'a> PinnedCommands<'a> {
             true,
             self.cpu,
             self.policy,
-        )
-        .map_err(|source| source.to_string())?;
-        checked_success(binary, &result).map_err(|source| source.to_string())?;
+        )?;
+        checked_success(binary, &result)?;
         Ok(result.stdout)
     }
 
     /// Runs both binaries and requires byte-identical deterministic output.
-    fn agreed(&self, args: &[String], stdin: &[u8], what: &str) -> Result<Vec<u8>, String> {
+    fn agreed(
+        &self,
+        args: &[String],
+        stdin: &[u8],
+        what: AgreedOutput,
+    ) -> Result<Vec<u8>, CommandError> {
         let stim = self.run(self.stim, args, stdin)?;
         let stab = self.run(self.stab, args, stdin)?;
         if stim != stab {
-            return Err(format!("{what} differs from pinned Stim"));
+            return Err(CommandError::Disagreement { what });
         }
         Ok(stim)
     }
 }
 
 impl PinnedInputs for PinnedCommands<'_> {
-    fn circuit(&mut self, args: &[String]) -> Result<Vec<u8>, String> {
-        self.agreed(args, b"", "generated circuit")
+    fn circuit(&mut self, args: &[String]) -> Result<Vec<u8>, CommandError> {
+        self.agreed(args, b"", AgreedOutput::GeneratedCircuit)
     }
 
-    fn dem(&mut self, circuit: &[String], analyze: &[String]) -> Result<Vec<u8>, String> {
+    fn dem(&mut self, circuit: &[String], analyze: &[String]) -> Result<Vec<u8>, CommandError> {
         let circuit = self.circuit(circuit)?;
-        self.agreed(analyze, &circuit, "analyzed detector error model")
+        self.agreed(analyze, &circuit, AgreedOutput::AnalyzedDem)
     }
 
-    fn stim_records(&mut self, circuit: &[String], sample: &[String]) -> Result<Vec<u8>, String> {
+    fn stim_records(
+        &mut self,
+        circuit: &[String],
+        sample: &[String],
+    ) -> Result<Vec<u8>, CommandError> {
         let circuit = self.circuit(circuit)?;
         self.run(self.stim, sample, &circuit)
     }
@@ -92,7 +100,7 @@ pub(super) fn run_command(
     capture: bool,
     cpu: Option<usize>,
     policy: &Policy,
-) -> Result<ProcessResult, BenchError> {
+) -> Result<ProcessResult, CommandError> {
     let output_policy = if capture {
         OutputPolicy::Capture {
             maximum_bytes: policy.maximum_output_bytes,
@@ -100,8 +108,7 @@ pub(super) fn run_command(
     } else {
         OutputPolicy::Discard
     };
-    let launcher = bench_launcher()
-        .map_err(|source| BenchError::E2e(format!("locate measurement launcher: {source}")))?;
+    let launcher = bench_launcher().map_err(CommandError::Launcher)?;
     let limits = ProcessLimits {
         stdout: output_policy,
         stderr: OutputPolicy::Capture {
@@ -115,19 +122,18 @@ pub(super) fn run_command(
             .with_affinity(cpu)
             .measured(launcher, Some(policy.maximum_output_bytes as u64)),
     )
-    .map_err(BenchError::from)
+    .map_err(CommandError::from)
 }
 
-pub(super) fn checked_success(binary: &Path, result: &ProcessResult) -> Result<(), BenchError> {
+pub(super) fn checked_success(binary: &Path, result: &ProcessResult) -> Result<(), CommandError> {
     if result.status.success() && result.stderr_bytes == 0 {
         return Ok(());
     }
-    Err(BenchError::E2e(format!(
-        "{} failed with status {} and stderr {}",
-        binary.display(),
-        result.status,
-        String::from_utf8_lossy(&result.stderr)
-    )))
+    Err(CommandError::Unclean {
+        program: binary.to_path_buf(),
+        status: result.status,
+        stderr: String::from_utf8_lossy(&result.stderr).into(),
+    })
 }
 
 pub(super) fn command_output(
@@ -138,7 +144,7 @@ pub(super) fn command_output(
     maximum_output: usize,
     cpu: Option<usize>,
     timeout_seconds: u64,
-) -> Result<Vec<u8>, BenchError> {
+) -> Result<Vec<u8>, CommandError> {
     let args = args.iter().map(OsString::from).collect::<Vec<_>>();
     let limits = ProcessLimits::capture(maximum_output, Duration::from_secs(timeout_seconds));
     let result = run_bounded_process(
@@ -147,11 +153,10 @@ pub(super) fn command_output(
             .with_affinity(cpu),
     )?;
     if !result.status.success() {
-        return Err(BenchError::E2e(format!(
-            "{} failed: {}",
-            binary.display(),
-            String::from_utf8_lossy(&result.stderr)
-        )));
+        return Err(CommandError::Failed {
+            program: binary.to_path_buf(),
+            stderr: String::from_utf8_lossy(&result.stderr).into(),
+        });
     }
     Ok(result.stdout)
 }

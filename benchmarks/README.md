@@ -38,6 +38,7 @@ A competing process is another benchmark controller or worker, any process execu
 Stim and Stab run from private read-only copies that are hashed before preflight and again after the last sample, the release build uses `--locked`, and the source commit and cleanliness are rechecked after the run.
 Recording, replay, and the release check share one derivation that requires each case's tier sample count, per-sample work, and per-sample output bytes to match its correctness witnesses.
 Preflight also compares the mean number of one bits per record between Stim's and Stab's outputs of each stochastic contract, using each side's sample variance across records and a six-sigma bound; records are independent while bits within a record are not, so a per-bit binomial model would reject correct outputs.
+Each stochastic output witness in `correctness.json` also records that census as an optional `census` object (record count, one-bit total, and the sum of squared per-record one-bit counts), and replay and the release check repeat the same comparison whenever both sides carry one; bundles written before this field omit it and still verify.
 
 `--affinity-cpu` takes a Linux CPU ID, including IDs in a restricted or noncontiguous affinity mask. The process supervisor applies the requested affinity through the kernel; the recorded available processor count is descriptive and does not bound CPU IDs.
 

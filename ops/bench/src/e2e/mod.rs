@@ -1,6 +1,7 @@
 mod bundle;
 mod commands;
 mod data;
+mod error;
 mod execution;
 mod host;
 mod model;
@@ -21,7 +22,10 @@ use crate::root::RepoRoot;
 pub(crate) use bundle::{
     BaselineCandidateArgs, ReplayArgs, baseline_candidate, release_check, replay,
 };
+pub(crate) use error::{E2eError, RunError};
 pub(crate) use execution::{RunArgs, WorkerArgs, run, run_worker};
+
+use error::{PrerequisiteIssue, SuiteError};
 
 #[derive(Clone, Debug, Args)]
 pub(crate) struct CheckArgs {
@@ -63,22 +67,15 @@ fn check_or_write_docs(
     let path = root.e2e_suite_doc();
     let expected = render_suite(suite);
     if write_docs {
-        fs::write(&path, expected).map_err(|source| {
-            BenchError::E2e(format!("failed to write {}: {source}", path.display()))
-        })?;
-        return Ok(());
+        return fs::write(&path, expected)
+            .map_err(|source| SuiteError::WriteDocs { path, source }.into());
     }
-    let actual = fs::read_to_string(&path).map_err(|source| {
-        BenchError::E2e(format!(
-            "failed to read generated {}: {source}; run just bench::e2e-check --write-docs",
-            path.display()
-        ))
-    })?;
+    let actual = match fs::read_to_string(&path) {
+        Ok(actual) => actual,
+        Err(source) => return Err(SuiteError::ReadDocs { path, source }.into()),
+    };
     if actual != expected {
-        return Err(BenchError::E2e(format!(
-            "{} is stale; run just bench::e2e-check --write-docs",
-            path.display()
-        )));
+        return Err(SuiteError::StaleDocs { path }.into());
     }
     Ok(())
 }
@@ -163,13 +160,9 @@ struct LoadedSuite {
 
 fn load_suite(root: &RepoRoot) -> Result<LoadedSuite, BenchError> {
     let path = root.e2e_suite();
-    let bytes = fs::read(&path).map_err(|source| {
-        BenchError::E2e(format!("failed to read {}: {source}", path.display()))
-    })?;
-    let suite = toml::from_slice::<model::Suite>(&bytes).map_err(|source| {
-        BenchError::E2e(format!("failed to parse {}: {source}", path.display()))
-    })?;
-    suite.validate().map_err(BenchError::E2e)?;
+    let bytes = read_source(&path)?;
+    let suite = parse_source::<model::Suite>(path, &bytes)?;
+    suite.validate().map_err(SuiteError::from)?;
     let digest = hex::encode(Sha256::digest(&bytes));
     Ok(LoadedSuite {
         bytes,
@@ -180,28 +173,18 @@ fn load_suite(root: &RepoRoot) -> Result<LoadedSuite, BenchError> {
 
 fn validate_prerequisites(root: &RepoRoot, suite: &model::Suite) -> Result<(), BenchError> {
     let root_path = root.path.join("oracle").join("stim-v1.16-parity.toml");
-    let root_bytes = fs::read(&root_path).map_err(|source| {
-        BenchError::E2e(format!("failed to read {}: {source}", root_path.display()))
-    })?;
-    let manifest = toml::from_slice::<ParityRoot>(&root_bytes).map_err(|source| {
-        BenchError::E2e(format!("failed to parse {}: {source}", root_path.display()))
-    })?;
+    let root_bytes = read_source(&root_path)?;
+    let manifest = parse_source::<ParityRoot>(root_path, &root_bytes)?;
     let mut statuses = BTreeMap::new();
     for relative in manifest.family_files {
         let path = root.path.join(relative);
-        let bytes = fs::read(&path).map_err(|source| {
-            BenchError::E2e(format!("failed to read {}: {source}", path.display()))
-        })?;
-        let fragment = toml::from_slice::<ParityFragment>(&bytes).map_err(|source| {
-            BenchError::E2e(format!("failed to parse {}: {source}", path.display()))
-        })?;
+        let bytes = read_source(&path)?;
+        let fragment = parse_source::<ParityFragment>(path, &bytes)?;
         for family in fragment.families {
-            if statuses.insert(family.id.clone(), family.status).is_some() {
-                return Err(BenchError::E2e(format!(
-                    "duplicate parity family {}",
-                    family.id
-                )));
+            if statuses.contains_key(&family.id) {
+                return Err(SuiteError::DuplicateParityFamily { family: family.id }.into());
             }
+            statuses.insert(family.id, family.status);
         }
     }
     let required = suite
@@ -209,22 +192,38 @@ fn validate_prerequisites(root: &RepoRoot, suite: &model::Suite) -> Result<(), B
         .iter()
         .flat_map(|family| family.prerequisites.iter())
         .collect::<BTreeSet<_>>();
-    let mut errors = Vec::new();
+    let mut issues = Vec::new();
     for prerequisite in required {
         match statuses.get(prerequisite) {
             Some(ParityStatus::Done | ParityStatus::Divergence) => {}
-            Some(status) => errors.push(format!(
-                "correctness prerequisite {prerequisite} has status {}",
-                status.as_str()
-            )),
-            None => errors.push(format!(
-                "correctness prerequisite {prerequisite} is not in the parity ledger"
-            )),
+            Some(status) => issues.push(PrerequisiteIssue::Unsatisfied {
+                prerequisite: prerequisite.clone(),
+                status: status.as_str(),
+            }),
+            None => issues.push(PrerequisiteIssue::NotInLedger {
+                prerequisite: prerequisite.clone(),
+            }),
         }
     }
-    errors
-        .is_empty()
-        .ok_or_else(|| BenchError::E2e(errors.join("\n")))
+    if issues.is_empty() {
+        Ok(())
+    } else {
+        Err(SuiteError::Prerequisites(issues).into())
+    }
+}
+
+fn read_source(path: &std::path::Path) -> Result<Vec<u8>, SuiteError> {
+    fs::read(path).map_err(|source| SuiteError::Read {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+fn parse_source<T: serde::de::DeserializeOwned>(
+    path: std::path::PathBuf,
+    bytes: &[u8],
+) -> Result<T, SuiteError> {
+    toml::from_slice::<T>(bytes).map_err(|source| SuiteError::Parse { path, source })
 }
 
 #[derive(Deserialize)]

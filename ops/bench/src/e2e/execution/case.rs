@@ -11,7 +11,8 @@ use tempfile::TempDir;
 
 use super::Binaries;
 use crate::e2e::commands::{PinnedCommands, checked_success, run_command};
-use crate::e2e::data::{CheckedOutput, OutputKey, OutputWitness};
+use crate::e2e::data::{OutputKey, OutputWitness, compare_witness_censuses};
+use crate::e2e::error::{ByteCountOverflow, CaseError, Implementation};
 use crate::e2e::model::{
     Case, CaseId, Comparator, Family, FileRole, OutputContract, PipelineInput, Policy, Workload,
 };
@@ -52,13 +53,17 @@ impl<'a> PreparedCase<'a> {
         cpu: Option<usize>,
     ) -> Result<Self, BenchError> {
         let scratch = root.benchmark_root().join("e2e-scratch");
-        fs::create_dir_all(&scratch).map_err(|source| {
-            BenchError::E2e(format!("failed to create {}: {source}", scratch.display()))
-        })?;
+        if let Err(source) = fs::create_dir_all(&scratch) {
+            return Err(crate::e2e::error::RunError::CreateDirectory {
+                path: scratch,
+                source,
+            }
+            .into());
+        }
         let directory = tempfile::Builder::new()
             .prefix("case-")
             .tempdir_in(&scratch)
-            .map_err(|source| BenchError::E2e(format!("cannot create case scratch: {source}")))?;
+            .map_err(CaseError::Scratch)?;
         let mut pinned =
             PinnedCommands::new(&binaries.stim, &binaries.stab, &root.path, policy, cpu);
         let (stdin_recipe, command_args, file_specs) = match &case.workload {
@@ -71,19 +76,22 @@ impl<'a> PreparedCase<'a> {
         };
         let stdin = stdin_recipe
             .map(|recipe| recipe.materialize(&mut pinned))
-            .transpose()
-            .map_err(BenchError::E2e)?
+            .transpose()?
             .unwrap_or_default();
         let mut prepared_files = Vec::new();
         for file in file_specs {
             let path = directory.path().join(&file.name);
             if file.role == FileRole::Input {
-                let recipe = file.data.as_ref().ok_or_else(|| {
-                    BenchError::E2e(format!("input file {} has no data", file.name))
-                })?;
-                let bytes = recipe.materialize(&mut pinned).map_err(BenchError::E2e)?;
-                fs::write(&path, bytes).map_err(|source| {
-                    BenchError::E2e(format!("cannot write {}: {source}", path.display()))
+                let recipe = file
+                    .data
+                    .as_ref()
+                    .ok_or_else(|| CaseError::InputWithoutData {
+                        file: file.name.clone(),
+                    })?;
+                let bytes = recipe.materialize(&mut pinned)?;
+                fs::write(&path, bytes).map_err(|source| CaseError::WriteInput {
+                    path: path.clone(),
+                    source,
                 })?;
             }
             prepared_files.push(PreparedFile {
@@ -130,6 +138,7 @@ impl<'a> PreparedCase<'a> {
                     bytes: execution.output_bytes,
                     sha256: execution.output_sha256.clone(),
                     one_bits: None,
+                    census: None,
                 };
                 Ok((
                     CaseCorrectness {
@@ -148,26 +157,30 @@ impl<'a> PreparedCase<'a> {
             Workload::Cli { stdout, .. } | Workload::CliPipeline { stdout, .. } => {
                 let stim = self.run_cli_once(&binaries.stim, true)?;
                 let stab = self.run_cli_once(&binaries.stab, true)?;
-                let stim_checked = self.validate_cli_outputs(stdout, &stim)?;
-                let stab_checked = self.validate_cli_outputs(stdout, &stab)?;
-                compare_record_censuses(&self.id, &stim_checked, &stab_checked)?;
-                let stim_outputs = witnesses(stim_checked);
-                let stab_outputs = witnesses(stab_checked);
-                for (side, outputs) in [("Stim", &stim_outputs), ("Stab", &stab_outputs)] {
-                    let stdout = outputs.get(&OutputKey::Stdout).ok_or_else(|| {
-                        BenchError::E2e(format!("{side} stdout witness is missing"))
-                    })?;
-                    self.case
-                        .work
-                        .check(&self.stdin, stdout)
-                        .map_err(BenchError::E2e)?;
+                let stim_outputs = self.validate_cli_outputs(stdout, &stim)?;
+                let stab_outputs = self.validate_cli_outputs(stdout, &stab)?;
+                compare_witness_censuses(&stim_outputs, &stab_outputs).map_err(
+                    |(key, source)| CaseError::Census {
+                        case: self.id.clone(),
+                        key,
+                        source,
+                    },
+                )?;
+                for (side, outputs) in [
+                    (Implementation::Stim, &stim_outputs),
+                    (Implementation::Stab, &stab_outputs),
+                ] {
+                    let stdout = outputs
+                        .get(&OutputKey::Stdout)
+                        .ok_or(CaseError::MissingStdoutWitness { side })?;
+                    self.case.work.check(&self.stdin, stdout)?;
                 }
                 compare_exact_outputs(stdout, &self.files, &stim_outputs, &stab_outputs)?;
                 if stim.intermediates != stab.intermediates {
-                    return Err(BenchError::E2e(format!(
-                        "{} pipeline intermediate outputs differ from pinned Stim",
-                        self.id
-                    )));
+                    return Err(CaseError::IntermediatesDiffer {
+                        case: self.id.clone(),
+                    }
+                    .into());
                 }
                 let input_sha256 = self.input_digest()?;
                 let expected = ExpectedOutput {
@@ -192,38 +205,42 @@ impl<'a> PreparedCase<'a> {
         &self,
         stdout_contract: &OutputContract,
         execution: &CliExecution,
-    ) -> Result<BTreeMap<OutputKey, CheckedOutput>, BenchError> {
-        let stdout = execution.stdout.as_ref().ok_or_else(|| {
-            BenchError::E2e(format!("{} preflight did not capture stdout", self.id))
-        })?;
-        let mut outputs = BTreeMap::from([(
-            OutputKey::Stdout,
-            stdout_contract.validate(stdout).map_err(BenchError::E2e)?,
-        )]);
+    ) -> Result<BTreeMap<OutputKey, OutputWitness>, BenchError> {
+        let stdout = execution
+            .stdout
+            .as_ref()
+            .ok_or_else(|| CaseError::StdoutNotCaptured {
+                case: self.id.clone(),
+            })?;
+        let mut outputs = BTreeMap::from([(OutputKey::Stdout, stdout_contract.validate(stdout)?)]);
         for file in &self.files {
             if file.role != FileRole::Output {
                 continue;
             }
-            let bytes = execution.files.get(&file.name).ok_or_else(|| {
-                BenchError::E2e(format!("{} omitted output file {}", self.id, file.name))
-            })?;
-            let contract = file.output.as_ref().ok_or_else(|| {
-                BenchError::E2e(format!(
-                    "{} output file {} has no contract",
-                    self.id, file.name
-                ))
-            })?;
+            let bytes =
+                execution
+                    .files
+                    .get(&file.name)
+                    .ok_or_else(|| CaseError::OmittedOutputFile {
+                        case: self.id.clone(),
+                        file: file.name.clone(),
+                    })?;
+            let contract =
+                file.output
+                    .as_ref()
+                    .ok_or_else(|| CaseError::OutputWithoutContract {
+                        case: self.id.clone(),
+                        file: file.name.clone(),
+                    })?;
             outputs.insert(
                 OutputKey::File(file.name.clone()),
-                contract.validate(bytes).map_err(BenchError::E2e)?,
+                contract.validate(bytes)?,
             );
         }
         for (index, bytes) in execution.intermediates.iter().enumerate() {
             outputs.insert(
                 OutputKey::Step(index),
-                OutputContract::Exact { minimum_bytes: 1 }
-                    .validate(bytes)
-                    .map_err(BenchError::E2e)?,
+                OutputContract::Exact { minimum_bytes: 1 }.validate(bytes)?,
             );
         }
         Ok(outputs)
@@ -263,13 +280,21 @@ impl<'a> PreparedCase<'a> {
         expected: &ExpectedOutput,
         cancellation: &stab_process::Cancellation,
     ) -> Result<CaseSamples, BenchError> {
-        let digest = self.case.digest(&self.family.id).map_err(BenchError::E2e)?;
+        let digest = self
+            .case
+            .digest(&self.family.id)
+            .map_err(|source| CaseError::Digest {
+                case: self.id.clone(),
+                source,
+            })?;
         let mut paired = Vec::new();
         let mut stab_only = Vec::new();
         match self.family.comparator {
             Comparator::StimCli => {
                 let expected_stim = self.batch_bytes(expected.stim_bytes.ok_or_else(|| {
-                    BenchError::E2e(format!("{} has no Stim output expectation", self.id))
+                    CaseError::NoStimExpectation {
+                        case: self.id.clone(),
+                    }
                 })?)?;
                 let expected_stab = self.batch_bytes(expected.stab_bytes)?;
                 for index in 0..samples {
@@ -288,10 +313,11 @@ impl<'a> PreparedCase<'a> {
                         }
                     };
                     if stim.output_bytes != expected_stim || stab.output_bytes != expected_stab {
-                        return Err(BenchError::E2e(format!(
-                            "{} output size changed during paired sample {index}",
-                            self.id
-                        )));
+                        return Err(CaseError::OutputSizeChanged {
+                            case: self.id.clone(),
+                            index,
+                        }
+                        .into());
                     }
                     paired.push(PairedTiming {
                         index,
@@ -315,10 +341,11 @@ impl<'a> PreparedCase<'a> {
                     if sample.output_bytes != expected_stab
                         || expected.stab_sha256.as_deref() != Some(sample.output_sha256.as_str())
                     {
-                        return Err(BenchError::E2e(format!(
-                            "{} semantic output changed during Stab sample {index}",
-                            self.id
-                        )));
+                        return Err(CaseError::SemanticOutputChanged {
+                            case: self.id.clone(),
+                            index,
+                        }
+                        .into());
                     }
                     stab_only.push(StabTiming {
                         index,
@@ -348,7 +375,7 @@ impl<'a> PreparedCase<'a> {
             peak_rss_bytes = peak_rss_bytes.max(execution.peak_rss_bytes);
             output_bytes = output_bytes
                 .checked_add(execution.total_output_bytes)
-                .ok_or_else(|| BenchError::E2e("CLI output byte count overflow".to_string()))?;
+                .ok_or(CaseError::ByteCount(ByteCountOverflow::CliBatch))?;
         }
         Ok(BatchMeasurement {
             seconds,
@@ -364,10 +391,11 @@ impl<'a> PreparedCase<'a> {
                     Ok(()) => {}
                     Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
                     Err(source) => {
-                        return Err(BenchError::E2e(format!(
-                            "cannot clear {}: {source}",
-                            file.path.display()
-                        )));
+                        return Err(CaseError::ClearOutput {
+                            path: file.path.clone(),
+                            source,
+                        }
+                        .into());
                     }
                 }
             }
@@ -405,10 +433,14 @@ impl<'a> PreparedCase<'a> {
                         self.policy,
                     )?;
                     elapsed = elapsed.checked_add(result.wall_elapsed).ok_or_else(|| {
-                        BenchError::E2e(format!("{} pipeline wall time overflowed", self.id))
+                        CaseError::PipelineTime {
+                            case: self.id.clone(),
+                        }
                     })?;
                     peak = peak.max(result.parent_observed_peak_rss_bytes.ok_or_else(|| {
-                        BenchError::E2e(format!("{} pipeline RSS was not observed", self.id))
+                        CaseError::PipelineRss {
+                            case: self.id.clone(),
+                        }
                     })?);
                     if last {
                         final_result = Some(result);
@@ -419,18 +451,18 @@ impl<'a> PreparedCase<'a> {
                         }
                     }
                 }
-                let mut final_result = final_result.ok_or_else(|| {
-                    BenchError::E2e(format!("{} pipeline has no final step", self.id))
+                let mut final_result = final_result.ok_or_else(|| CaseError::NoFinalStep {
+                    case: self.id.clone(),
                 })?;
                 final_result.wall_elapsed = elapsed;
                 final_result.parent_observed_peak_rss_bytes = Some(peak);
                 final_result
             }
             Workload::RustPipeline { .. } => {
-                return Err(BenchError::E2e(format!(
-                    "{} Rust workload reached the CLI runner",
-                    self.id
-                )));
+                return Err(CaseError::RustOnCliRunner {
+                    case: self.id.clone(),
+                }
+                .into());
             }
         };
         checked_success(binary, &result)?;
@@ -440,20 +472,21 @@ impl<'a> PreparedCase<'a> {
             if file.role != FileRole::Output {
                 continue;
             }
-            let bytes = fs::read(&file.path).map_err(|source| {
-                BenchError::E2e(format!("cannot read {}: {source}", file.path.display()))
-            })?;
+            let bytes = read_file(&file.path)?;
             total_output_bytes = total_output_bytes
-                .checked_add(u64::try_from(bytes.len()).map_err(|_| {
-                    BenchError::E2e("side-output byte count does not fit in u64".to_string())
-                })?)
-                .ok_or_else(|| BenchError::E2e("total output byte count overflow".to_string()))?;
+                .checked_add(
+                    u64::try_from(bytes.len())
+                        .map_err(|_| CaseError::ByteCount(ByteCountOverflow::SideOutput))?,
+                )
+                .ok_or(CaseError::ByteCount(ByteCountOverflow::TotalOutput))?;
             files.insert(file.name.clone(), bytes);
         }
         Ok(CliExecution {
             seconds: result.wall_elapsed.as_secs_f64(),
             peak_rss_bytes: result.parent_observed_peak_rss_bytes.ok_or_else(|| {
-                BenchError::E2e(format!("{} process RSS was not observed", self.id))
+                CaseError::ProcessRss {
+                    case: self.id.clone(),
+                }
             })?,
             total_output_bytes,
             stdout: capture.then_some(result.stdout),
@@ -475,10 +508,10 @@ impl<'a> PreparedCase<'a> {
                 seed,
             } = self.case.workload
             else {
-                return Err(BenchError::E2e(format!(
-                    "{} non-Rust workload reached Rust runner",
-                    self.id
-                )));
+                return Err(CaseError::CliOnRustRunner {
+                    case: self.id.clone(),
+                }
+                .into());
             };
             let execution = self.run_rust_once(
                 bench,
@@ -491,13 +524,13 @@ impl<'a> PreparedCase<'a> {
             peak_rss_bytes = peak_rss_bytes.max(execution.peak_rss_bytes);
             output_bytes = output_bytes
                 .checked_add(execution.output_bytes)
-                .ok_or_else(|| BenchError::E2e("Rust output byte count overflow".to_string()))?;
+                .ok_or(CaseError::ByteCount(ByteCountOverflow::RustBatch))?;
             match &output_sha256 {
                 Some(expected) if expected != &execution.output_sha256 => {
-                    return Err(BenchError::E2e(format!(
-                        "{} Rust batch output changed",
-                        self.id
-                    )));
+                    return Err(CaseError::RustBatchChanged {
+                        case: self.id.clone(),
+                    }
+                    .into());
                 }
                 None => output_sha256 = Some(execution.output_sha256),
                 _ => {}
@@ -507,8 +540,7 @@ impl<'a> PreparedCase<'a> {
             seconds,
             peak_rss_bytes,
             output_bytes,
-            output_sha256: output_sha256
-                .ok_or_else(|| BenchError::E2e("Rust batch is empty".to_string()))?,
+            output_sha256: output_sha256.ok_or(CaseError::EmptyRustBatch)?,
         })
     }
 
@@ -543,10 +575,10 @@ impl<'a> PreparedCase<'a> {
         checked_success(bench, &result)?;
         let receipt =
             serde_json::from_slice::<RustWorkerReceipt>(&result.stdout).map_err(|source| {
-                BenchError::E2e(format!(
-                    "{} Rust worker receipt is invalid: {source}",
-                    self.id
-                ))
+                CaseError::WorkerReceipt {
+                    case: self.id.clone(),
+                    source,
+                }
             })?;
         if receipt.schema_version != 1
             || receipt.shots != shots
@@ -555,18 +587,20 @@ impl<'a> PreparedCase<'a> {
             || !receipt.elapsed_seconds.is_finite()
             || receipt.elapsed_seconds <= 0.0
         {
-            return Err(BenchError::E2e(format!(
-                "{} Rust worker receipt violates its semantic contract",
-                self.id
-            )));
+            return Err(CaseError::ReceiptContract {
+                case: self.id.clone(),
+            }
+            .into());
         }
         Ok(RustMeasurement {
             seconds: receipt.elapsed_seconds,
             peak_rss_bytes: result.parent_observed_peak_rss_bytes.ok_or_else(|| {
-                BenchError::E2e(format!("{} Rust worker RSS was not observed", self.id))
+                CaseError::WorkerRss {
+                    case: self.id.clone(),
+                }
             })?,
             output_bytes: u64::try_from(format!("{}:{}", shots, receipt.logical_failures).len())
-                .map_err(|_| BenchError::E2e("Rust output size does not fit in u64".to_string()))?,
+                .map_err(|_| CaseError::ByteCount(ByteCountOverflow::RustOutput))?,
             output_sha256: receipt.output_sha256,
         })
     }
@@ -575,7 +609,12 @@ impl<'a> PreparedCase<'a> {
     fn batch_bytes(&self, per_run: u64) -> Result<u64, BenchError> {
         per_run
             .checked_mul(u64::from(self.case.batch))
-            .ok_or_else(|| BenchError::E2e(format!("{} batch output byte count overflow", self.id)))
+            .ok_or_else(|| {
+                CaseError::BatchBytes {
+                    case: self.id.clone(),
+                }
+                .into()
+            })
     }
 
     fn sample_work(&self) -> Result<u64, BenchError> {
@@ -583,7 +622,12 @@ impl<'a> PreparedCase<'a> {
             .work
             .amount
             .checked_mul(u64::from(self.case.batch))
-            .ok_or_else(|| BenchError::E2e(format!("{} semantic work overflow", self.id)))
+            .ok_or_else(|| {
+                CaseError::WorkOverflow {
+                    case: self.id.clone(),
+                }
+                .into()
+            })
     }
 
     fn input_digest(&self) -> Result<String, BenchError> {
@@ -594,9 +638,7 @@ impl<'a> PreparedCase<'a> {
             if file.role != FileRole::Input {
                 continue;
             }
-            let bytes = fs::read(&file.path).map_err(|source| {
-                BenchError::E2e(format!("cannot read {}: {source}", file.path.display()))
-            })?;
+            let bytes = read_file(&file.path)?;
             hash.update((file.name.len() as u64).to_le_bytes());
             hash.update(file.name.as_bytes());
             hash.update((bytes.len() as u64).to_le_bytes());
@@ -634,32 +676,11 @@ struct RustMeasurement {
     output_sha256: String,
 }
 
-fn witnesses(checked: BTreeMap<OutputKey, CheckedOutput>) -> BTreeMap<OutputKey, OutputWitness> {
-    checked
-        .into_iter()
-        .map(|(key, checked)| (key, checked.witness))
-        .collect()
-}
-
-/// Compares Stab's per-record one-bit statistics with pinned Stim's for every stochastic record
-/// output both sides produced.
-fn compare_record_censuses(
-    id: &CaseId,
-    stim: &BTreeMap<OutputKey, CheckedOutput>,
-    stab: &BTreeMap<OutputKey, CheckedOutput>,
-) -> Result<(), BenchError> {
-    for (key, stim_output) in stim {
-        let (Some(stim_census), Some(stab_census)) = (
-            stim_output.census,
-            stab.get(key).and_then(|output| output.census),
-        ) else {
-            continue;
-        };
-        stab_census
-            .compare_with_stim(stim_census)
-            .map_err(|reason| BenchError::E2e(format!("{id} output {key}: {reason}")))?;
-    }
-    Ok(())
+fn read_file(path: &Path) -> Result<Vec<u8>, CaseError> {
+    fs::read(path).map_err(|source| CaseError::ReadFile {
+        path: path.to_path_buf(),
+        source,
+    })
 }
 
 /// Requires byte-identical witnesses for every exact output: exact stdout, exact side files, and
@@ -687,9 +708,7 @@ pub(super) fn compare_exact_outputs(
     );
     for key in exact {
         if stim.get(&key) != stab.get(&key) {
-            return Err(BenchError::E2e(format!(
-                "exact output {key} differs from pinned Stim"
-            )));
+            return Err(CaseError::ExactOutputDiffers { key }.into());
         }
     }
     Ok(())
@@ -708,9 +727,10 @@ pub(super) fn substitute_args(
             if let Some(path) = paths.get(arg) {
                 Ok(path.as_os_str().to_os_string())
             } else if arg.contains("{file:") {
-                Err(BenchError::E2e(format!(
-                    "unknown or partial file placeholder {arg}"
-                )))
+                Err(CaseError::Placeholder {
+                    argument: arg.clone(),
+                }
+                .into())
             } else {
                 Ok(OsString::from(arg))
             }
