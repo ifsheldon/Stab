@@ -70,14 +70,14 @@ Every admitted workload produces byte-identical output; only workloads that the 
 | --- | --- |
 | `DetectionConversionLimits::{max_record_bits, max_expanded_instructions, max_repeat_iterations, max_compiled_terms, max_compiled_bytes}` and their `with_*` builders | `DetectionConversionLimits::{new, memory_budget, with_memory_budget}`; the budget bounds the compiled plan, one byte per record bit, the reference scratch, and session storage |
 | `DetectionResourceKind::{RecordBits, SamplingExpandedOperations, ExpandedInstructions, RepeatIterations, CompiledTerms}` and `DetectionRecordLimitSubject` | `DetectionResourceKind::CompiledBytes` and `RepeatNesting` |
-| `SamplingCompileError::ExpandedOperationLimit` | `SamplingCompileError::CompiledBytesLimit { required, budget }`; configure the budget with `SamplingCompiler::memory_budget` |
+| `SamplingCompileError::ExpandedOperationLimit` | `SamplingCompileError::CompiledBytesLimit { exceeded }`; configure the budget with `SamplingCompiler::memory_budget` |
 | The general stabilizer-frame sampling fallback for programs above 256 MiB | A typed `CompiledBytesLimit` refusal against the budget |
 | `DemSamplerLimits::{max_sampled_error_applications_per_shot, max_replay_work_units_per_shot, max_active_batch_bytes}` and their builders; `DemResourceKind::{SampledErrorApplications, ReplayWorkUnits}`; `DemSamplingExecutionError::SessionStorageLimit` | `DemSamplingCompiler::{limits, memory_budget}` and `DemSamplerLimits::{new, memory_budget, with_memory_budget}`; compilation refusals report `DemResourceKind::CompiledBytes` and session storage refusals report `DemResourceKind::ActiveBatchBytes` |
 | `DemSamplingPlan::{validate_replay_with_limits, validate_replay_work_units_with_limits, validate_detector_sample_work_units_with_limits, validate_sampled_error_work_units_with_limits}` | `DemSamplingPlan::validate_replay`, which only checks representability |
 | `CircuitFlattenLimits` count fields, `DEFAULT_MAX_*` constants, and builders | `CircuitFlattenLimits::{new, memory_budget, with_memory_budget}` |
 | `DemFlattenLimits` repeat-unroll, expanded-instruction, repeat-iteration, target, argument, and byte fields, `DEFAULT_MAX_*` constants, and builders | `DemFlattenLimits::{new, memory_budget, with_memory_budget}` |
 | `CircuitPassLimits` item, target, argument, and payload fields, `DEFAULT_MAX_*` constants, and builders | `CircuitPassLimits::new(memory_budget, repeat_nesting)` with `memory_budget` and `with_memory_budget` |
-| Fixed analyzer, feedback-inlining, Pauli-conjugation, time-reversal, flow-generator, missing-detector, detecting-region, and coordinate-query work caps | Removed; retained storage is admitted against a caller budget: `ErrorAnalyzerOptions::memory_budget`, `circuit_with_inlined_feedback_with_limits`, `DetectorErrorModel::detector_coordinates_with_memory_budget`, the generator parameters' `with_memory_budget`, `TimeReversedForFlowsOptions::memory_budget`, `InverseQecOptions::memory_budget`, `FlowGeneratorOptions::memory_budget`, `MissingDetectorOptions::memory_budget`, `DetectingRegionOptions::memory_budget`, `DetectingRegionTargetOptions::memory_budget`, `all_detecting_region_targets_with_budget`, and `all_detecting_region_ticks_with_budget`; the functions without one use `MemoryBudget::DEFAULT` |
+| Fixed analyzer, feedback-inlining, Pauli-conjugation, time-reversal, flow-generator, missing-detector, detecting-region, and coordinate-query work caps | Removed; retained storage is admitted against a caller budget: `ErrorAnalyzerOptions::memory_budget`, `circuit_with_inlined_feedback_with_limits`, `DetectorErrorModel::detector_coordinates_with_budget`, the generator parameters' `with_memory_budget`, `TimeReversedForFlowsOptions::memory_budget`, `InverseQecOptions::memory_budget`, `FlowGeneratorOptions::memory_budget`, `MissingDetectorOptions::memory_budget`, `DetectingRegionOptions::memory_budget`, `DetectingRegionTargetOptions::memory_budget`, `all_detecting_region_targets_with_budget`, and `all_detecting_region_ticks_with_budget`; the functions without one use `MemoryBudget::DEFAULT` |
 | The generator's 131,072-physical-qubit cap | A projected one mebibyte plus 768 bytes per physical qubit admitted against the generator parameters' budget |
 | Flow checking, Pauli conjugation, and `Flow` text parsing at the default budget only | `check_if_circuit_has_unsigned_stabilizer_flows_with_options`, `check_unsigned_stabilizer_flows_with_diagnostics_with_options`, `circuit_has_unsigned_stabilizer_flow_with_options`, and `circuit_has_all_unsigned_stabilizer_flows_with_options` with `UnsignedFlowCheckOptions`; `pauli_after_circuit_with_options` and `pauli_before_circuit_with_options` with `PauliConjugationOptions`; and `Flow::from_str_with_budget`; the existing functions delegate with the default budget |
 | `sample_if_circuit_has_stabilizer_flows` at the default budget only | `sample_if_circuit_has_stabilizer_flows_with_options` with `SampledFlowOptions`, whose `memory_budget` admits each flow's augmented noiseless witness circuit, compiled sampling plan, witness simulator, and session; the existing function delegates with the default budget |
@@ -121,17 +121,17 @@ Only a sink failure or an internal invariant violation still poisons a sampling 
 ## Algebra Byte Admission
 
 Every count and work cap in `stab-algebra` is removed by replacing the dense algorithms with word-parallel ones over packed rows, and admits the storage those caps bounded in bytes.
-`stab_algebra::AlgebraMemoryBudget`, also exported from the `stab-core` root, is the algebra's own typed byte bound with the same one-gibibyte default as `MemoryBudget`, because `stab-algebra` does not depend on `stab-model`.
+The algebra admits against the shared `MemoryBudget`, which `stab-algebra` re-exports from `stab-foundation`.
 Constructors that turn a requested size into storage admit its bytes before allocating or drawing randomness; operations on values the caller already holds reserve a bounded multiple of them fallibly.
 
 | Removed or changed item | Replacement |
 | --- | --- |
 | `StabilizerResource::{PauliQubits, CliffordQubits, TableauQubits, RandomTableauQubits, StabilizerSolveQubits, UnitaryMatrixDimension, FlowClassicalTerms, CircuitTableauRepeatWork}` and the `limit` and `ensure` methods | `StabilizerResource::{PauliString, CliffordString, Tableau, RandomTableau, StabilizerSolve, FlowTerms}`, which name the refused or failed storage and carry no limit |
-| `StabilizerError::ResourceLimitExceeded { resource, requested, limit }` | `StabilizerError::MemoryBudgetExceeded { resource, requested_bytes, budget_bytes }` for a refused request and `StabilizerError::AllocationFailed { resource, bytes }` for a failed fallible reservation |
+| `StabilizerError::ResourceLimitExceeded { resource, requested, limit }` | `StabilizerError::MemoryBudgetExceeded { resource, exceeded }` for a refused request and `StabilizerError::AllocationFailed { resource, bytes }` for a failed fallible reservation |
 | `StabilizerError::OverconstrainedStabilizers` | Removed; as in Stim, a generator beyond the independent ones is reported as redundant or contradictory |
 | `Tableau::x_output` and `Tableau::z_output` returning `&PauliString` | Both return an owned `PauliString`, because generator images are packed rows rather than stored strings |
 | `stab_algebra::advanced::{tableau_identity_unchecked, tableau_from_output_columns_unchecked}` | `Tableau::identity_with_budget` and `Tableau::from_conjugated_generators`; a Tableau with mismatched generator shapes can no longer be constructed |
-| None | `PauliString::{identity_with_budget, random_with_budget, from_bases_with_budget, from_str_with_budget}`, `FlexPauliString::{identity_with_budget, from_phase_and_bases_with_budget, from_str_with_budget}`, `CliffordString::{identity_with_budget, random_with_budget, from_gates_with_budget, concat_with_budget, repeat_with_budget}`, `PauliStringIterator::new_with_budget`, `Tableau::{from_pauli_string_with_budget, embedded_with_budget}`; each takes an `AlgebraMemoryBudget` and the unbudgeted constructor, method, or `FromStr` impl delegates to it with `AlgebraMemoryBudget::DEFAULT` |
+| None | `PauliString::{identity_with_budget, random_with_budget, from_bases_with_budget, from_str_with_budget}`, `FlexPauliString::{identity_with_budget, from_phase_and_bases_with_budget, from_str_with_budget}`, `CliffordString::{identity_with_budget, random_with_budget, from_gates_with_budget, concat_with_budget, repeat_with_budget}`, `PauliStringIterator::new_with_budget`, `Tableau::{from_pauli_string_with_budget, embedded_with_budget}`; each takes a `MemoryBudget` and the unbudgeted constructor, method, or `FromStr` impl delegates to it with `MemoryBudget::DEFAULT` |
 | None | `Tableau::identity_with_budget`, `Tableau::random_with_budget`, `Tableau::from_stabilizers_with_budget`, `Tableau::is_identity`, `stab_analysis::circuit_to_tableau_with_options` with `CircuitToTableauOptions`, and `stab_analysis::AnalysisOperation::TableauConversion` |
 | None | `Tableau::prepend(&mut self, gate: &Tableau, targets: &[usize])`, which rewrites only the target generator rows, and `stab_algebra::TableauAppender` with `identity_with_budget`, `new(Tableau)`, `append`, `x_output_basis`, `z_output_basis`, `x_output_sign`, `z_output_sign`, `len`, `is_empty`, and `finish`, which holds a Tableau transposed so each appended one- or two-qubit gate costs `O(n / 64)` word operations; `stab_bits::transpose_bit_tile` exposes the 64 by 64 block transpose it uses |
 
@@ -345,7 +345,7 @@ These changes come from Phase D of the review fix plan and from its public API r
 | CLI task-name tables and `CliError::Unsupported{Repetition, Surface, Color}Task` | `stab_analysis::CodeFamily` and the task enums implement `FromStr`, `Display`, `ALL`, and `as_str`; the CLI error is `CliError::UnsupportedGenTask(UnknownCodeTask)` with unchanged text and codes |
 | `stab_model::advanced::probability_from_valid` | Removed; use `Probability::try_new`, or `Probability::ZERO` and `Probability::ONE` |
 | `stab_model::advanced::{dem_model_items_mut, dem_repeat_block_body_mut}` | `DetectorErrorModel::{reverse_items, item_mut, insert_item, try_retain_items_mut}` and the now-public `DemRepeatBlock::body_mut` |
-| `Circuit::detector_coordinates()` without a budget | It admits the map against the default budget, and `Circuit::detector_coordinates_with_memory_budget` takes one; a refusal is `ModelError::ResourceLimit` with `ResourceKind::MaterializedBytes` |
+| `Circuit::detector_coordinates()` without a budget | It admits the map against the default budget, and `Circuit::detector_coordinates_with_budget` takes one; a refusal is `ModelError::ResourceLimit` with `ResourceKind::MaterializedBytes` |
 | None | `stab_bits::fill_periodic_words`, `BitVec::try_zeros`, and `BitVec::try_resize_zeros` |
 | None | `DemSamplingPlan::limits()`, `DetectionResourceKind::SessionStorageBytes`, and a `StorageAllocation { message }` variant on `DetectionError`, `DemError`, and `SamplingCompileError` |
 
@@ -394,13 +394,53 @@ The typed variants carry data instead of prose: `NonDeterministicTargets` holds 
 `CountOverflow`, `AllocationFailed`, `UnsupportedInput`, `MeasurementRecordOutOfRange`, and `InternalInvariant` carry their `AnalysisOperation` and a detail string, and `AnalysisError::operation()` returns the operation of any variant that has one.
 `AnalysisError` is deliberately not `#[non_exhaustive]`, so a consumer that maps it to codes fails to compile when a variant is added.
 
-The generation budget refusal is now `AnalysisError::ResourceLimit` for `AnalysisOperation::CircuitGeneration`, and `ResourceLimitError::is_memory_budget()` reports whether a refusal came from the memory budget.
+The generation budget refusal is now `AnalysisError::ResourceLimit` for `AnalysisOperation::CircuitGeneration`, and `ResourceLimitError::memory_budget_exceeded()` returns the refusal when it came from the memory budget.
 `stab_model::ModelError::AllocationFailed { dialect, detail }` is new and replaces the allocator refusals that were reported as an invalid detector error model.
 
 The command line's machine-readable codes follow the variants.
 The analysis use of `invalid-detector-error-model` is split into `non-deterministic-targets`, `approximate-disjoint-errors-required`, `unanalyzable-noise`, `error-decomposition-failed`, `non-graphlike-error`, `no-logical-error-found`, `invalid-analysis-request`, `anti-hermitian-pauli-product`, `measurement-record-out-of-range`, `unsupported-analysis-input`, `analysis-count-overflow`, and `analysis-invariant-failed`, and that code now means only a malformed detector error model.
 `invalid-tableau-conversion` and `invalid-circuit-simplification` are removed in favour of `non-unitary-operation`, `pauli-not-preserved`, `gate-data-unavailable`, and the codes above; the analysis uses of `invalid-domain-value` and `invalid-result-format` become `invalid-generator-parameter` and `non-finite-coordinate`; and allocator refusals from analysis and from the model carry `resource-limit-exceeded`.
 The JSON `context` of these diagnostics, which was empty, now carries the typed fields, for example `targets` for non-deterministic targets and `operation`, `gate`, and `reason` for a non-unitary operation.
+
+## Shared Foundation Crate And One Budget Refusal
+
+The new leaf crate `stab-foundation` owns the values that `stab-model`, `stab-algebra`, and `stab-records` each used to define for themselves.
+Each of the three re-exports the items in its own signatures, and `stab-core` exports each once at its root, so existing `stab_model::MemoryBudget`, `stab_model::Cancellation`, and `stab_records::ByteSpan` paths still resolve.
+The publish order now starts with `stab-foundation`.
+
+| Removed or changed | Replacement |
+| --- | --- |
+| `stab_algebra::AlgebraMemoryBudget` | `MemoryBudget`; every `*_with_budget` constructor takes it, and analysis no longer converts |
+| `AlgebraMemoryBudget::from_bytes(u64::MAX)` as "no budget" | `MemoryBudget::UNLIMITED` |
+| `MemoryBudget::bytes_usize()` | `MemoryBudget::bytes_saturating_usize()` |
+| None | `MemoryBudget::admit(required) -> Result<(), MemoryBudgetExceeded>` |
+| `stab_records::EncodedSizeEstimate<T>` | `Estimate<T>`; records never produces `UpperBound` |
+| `stab_model::EstimateClass` and `Estimate::class()` | Removed; match on `Estimate` |
+| Separate `ByteSpan` and `DiagnosticSeverity` in `stab-model` and `stab-records` | One of each, with `ByteSpan::try_new(start, len) -> Option<Self>` and `ByteSpan::empty_at(start)` |
+| `stab_model::advanced::byte_span_from_valid_range` | `ByteSpan::try_new` |
+| `stab_engine::ResourceAmount` | `stab_model::ResourceAmount`, with public `saturating_from_u128` and `saturating_add` |
+| `{Circuit, DetectorErrorModel}::detector_coordinates_with_memory_budget` | `detector_coordinates_with_budget` |
+| `stab_model::ResourceLimitError::span() -> ByteSpan` | `Option<ByteSpan>`, `None` for a query or traversal of an already parsed model |
+| `StabilizerError::MemoryBudgetExceeded { resource, requested_bytes, budget_bytes }` | `{ resource, exceeded }` |
+| `SamplingCompileError::CompiledBytesLimit { required, budget }` | `{ exceeded }` |
+| `SessionStorageLimit { estimated_bytes, limit_bytes }` on `SamplingExecutionError` and `DetectionExecutionError` | `{ exceeded }` |
+| `stab_analysis::ResourceLimitError::is_memory_budget()` | `memory_budget_exceeded()` |
+
+A refused memory budget is now one value, `MemoryBudgetExceeded`, with `required() -> ResourceAmount` and `budget() -> MemoryBudget`.
+Each component's error keeps its own typed description of what was being built and embeds that value.
+Every error type that can carry such a refusal, directly or through an error it wraps, has `memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded>`: `StabilizerError`, `ModelError`, both `ResourceLimitError` types, `AnalysisError`, `CircuitPassError`, the sampling, detection, and DEM sampling compile, execution, and run errors, `SampledFlowError`, the reference-sample errors, and `DecoderModelViewError`.
+A fixed limit that is not a memory budget, and an allocator refusal, return `None`.
+
+The command line prints the `--memory-budget` help, and reports the code `resource-limit-exceeded`, exactly when that accessor answers or the error is its own input-size or command-ledger refusal; it no longer reads message text.
+Message text is unchanged across an 8,998-run comparison except in one case: a session-storage estimate above `u64::MAX` bytes now prints as `at least 18446744073709551615` instead of the exact number.
+
+Refusals that were misreported are now typed:
+
+- The DEM traversal repeat-depth cap, the repeat-expansion cap, and the coordinate-query candidate cap are `ModelError::ResourceLimit` fixed limits with `ResourceKind::{RepeatIterations, RepeatCandidates}` and the new `ResourceOperation::{DetectorErrorModelSelectedCoordinates, DetectorErrorModelTraversal}`. Their text is unchanged, their code changes from `invalid-detector-error-model` to `resource-limit-exceeded`, and they carry no budget help.
+- A DEM coordinate-shift allocation failure is `ModelError::AllocationFailed` instead of an invalid detector error model.
+- A failed reservation for a detecting region is `AnalysisError::AllocationFailed`, where it was labelled a memory-budget refusal.
+- A budget refusal raised while a sample run is writing reports `resource-limit-exceeded` instead of `sampling-execution-failed`.
+- The JSON `span` of a refusal that has no source position is `null` instead of an empty span at byte zero.
 
 ## One Observable Id
 

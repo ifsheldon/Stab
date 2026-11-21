@@ -38,7 +38,7 @@ The per-operation limits types for parsing, circuit flattening, DEM flattening, 
 Logical-error search and SAT materialization keep their explicit search budgets with budget-exhausted results.
 These policies are not aliases of one global limits structure, although the CLI feeds all of them from one `--memory-budget` option.
 
-`stab-algebra` depends on no model crate, so it owns a typed `AlgebraMemoryBudget` with the same one-gibibyte default for values built from a requested size, such as a Tableau, a random Tableau, or the stabilizer solver's working rows; `stab-analysis` maps its `MemoryBudget` onto it, and its callers poll cancellation between algebra calls, each of which is polynomial in bytes already admitted.
+`MemoryBudget`, `Cancellation`, and the refusal value `MemoryBudgetExceeded` live in the leaf crate `stab-foundation`, which `stab-model`, `stab-algebra`, and `stab-records` share. `stab-algebra` admits values built from a requested size, such as a Tableau, a random Tableau, or the stabilizer solver's working rows, against that `MemoryBudget`; `stab-analysis` passes its budget through unchanged, and its callers poll cancellation between algebra calls, each of which is polynomial in bytes already admitted.
 Algebra operations whose storage is a bounded multiple of operands the caller already holds reserve it fallibly without a separate admission.
 
 A constant is not automatically a public policy field.
@@ -57,3 +57,5 @@ Estimates label values as exact, upper-bound, or unknown and do not execute the 
 - New operation policies require a real byte-admission boundary, exact-budget and first-excess tests, and structured `ResourceLimitError` context naming the budget.
 - Long-running work on compact inputs is expected; callers bound time with cooperative cancellation, which the CLI does not expose because the process already stops on signals.
 - Admission precedes allocation proportional to rejected work, RNG advancement, output mutation, and expensive lowering; bounded capacity estimation from an admitted source prefix remains an implementation optimization.
+
+A refused memory budget has one representation. `MemoryBudgetExceeded` carries the required amount, exact or a lower bound when it exceeds `u64`, and the budget; the error of each component keeps its own typed account of what was being built and embeds that value. Every public error type that can carry such a refusal, directly or through an error it wraps, answers `memory_budget_exceeded()`. A fixed limit that is not a memory budget, and an allocator refusal, never answer it. The CLI decides the `--memory-budget` help and the `resource-limit-exceeded` code from that accessor and from its own `InputTooLarge` and `CommandMemoryBudget` variants, and a test drives every command family to a refusal to keep it so.

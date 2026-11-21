@@ -12,9 +12,9 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 
 | # | Item | Size | Recommendation |
 | --- | --- | --- | --- |
-| D1 | One memory-budget type in a shared leaf crate | L | Decided: do. In progress. |
-| D2 | One representation of a refused budget | L | Decided: do. In progress, with the two fixed model caps of S5. |
-| D3 | One observable-id domain | M | Decided: do, as 32 bits everywhere. In progress. |
+| D1 | One memory-budget type in a shared leaf crate | L | Done on 2026-11-21 as `stab-foundation`. |
+| D2 | One representation of a refused budget | L | Done on 2026-11-21, with the fixed model caps of S5. |
+| D3 | One observable-id domain | M | Done on 2026-11-21, as 32 bits everywhere. |
 | D4 | Reject symlinks and unsafe path components on outputs | S | Do not reject. Document the CLI trust boundary instead. |
 | R1 | Three-way verdict from the flow checks | M | Do first. It is the only item that returns a wrong answer today. |
 | R2 | "No logical error found" as a search outcome, named search options | M | Do. |
@@ -30,13 +30,15 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 | S2 | `ConversionOperation` is 40 bytes | S | Try it; keep only if `m2d` does not slow down. |
 | S3 | `circuit_reference_signs` computes a byte per bit before packing | S | Do when that module is next touched. |
 | S4 | A public `Tableau::to_unitary` | S to M | Defer until the library conversion surface is scheduled. |
-| S5 | Two fixed caps in `stab-model` report an invalid detector error model | S | Folded into D2. |
+| S5 | Fixed caps in `stab-model` reported an invalid detector error model | S | Done with D2. |
 | N1 | Areas the review did not read | M | Run a second review pass before the next release. |
 
-Suggested order after the three decided items land: R1, R2, R10, then R6 with R3 and R9, then R4 with R5 and R7, then R8, with S1 as an independent performance task at any point.
+Suggested order: R1, R2, R10, then R6 with R3 and R9, then R4 with R5 and R7, then R8, with S1 as an independent performance task at any point.
 R4 goes late on purpose: R1, R2, R3, and R7 each delete or reshape functions that R4 would otherwise rewrite twice.
 
-## Decided
+## Decided And Done
+
+These three were decided and implemented on 2026-11-21; the sections record what was changed and why.
 
 ### D1. One memory-budget type in a shared leaf crate
 
@@ -44,7 +46,7 @@ R4 goes late on purpose: R1, R2, R3, and R7 each delete or reshape functions tha
 `stab-analysis` converts one into the other by hand at every entry point that reaches the algebra, and two sites spell "no budget" as `from_bytes(u64::MAX)`.
 The same split duplicates `ByteSpan` and `DiagnosticSeverity` (once in `stab-model`, once in `stab-records`) and the size estimate (`Estimate<T>` in the model, `EncodedSizeEstimate<T>` in records), so the CLI imports both spellings under aliases and converts between them.
 
-The change adds one leaf product crate that depends on no Stab crate and holds the budget, cancellation, the refusal of D2, the estimate, the byte span, and the diagnostic severity.
+The leaf product crate `stab-foundation` depends on no Stab crate and holds the budget, cancellation, the refusal of D2, the estimate, the byte span, and the diagnostic severity.
 `stab-model`, `stab-algebra`, and `stab-records` depend on it and re-export the items that appear in their own signatures, so `stab_model::MemoryBudget` keeps working as a path while `AlgebraMemoryBudget` disappears.
 It adds one edge to the dependency graph, one crate to the publish order, and one row to the product-contract table in `ops/architecture`.
 
@@ -397,9 +399,9 @@ No CLI command needs it.
 
 ### S5. Two fixed caps in `stab-model`
 
-Two fixed limits in `stab-model` still report `invalid detector error model` when they refuse, so a caller cannot tell a malformed model from a limit.
+Fixed limits in `stab-model` reported `invalid detector error model` when they refused, so a caller could not tell a malformed model from a limit.
 
-Recommendation: folded into D2, which gives the model a refusal that does not need a parse position.
+Done with D2: three caps (traversal repeat depth, repeat expansion, and coordinate-query candidates) are typed fixed limits, and the model's refusal no longer needs a parse position.
 
 ## Not Reviewed
 

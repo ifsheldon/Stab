@@ -15,12 +15,13 @@ A prose diagram is insufficient as the sole decision record because an apparentl
 Product dependency arrows point from a consumer to its dependency:
 
 ```text
+stab-foundation -> no Stab crate
 stab-kernels-simd -> no Stab crate
 
 stab-bits -> stab-kernels-simd
-stab-records -> stab-bits
-stab-algebra -> stab-bits + stab-kernels-simd
-stab-model -> no Stab crate
+stab-records -> stab-bits + stab-foundation
+stab-algebra -> stab-bits + stab-kernels-simd + stab-foundation
+stab-model -> stab-foundation
 stab-analysis -> stab-model + stab-algebra
 stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis + stab-bits
 stab-decoder -> stab-model + stab-records
@@ -38,6 +39,14 @@ Architecture policy rejects every dependency outside the graph.
 The engine's direct `stab-bits` edge lets one generic Pauli-frame implementation run on `u64` planes for 64-lane sessions and on `BitBlock` planes for 256-lane sessions.
 
 Every product crate declares Rust 1.100 as its minimum supported version, and only `stab-kernels-simd` may depend on the SIMD library, as [ADR 0008](adr-0008-unconditional-fearless-simd-kernels.md) records.
+
+## Amendment: Shared Foundation Crate (2026-11-21)
+
+`stab-model`, `stab-algebra`, and `stab-records` do not depend on one another, so each had defined its own copy of values that all three put in public signatures: `MemoryBudget` and `AlgebraMemoryBudget`, two `ByteSpan` and `DiagnosticSeverity` types, and two size estimates. `stab-analysis` converted budgets by hand at every algebra call, and the CLI imported both spellings under aliases.
+
+The leaf crate `stab-foundation` now owns those values, together with cancellation and the one representation of a refused memory budget. It depends on no Stab crate and on no external crate, and only the three crates above depend on it; they re-export what they use. The alternative of placing the values in `stab-bits` was rejected because `stab-model` would then depend on packed storage it does not use.
+
+`stab-foundation` holds only domain-neutral value types. A type that knows about circuits, detector error models, gates, bits, formats, or operations does not belong there.
 
 ## Consequences
 

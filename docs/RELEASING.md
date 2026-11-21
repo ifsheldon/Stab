@@ -6,16 +6,17 @@ Stab product crates are published as one coordinated version because their pre-1
 
 `just release::publish-order` prints and validates the source-owned order:
 
-1. `stab-kernels-simd`
-2. `stab-model`
-3. `stab-bits`
-4. `stab-records`
-5. `stab-algebra`
-6. `stab-analysis`
-7. `stab-decoder`
-8. `stab-engine`
-9. `stab-core`
-10. `stab-cli`
+1. `stab-foundation`
+2. `stab-kernels-simd`
+3. `stab-model`
+4. `stab-bits`
+5. `stab-records`
+6. `stab-algebra`
+7. `stab-analysis`
+8. `stab-decoder`
+9. `stab-engine`
+10. `stab-core`
+11. `stab-cli`
 
 Ops and test-support crates remain unpublished. Every product package must be version `0.2.0`, include `README.crates.md`, carry complete crates.io metadata, and require internal publishable path dependencies with exact version `=0.2.0`.
 
@@ -41,7 +42,7 @@ From that final clean reviewed revision, choose a new output path containing the
 just release::check --out target/releases/v0.2.0-<commit>-preflight
 ```
 
-The Rust release tool reruns the architecture policy, validates the exact package set and topological order, creates all ten normalized archives in a new isolated Cargo target, and validates each archive's `.cargo_vcs_info.json` against the clean current commit. It bounds compressed bytes, expanded bytes, declared payload bytes, and entry count while rejecting unsafe paths and links. Every Cargo child receives a private `HOME`, `CARGO_HOME`, target, and temporary directory, an explicit toolchain, a source-owned `cargo:token` configuration, and no ambient environment. Each child runs from a working directory outside the repository, so it cannot discover the repository's `.cargo/config.toml`; the three-day `registry.global-min-publish-age` cooldown set there would otherwise hide sibling crates published minutes earlier in the same release, and a unit test enforces the separation. The preflight executes one coordinated multi-package `cargo publish --dry-run --locked --registry crates-io` invocation so Cargo resolves unpublished exact-version siblings through its temporary registry and compiles the normalized registry packages without uploading them. It also generates and validates the canonical crates.io metadata that will accompany each archive. Fresh reviewed archives and metadata are copied under the unique preflight directory, made read-only, and recorded in schema-version-4 `report.json` with their exact lengths, SHA-256 digests, Git commit, Cargo identity, rustc identity, and active Rustup toolchain. The tool never reads archives from the workspace's shared `target/package` directory.
+The Rust release tool reruns the architecture policy, validates the exact package set and topological order, creates all eleven normalized archives in a new isolated Cargo target, and validates each archive's `.cargo_vcs_info.json` against the clean current commit. It bounds compressed bytes, expanded bytes, declared payload bytes, and entry count while rejecting unsafe paths and links. Every Cargo child receives a private `HOME`, `CARGO_HOME`, target, and temporary directory, an explicit toolchain, a source-owned `cargo:token` configuration, and no ambient environment. Each child runs from a working directory outside the repository, so it cannot discover the repository's `.cargo/config.toml`; the three-day `registry.global-min-publish-age` cooldown set there would otherwise hide sibling crates published minutes earlier in the same release, and a unit test enforces the separation. The preflight executes one coordinated multi-package `cargo publish --dry-run --locked --registry crates-io` invocation so Cargo resolves unpublished exact-version siblings through its temporary registry and compiles the normalized registry packages without uploading them. It also generates and validates the canonical crates.io metadata that will accompany each archive. Fresh reviewed archives and metadata are copied under the unique preflight directory, made read-only, and recorded in schema-version-4 `report.json` with their exact lengths, SHA-256 digests, Git commit, Cargo identity, rustc identity, and active Rustup toolchain. The tool never reads archives from the workspace's shared `target/package` directory.
 
 Review every immutable archive under the preflight directory before the first upload, and confirm that the report's full Git commit equals `RELEASE_COMMIT`. Do not reuse a failed preflight output path, modify a reviewed archive, or publish from a revision or toolchain other than the report's exact identities.
 
@@ -61,7 +62,7 @@ If publication stops partway through, rerun the same command with the same revie
 
 ## Tag And GitHub Release
 
-After all ten crates resolve from crates.io, create an annotated or signed tag at the exact preflight commit and push it:
+After all eleven crates resolve from crates.io, create an annotated or signed tag at the exact preflight commit and push it:
 
 ```text
 test "$(git rev-parse HEAD^{commit})" = "$RELEASE_COMMIT"

@@ -233,8 +233,8 @@ Three Stim divergences were found and fixed along the way: the sparse-form rule 
 
 Decisions that change the crate graph or a parity surface, each needing its own answer:
 
-- **One memory-budget type.** `MemoryBudget` and `AlgebraMemoryBudget` are converted by hand in several files; a shared leaf crate would also hold cancellation, estimates, byte spans, and diagnostic severity, which are each defined twice.
-- **One representation of a refused budget.** The engine, analysis, model, and algebra each report "memory budget exceeded" in their own shape, and the CLI still decides budget help from message text for the non-analysis error types.
+- **One memory-budget type.** Done on 2026-11-21 as the leaf crate `stab-foundation`, which also holds cancellation, the estimate, the byte span, and the diagnostic severity.
+- **One representation of a refused budget.** Done on 2026-11-21: `MemoryBudgetExceeded` in `stab-foundation`, one `memory_budget_exceeded()` accessor on every error type, and no message-text matching in the CLI.
 - **The observable-id domain.** Done on 2026-11-21: one `ObservableId` with the 32-bit domain of the DEM format, checked where a circuit is parsed or built. A 64-bit domain was considered and rejected because pinned Stim's DEM format refuses ids above `0xFFFFFFFF`.
 - **Symlinks and unsafe path components on outputs.** No command rejects them, and neither does Stim; rejecting them would be a deliberate divergence for every command.
 
@@ -257,7 +257,7 @@ Smaller items noticed and left:
 - `ConversionOperation` is 40 bytes because of its repeat fields; a side table could save about 16 MB per million detectors.
 - `circuit_reference_signs` computes a byte per bit before packing.
 - A public `Tableau::to_unitary` needs a more efficient construction than the test helper.
-- Two fixed caps in `stab-model` still report an invalid detector error model.
+- Done on 2026-11-21: the fixed caps in `stab-model` that reported an invalid detector error model are typed fixed limits.
 
 ## Order And Delegation
 
