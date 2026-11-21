@@ -197,11 +197,11 @@ fn pf6_search_sparse_high_targets_sat_compresses_ids() {
         sparse_high_observable_model(),
     ] {
         assert_eq!(
-            shortest_error_sat_problem(&model).expect("shortest WCNF"),
+            shortest_error_sat_problem(&model, &Default::default()).expect("shortest WCNF"),
             TWO_ERROR_UNWEIGHTED_WDIMACS
         );
         assert_eq!(
-            likeliest_error_sat_problem(&model, 10).expect("weighted WCNF"),
+            likeliest_error_sat_problem(&model, 10, &Default::default()).expect("weighted WCNF"),
             TWO_ERROR_WEIGHTED_WDIMACS
         );
     }

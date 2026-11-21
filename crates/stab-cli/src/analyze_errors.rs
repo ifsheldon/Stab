@@ -2,8 +2,11 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use clap::Args;
-use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
-use stab_model::Probability;
+use stab_analysis::{
+    DecompositionFailure, ErrorAnalyzerOptions, ErrorDecomposition, GaugeDetectors, LoopFolding,
+    RemnantEdges, circuit_to_detector_error_model,
+};
+use stab_model::{MemoryBudget, Probability};
 
 use crate::{
     CliError, MemoryBudgetArg, MemoryLedger,
@@ -56,6 +59,40 @@ pub(crate) struct AnalyzeErrorsArgs {
     memory: MemoryBudgetArg,
 }
 
+impl AnalyzeErrorsArgs {
+    /// Maps the flags onto the analyzer's options. Like Stim v1.16.0, the two decomposition
+    /// refinements are accepted without `--decompose_errors` and then have no effect.
+    fn analyzer_options(&self, memory_budget: MemoryBudget) -> ErrorAnalyzerOptions {
+        ErrorAnalyzerOptions {
+            loops: if self.fold_loops {
+                LoopFolding::Fold
+            } else {
+                LoopFolding::Unroll
+            },
+            decomposition: self.decompose_errors.then_some(ErrorDecomposition {
+                on_failure: if self.ignore_decomposition_failures {
+                    DecompositionFailure::Ignore
+                } else {
+                    DecompositionFailure::Fail
+                },
+                remnant_edges: if self.block_decompose_from_introducing_remnant_edges {
+                    RemnantEdges::Block
+                } else {
+                    RemnantEdges::Allow
+                },
+            }),
+            gauge_detectors: if self.allow_gauge_detectors {
+                GaugeDetectors::Allow
+            } else {
+                GaugeDetectors::Reject
+            },
+            approximate_disjoint_errors: self.approximate_disjoint_errors,
+            memory_budget,
+            cancellation: stab_model::Cancellation::never(),
+        }
+    }
+}
+
 pub(crate) fn run_analyze_errors<R, W>(
     args: AnalyzeErrorsArgs,
     input: &mut R,
@@ -92,21 +129,8 @@ where
         .file_buffer(args.output.is_some())
         .admit(&mut ledger)?;
     let analysis = ledger.stage();
-    let dem = circuit_to_detector_error_model(
-        &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: args.fold_loops,
-            decompose_errors: args.decompose_errors,
-            allow_gauge_detectors: args.allow_gauge_detectors,
-            ignore_decomposition_failures: args.ignore_decomposition_failures,
-            block_decomposition_from_introducing_remnant_edges: args
-                .block_decompose_from_introducing_remnant_edges,
-            approximate_disjoint_errors_threshold: args.approximate_disjoint_errors,
-            memory_budget: analysis.get(),
-            cancellation: stab_model::Cancellation::never(),
-        },
-    )
-    .map_err(|error| analysis.refusal(error))?;
+    let dem = circuit_to_detector_error_model(&circuit, &args.analyzer_options(analysis.get()))
+        .map_err(|error| analysis.refusal(error))?;
     drop(circuit);
     ledger.release(circuit_hold);
     let mut outputs = io.activate()?;

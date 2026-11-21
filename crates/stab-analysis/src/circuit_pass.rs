@@ -12,98 +12,34 @@ use crate::{ResourceKind, ResourceLimitError};
 
 const OPAQUE_TAG_STORAGE_MULTIPLIER: u64 = 4;
 
-/// Resource policy applied before and after a circuit pass runs.
+/// Resource policy and cancellation signal of one circuit-pass execution.
 ///
-/// The memory budget bounds the projected logical payload of the input, of each pass's declared
-/// output projection, and of the returned circuit. Counts describe the represented, folded
-/// circuit and are reported but not separately capped. Repeat nesting is always bounded by the
-/// model's hard recursive-safety ceiling and may be tightened by callers.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct CircuitPassLimits {
-    memory_budget: MemoryBudget,
-    repeat_nesting: RepeatNestingLimit,
-}
-
-impl CircuitPassLimits {
-    pub const fn new(memory_budget: MemoryBudget, repeat_nesting: RepeatNestingLimit) -> Self {
-        Self {
-            memory_budget,
-            repeat_nesting,
-        }
-    }
-
-    /// Returns the widest policy permitted by the fixed repeat-nesting safety envelope.
-    pub fn maximal() -> Self {
-        Self::new(MemoryBudget::UNLIMITED, ParseLimits::DEFAULT_REPEAT_NESTING)
-    }
-
-    /// Returns the budget for admitted logical payload, excluding allocator metadata and spare
-    /// capacity.
-    pub const fn memory_budget(self) -> MemoryBudget {
-        self.memory_budget
-    }
-
-    pub const fn repeat_nesting(self) -> RepeatNestingLimit {
-        self.repeat_nesting
-    }
-
-    #[must_use]
-    pub const fn with_memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
-        self.memory_budget = memory_budget;
-        self
-    }
-
-    #[must_use]
-    pub const fn with_repeat_nesting(mut self, repeat_nesting: RepeatNestingLimit) -> Self {
-        self.repeat_nesting = repeat_nesting;
-        self
-    }
-}
-
-impl Default for CircuitPassLimits {
-    fn default() -> Self {
-        Self::new(MemoryBudget::DEFAULT, ParseLimits::DEFAULT_REPEAT_NESTING)
-    }
-}
-
-/// Immutable context shared by circuit-pass implementations.
-///
-/// The context carries the resource limits and the cancellation signal of one pass execution.
 /// [`run_circuit_pass`] polls the signal once per folded item while it admits the input and the
 /// returned circuit, and before and after the pass runs. A pass whose work is not bounded by a
 /// small multiple of its admitted input should poll [`Self::cancellation`] at bounded intervals,
 /// for example with `stab_model::advanced::CancellationCountdown`, and return any diagnostic once
 /// it observes the signal: the executor reports [`CircuitPassError::Cancelled`] for every failure
 /// returned while the signal is set.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CircuitPassContext {
-    limits: CircuitPassLimits,
-    cancellation: Cancellation,
+    /// Budget for the projected logical payload of the input, of each pass's declared output
+    /// projection, and of the returned circuit, excluding allocator metadata and spare capacity.
+    /// Counts describe the represented, folded circuit and are reported but not separately
+    /// capped.
+    pub memory_budget: MemoryBudget,
+    /// Deepest repeat nesting admitted, never above the model's hard recursive-safety ceiling.
+    pub repeat_nesting: RepeatNestingLimit,
+    /// The signal the executor and pass implementations poll.
+    pub cancellation: Cancellation,
 }
 
-impl CircuitPassContext {
-    /// A context with `limits` and a signal that is never set.
-    pub const fn new(limits: CircuitPassLimits) -> Self {
+impl Default for CircuitPassContext {
+    fn default() -> Self {
         Self {
-            limits,
+            memory_budget: MemoryBudget::DEFAULT,
+            repeat_nesting: ParseLimits::DEFAULT_REPEAT_NESTING,
             cancellation: Cancellation::never(),
         }
-    }
-
-    pub const fn limits(&self) -> CircuitPassLimits {
-        self.limits
-    }
-
-    /// The signal the executor and pass implementations poll.
-    pub const fn cancellation(&self) -> &Cancellation {
-        &self.cancellation
-    }
-
-    /// Replaces the cancellation signal.
-    #[must_use]
-    pub fn with_cancellation(mut self, cancellation: Cancellation) -> Self {
-        self.cancellation = cancellation;
-        self
     }
 }
 
@@ -386,7 +322,7 @@ pub fn run_circuit_pass<P: CircuitPass + ?Sized>(
     options: &P::Options,
     context: &CircuitPassContext,
 ) -> Result<CircuitPassOutput<P::Report>, CircuitPassError<P::Diagnostic>> {
-    let cancellation = context.cancellation();
+    let cancellation = &context.cancellation;
     cancellation.check()?;
     let resources = validate_circuit(circuit, context, CircuitPassStage::Input)?;
     let input = CircuitPassInput {
@@ -397,11 +333,7 @@ pub fn run_circuit_pass<P: CircuitPass + ?Sized>(
     let projected = pass
         .project_output_resources(input, options)
         .map_err(|diagnostic| pass_failure(diagnostic, cancellation))?;
-    admit_resources(
-        projected,
-        context.limits(),
-        CircuitPassStage::OutputProjection,
-    )?;
+    admit_resources(projected, context, CircuitPassStage::OutputProjection)?;
     cancellation.check()?;
     let output = pass
         .run(input, options)
@@ -452,9 +384,8 @@ impl<D: Error + 'static> From<ValidationFailure> for CircuitPassError<D> {
 
 /// The context's limits and signal, with the countdown that spaces polls across folded items.
 struct ValidationScope<'a> {
-    limits: CircuitPassLimits,
+    limits: &'a CircuitPassContext,
     stage: CircuitPassStage,
-    cancellation: &'a Cancellation,
     countdown: CancellationCountdown,
 }
 
@@ -463,11 +394,9 @@ fn validate_circuit(
     context: &CircuitPassContext,
     stage: CircuitPassStage,
 ) -> Result<CircuitPassResources, ValidationFailure> {
-    let limits = context.limits();
     let mut scope = ValidationScope {
-        limits,
+        limits: context,
         stage,
-        cancellation: context.cancellation(),
         countdown: CancellationCountdown::new(),
     };
     let mut represented_items = 0;
@@ -497,10 +426,10 @@ fn validate_circuit(
             stage,
             error.resource(),
             u64::MAX,
-            resource_limit(limits, error.resource()),
+            resource_limit(context, error.resource()),
         )
     })?;
-    admit_resources(resources, limits, stage)?;
+    admit_resources(resources, context, stage)?;
     Ok(resources)
 }
 
@@ -520,7 +449,7 @@ fn validate_block(
 ) -> Result<(), ValidationFailure> {
     let (limits, stage) = (scope.limits, scope.stage);
     for item in circuit.items() {
-        scope.countdown.tick(scope.cancellation)?;
+        scope.countdown.tick(&scope.limits.cancellation)?;
         add_unbounded(represented_items, 1);
         match item {
             CircuitItem::Instruction(instruction) => {
@@ -532,7 +461,7 @@ fn validate_block(
                 let next_depth = depth.saturating_add(1);
                 *repeat_nesting = (*repeat_nesting).max(next_depth);
                 add_unbounded(tag_bytes, repeat.tag_bytes().map_or(0, <[u8]>::len));
-                let limit = limits.repeat_nesting().get();
+                let limit = limits.repeat_nesting.get();
                 if next_depth > limit {
                     return Err(ResourceLimitError::circuit_pass(
                         stage,
@@ -564,19 +493,19 @@ fn add_unbounded(total: &mut u64, additional: usize) {
 
 fn admit_resources(
     resources: CircuitPassResources,
-    limits: CircuitPassLimits,
+    limits: &CircuitPassContext,
     stage: CircuitPassStage,
 ) -> Result<(), ResourceLimitError> {
     for (resource, actual, limit) in [
         (
             ResourceKind::ProjectedPayloadBytes,
             resources.projected_payload_bytes(),
-            limits.memory_budget().bytes(),
+            limits.memory_budget.bytes(),
         ),
         (
             ResourceKind::RepeatNesting,
             u64::try_from(resources.repeat_nesting()).unwrap_or(u64::MAX),
-            u64::try_from(limits.repeat_nesting().get()).unwrap_or(u64::MAX),
+            u64::try_from(limits.repeat_nesting.get()).unwrap_or(u64::MAX),
         ),
     ] {
         if actual > limit {
@@ -685,10 +614,10 @@ fn checked_resource_add(
         .ok_or(CircuitPassProjectionError { resource })
 }
 
-const fn resource_limit(limits: CircuitPassLimits, resource: ResourceKind) -> u64 {
+const fn resource_limit(limits: &CircuitPassContext, resource: ResourceKind) -> u64 {
     match resource {
-        ResourceKind::ProjectedPayloadBytes => limits.memory_budget().bytes(),
-        ResourceKind::RepeatNesting => limits.repeat_nesting().get() as u64,
+        ResourceKind::ProjectedPayloadBytes => limits.memory_budget.bytes(),
+        ResourceKind::RepeatNesting => limits.repeat_nesting.get() as u64,
         _ => u64::MAX,
     }
 }

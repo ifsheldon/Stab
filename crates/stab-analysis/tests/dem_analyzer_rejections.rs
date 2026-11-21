@@ -10,7 +10,8 @@
 //! (with and without `--fold_loops`); error wording is Stab's own and is not asserted.
 
 use stab_analysis::{
-    AnalysisError, ErrorAnalyzerOptions, UnanalyzableNoise, circuit_to_detector_error_model,
+    AnalysisError, DecompositionFailure, ErrorAnalyzerOptions, ErrorDecomposition, LoopFolding,
+    UnanalyzableNoise, circuit_to_detector_error_model,
 };
 use stab_model::{Circuit, Probability};
 
@@ -54,17 +55,17 @@ impl Rejection {
 
 fn approximate_disjoint(threshold: f64) -> ErrorAnalyzerOptions {
     ErrorAnalyzerOptions {
-        approximate_disjoint_errors_threshold: Some(
-            Probability::try_new(threshold).expect("threshold"),
-        ),
+        approximate_disjoint_errors: Some(Probability::try_new(threshold).expect("threshold")),
         ..ErrorAnalyzerOptions::default()
     }
 }
 
 fn decomposing() -> ErrorAnalyzerOptions {
     ErrorAnalyzerOptions {
-        decompose_errors: true,
-        ignore_decomposition_failures: true,
+        decomposition: Some(ErrorDecomposition {
+            on_failure: DecompositionFailure::Ignore,
+            ..Default::default()
+        }),
         ..ErrorAnalyzerOptions::default()
     }
 }
@@ -174,23 +175,23 @@ fn rows() -> Vec<Row> {
 #[test]
 fn analyzer_rejections_match_stim_in_both_fold_modes() {
     for row in rows() {
-        for fold_loops in [false, true] {
+        for loops in [LoopFolding::Unroll, LoopFolding::Fold] {
             let options = ErrorAnalyzerOptions {
-                fold_loops,
+                loops,
                 ..row.options.clone()
             };
             let rejected = Circuit::from_stim_str(row.rejected).expect("rejected circuit parses");
-            match circuit_to_detector_error_model(&rejected, options.clone()) {
+            match circuit_to_detector_error_model(&rejected, &options) {
                 Err(error) if row.rejection.matches(&error) => {}
                 other => panic!(
-                    "{} (fold_loops={fold_loops}): expected a {:?} rejection, got {other:?}",
+                    "{} (loops={loops:?}): expected a {:?} rejection, got {other:?}",
                     row.name, row.rejection
                 ),
             }
             let accepted = Circuit::from_stim_str(row.accepted).expect("accepted circuit parses");
-            if let Err(error) = circuit_to_detector_error_model(&accepted, options) {
+            if let Err(error) = circuit_to_detector_error_model(&accepted, &options) {
                 panic!(
-                    "{} (fold_loops={fold_loops}): boundary twin was rejected: {error}",
+                    "{} (loops={loops:?}): boundary twin was rejected: {error}",
                     row.name
                 );
             }

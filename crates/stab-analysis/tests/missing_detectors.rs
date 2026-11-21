@@ -23,7 +23,7 @@ fn missing_circuit_with_options(
 ) -> Result<String, Box<dyn std::error::Error>> {
     let output = missing_detectors(
         circuit,
-        MissingDetectorOptions {
+        &MissingDetectorOptions {
             ignore_non_deterministic_measurements,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -170,7 +170,7 @@ fn require_missing_circuit_error_contains(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let Err(error) = missing_detectors(
         circuit,
-        MissingDetectorOptions {
+        &MissingDetectorOptions {
             ignore_non_deterministic_measurements,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -307,7 +307,7 @@ fn pf5_missing_detectors_spp_rejects_anti_hermitian_unitary_products()
         let circuit = Circuit::from_stim_str(&format!("{gate} X0*Z0\nM 0\n"))?;
         let Err(error) = missing_detectors(
             &circuit,
-            MissingDetectorOptions {
+            &MissingDetectorOptions {
                 ignore_non_deterministic_measurements: true,
                 memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
@@ -554,7 +554,7 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
     )?;
     let Err(error) = missing_detectors(
         &cross_iteration,
-        MissingDetectorOptions {
+        &MissingDetectorOptions {
             ignore_non_deterministic_measurements: true,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -578,7 +578,7 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
     )?;
     let Err(error) = missing_detectors(
         &observable_merging,
-        MissingDetectorOptions {
+        &MissingDetectorOptions {
             ignore_non_deterministic_measurements: true,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -600,7 +600,7 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
     let nested = over_depth_nested_repeat_circuit(257)?;
     let error = match missing_detectors(
         &nested,
-        MissingDetectorOptions {
+        &MissingDetectorOptions {
             ignore_non_deterministic_measurements: true,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -631,11 +631,11 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
     assert!(
         missing_detectors(
             &empty_overflow,
-            MissingDetectorOptions {
+            &MissingDetectorOptions {
                 ignore_non_deterministic_measurements: true,
                 memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
-            },
+            }
         )?
         .is_empty()
     );
@@ -647,11 +647,11 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
     assert!(
         missing_detectors(
             &nonempty_overflow,
-            MissingDetectorOptions {
+            &MissingDetectorOptions {
                 ignore_non_deterministic_measurements: true,
                 memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
-            },
+            }
         )?
         .is_empty()
     );
@@ -659,7 +659,7 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
     let measurement_pads = Circuit::from_stim_str("REPEAT 1000001 {\n    MPAD 0\n}\n")?;
     let Err(error) = missing_detectors(
         &measurement_pads,
-        MissingDetectorOptions {
+        &MissingDetectorOptions {
             ignore_non_deterministic_measurements: true,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -675,7 +675,7 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
         Circuit::from_stim_str("REPEAT 1000001 {\n    R 0\n    M 0\n    DETECTOR rec[-1]\n}\n")?;
     let Err(error) = missing_detectors(
         &tracker_changing,
-        MissingDetectorOptions {
+        &MissingDetectorOptions {
             ignore_non_deterministic_measurements: true,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -710,7 +710,7 @@ fn assert_missing_detector_projected_storage_and_allocation_bounds()
         let allocations = allocation_counter::measure(|| {
             result = Some(missing_detectors(
                 circuit,
-                MissingDetectorOptions {
+                &MissingDetectorOptions {
                     ignore_non_deterministic_measurements: true,
                     memory_budget: stab_model::MemoryBudget::DEFAULT,
                     cancellation: stab_model::Cancellation::never(),
@@ -742,7 +742,7 @@ fn assert_missing_detector_projected_storage_and_allocation_bounds()
         let allocations = allocation_counter::measure(|| {
             result = Some(missing_detectors(
                 circuit,
-                MissingDetectorOptions {
+                &MissingDetectorOptions {
                     ignore_non_deterministic_measurements: false,
                     memory_budget: stab_model::MemoryBudget::DEFAULT,
                     cancellation: stab_model::Cancellation::never(),
@@ -796,7 +796,7 @@ fn pf5_missing_detectors_repeat_refuses_expansion_beyond_the_budget()
     let circuit = Circuit::from_stim_str("REPEAT 1000001 {\n    M 0\n}\n")?;
     let Err(error) = missing_detectors(
         &circuit,
-        MissingDetectorOptions {
+        &MissingDetectorOptions {
             ignore_non_deterministic_measurements: true,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -811,7 +811,7 @@ fn pf5_missing_detectors_repeat_refuses_expansion_beyond_the_budget()
     let circuit = Circuit::from_stim_str("REPEAT 1000000 {\n    M 0 1\n}\n")?;
     let Err(error) = missing_detectors(
         &circuit,
-        MissingDetectorOptions {
+        &MissingDetectorOptions {
             ignore_non_deterministic_measurements: true,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -857,7 +857,7 @@ fn assert_missing_detector_folded_final_repeat_is_count_independent()
                 Circuit::from_stim_str(&format!("{prefix}REPEAT {count} {{\n{body}}}\n"))?;
             Ok(missing_detectors(
                 &circuit,
-                MissingDetectorOptions {
+                &MissingDetectorOptions {
                     ignore_non_deterministic_measurements,
                     memory_budget: stab_model::MemoryBudget::DEFAULT,
                     cancellation: stab_model::Cancellation::never(),

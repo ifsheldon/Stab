@@ -11,76 +11,35 @@ use crate::{
     CircuitPassOutput, CircuitPassResources, ResourceKind, ResourceLimitError,
 };
 
-/// Resource policy for operation-owned circuit flattening.
-///
-/// The memory budget bounds the conservative retained size of the materialized circuit, admitted
-/// before the output is allocated. Expanded operation, target, and argument counts are not
-/// separately capped; repeat nesting stays the shared fixed recursion envelope. The cancellation
-/// signal is polled once per materialized instruction.
+/// Options of [`flattened_circuit`] and [`flattened_circuit_operations`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct CircuitFlattenLimits {
-    memory_budget: MemoryBudget,
-    cancellation: Cancellation,
-}
-
-impl CircuitFlattenLimits {
-    pub const fn new(memory_budget: MemoryBudget) -> Self {
-        Self {
-            memory_budget,
-            cancellation: Cancellation::never(),
-        }
-    }
-
-    /// Returns the configured memory budget for the materialized result.
-    pub const fn memory_budget(&self) -> MemoryBudget {
-        self.memory_budget
-    }
-
-    /// Returns the cancellation signal polled while the result is materialized.
-    pub const fn cancellation(&self) -> &Cancellation {
-        &self.cancellation
-    }
-
-    /// Returns this policy with a different memory budget.
-    #[must_use]
-    pub const fn with_memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
-        self.memory_budget = memory_budget;
-        self
-    }
-
-    /// Returns this policy polling `cancellation`.
-    #[must_use]
-    pub fn with_cancellation(mut self, cancellation: Cancellation) -> Self {
-        self.cancellation = cancellation;
-        self
-    }
+pub struct CircuitFlattenOptions {
+    /// Budget for the conservative retained size of the materialized circuit, admitted before the
+    /// output is allocated. Expanded operation, target, and argument counts are not separately
+    /// capped; repeat nesting stays the shared fixed recursion envelope.
+    pub memory_budget: MemoryBudget,
+    /// Signal polled once per materialized instruction.
+    pub cancellation: Cancellation,
 }
 
 /// Returns a circuit with repeat blocks unrolled and coordinate shifts applied.
 ///
 /// `SHIFT_COORDS` instructions are absorbed into subsequent `QUBIT_COORDS` and `DETECTOR`
 /// instructions, matching Stim's materialized `flattened` transform. Because this returns an
-/// owned circuit, expansions whose conservative size exceeds the default memory budget are
-/// rejected; use the lazy flattened iterators for raw repeat traversal when materialization is
-/// not required.
-pub fn flattened_circuit(circuit: &Circuit) -> AnalysisResult<Circuit> {
-    flattened_circuit_with_limits(circuit, CircuitFlattenLimits::default())
-}
-
-/// Returns a materialized flattened circuit using explicit resource limits.
-///
-/// The expanded operation count is validated before any output circuit is allocated or mutated.
-pub fn flattened_circuit_with_limits(
+/// owned circuit, expansions whose conservative size exceeds the options' memory budget are
+/// rejected before any output circuit is allocated or mutated; use the lazy flattened iterators
+/// for raw repeat traversal when materialization is not required.
+pub fn flattened_circuit(
     circuit: &Circuit,
-    limits: CircuitFlattenLimits,
+    options: &CircuitFlattenOptions,
 ) -> AnalysisResult<Circuit> {
-    let estimate = validate_flattening_budget(circuit, &limits)?;
+    let estimate = validate_flattening_budget(circuit, options)?;
     let capacity = validate_materialized_instruction_capacity(estimate.operations)?;
     let mut result = CircuitBuilder::new();
     result.try_reserve_exact(capacity)?;
     let mut countdown = CancellationCountdown::new();
     visit_flattened_operations(circuit, &mut Vec::new(), |instruction| {
-        countdown.tick(limits.cancellation())?;
+        countdown.tick(&options.cancellation)?;
         result
             .try_append_instruction(instruction)
             .map_err(Into::into)
@@ -92,19 +51,13 @@ pub fn flattened_circuit_with_limits(
 ///
 /// This is the Rust transform counterpart to Stim's deprecated `flattened_operations` surface.
 /// It applies coordinate shifts and unrolls repeats, but preserves each yielded operation as an
-/// independent instruction.
-pub fn flattened_circuit_operations(circuit: &Circuit) -> AnalysisResult<Vec<CircuitInstruction>> {
-    flattened_circuit_operations_with_limits(circuit, CircuitFlattenLimits::default())
-}
-
-/// Returns owned flattened instructions using explicit resource limits.
-///
-/// Repeat nesting and the expanded operation count are admitted before output allocation.
-pub fn flattened_circuit_operations_with_limits(
+/// independent instruction. Repeat nesting and the expanded operation count are admitted before
+/// output allocation.
+pub fn flattened_circuit_operations(
     circuit: &Circuit,
-    limits: CircuitFlattenLimits,
+    options: &CircuitFlattenOptions,
 ) -> AnalysisResult<Vec<CircuitInstruction>> {
-    let estimate = validate_flattening_budget(circuit, &limits)?;
+    let estimate = validate_flattening_budget(circuit, options)?;
     let capacity = validate_materialized_instruction_capacity(estimate.operations)?;
     let mut result = Vec::new();
     result.try_reserve_exact(capacity).map_err(|error| {
@@ -118,7 +71,7 @@ pub fn flattened_circuit_operations_with_limits(
     })?;
     let mut countdown = CancellationCountdown::new();
     visit_flattened_operations(circuit, &mut Vec::new(), |instruction| {
-        countdown.tick(limits.cancellation())?;
+        countdown.tick(&options.cancellation)?;
         result.push(instruction);
         Ok(())
     })?;
@@ -246,7 +199,7 @@ impl CircuitPass for WithoutNoisePass {
     ) -> Result<CircuitPassOutput<Self::Report>, Self::Diagnostic> {
         let mut report = WithoutNoiseReport::default();
         let mut polls = PassPolls {
-            cancellation: input.context().cancellation(),
+            cancellation: &input.context().cancellation,
             countdown: CancellationCountdown::new(),
         };
         let circuit = circuit_without_noise_impl(input.circuit(), &mut report, &mut polls)?;
@@ -295,13 +248,13 @@ struct CircuitFlattenEstimate {
 
 fn validate_flattening_budget(
     circuit: &Circuit,
-    limits: &CircuitFlattenLimits,
+    options: &CircuitFlattenOptions,
 ) -> AnalysisResult<CircuitFlattenEstimate> {
     validate_flattened_repeat_nesting(circuit)?;
     let estimate = flattened_materialization_estimate(circuit)?;
     validate_materialized_instruction_capacity(estimate.operations)?;
     let materialized_bytes = estimate.materialized_bytes()?;
-    let budget = limits.memory_budget();
+    let budget = options.memory_budget;
     if !budget.admits(u128::from(materialized_bytes)) {
         return Err(ResourceLimitError::memory_budget(
             AnalysisOperation::CircuitFlatten,

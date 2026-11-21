@@ -8,7 +8,7 @@ use stab_model::Circuit;
 
 fn analyze(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
-    circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+    circuit_to_detector_error_model(&circuit, &ErrorAnalyzerOptions::default())
         .expect("analyze")
         .to_dem_string()
 }

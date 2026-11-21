@@ -36,7 +36,8 @@ fn pfm_b4_flow_solve_over_sixteen() {
         flow(&format!("{product} -> 1")),
     ];
 
-    let solved = solve_for_flow_measurements(&circuit, &queries).expect("solve 33 measurements");
+    let solved = solve_for_flow_measurements(&circuit, &queries, &Default::default())
+        .expect("solve 33 measurements");
     assert_eq!(solved, vec![Some(vec![32]), Some(vec![32])]);
     for (query, measurements) in queries.iter().zip(solved) {
         let measurements = measurements.expect("selected flow is solvable");
@@ -62,8 +63,12 @@ fn pfm_b4_flow_solver_rejects_invalid_circuits_without_exhaustive_fallback() {
                 .join(" ")
         ),
     ] {
-        let error = solve_for_flow_measurements(&circuit(&circuit_text), &[flow("Z0 -> Z0")])
-            .expect_err("invalid generator shape must fail closed");
+        let error = solve_for_flow_measurements(
+            &circuit(&circuit_text),
+            &[flow("Z0 -> Z0")],
+            &Default::default(),
+        )
+        .expect_err("invalid generator shape must fail closed");
         assert_matches!(error, AnalysisError::AntiHermitianPauliProduct { .. });
         assert!(error.to_string().contains("Hermitian"), "{error}");
         assert!(!error.to_string().contains("fallback"), "{error}");
@@ -76,7 +81,8 @@ fn pfm_b4_flow_solver_preserves_idle_qubit_flows_through_resets() {
         let circuit = circuit(circuit_text);
         let queries = [flow("X0 -> X0"), flow("Z0 -> Z0")];
         assert_eq!(
-            solve_for_flow_measurements(&circuit, &queries).expect("solve idle-qubit flows"),
+            solve_for_flow_measurements(&circuit, &queries, &Default::default())
+                .expect("solve idle-qubit flows"),
             vec![Some(vec![]), Some(vec![])],
             "{circuit_text}"
         );
@@ -86,8 +92,12 @@ fn pfm_b4_flow_solver_preserves_idle_qubit_flows_through_resets() {
 #[test]
 fn pfm_b4_flow_solver_treats_mpad_values_as_non_qubit_records() {
     assert_eq!(
-        solve_for_flow_measurements(&circuit("MPAD 0\n"), &[flow("X0 -> X0")])
-            .expect("solve identity flow through MPAD"),
+        solve_for_flow_measurements(
+            &circuit("MPAD 0\n"),
+            &[flow("X0 -> X0")],
+            &Default::default()
+        )
+        .expect("solve identity flow through MPAD"),
         vec![Some(vec![])]
     );
 }
@@ -106,7 +116,8 @@ fn pfm_b4_flow_solver_uses_implicit_sparse_query_identity_rows() {
     ];
 
     assert_eq!(
-        solve_for_flow_measurements(&circuit(""), &queries).expect("solve sparse query suffix"),
+        solve_for_flow_measurements(&circuit(""), &queries, &Default::default())
+            .expect("solve sparse query suffix"),
         vec![Some(vec![]), None]
     );
 }
@@ -117,17 +128,20 @@ fn pfm_b4_flow_solver_repeats_match_expansion_without_a_work_cap() {
     let expanded = circuit("M 0\nM 0\n");
     let queries = [flow("Z -> 1"), flow("1 -> Z"), flow("X -> X")];
     assert_eq!(
-        solve_for_flow_measurements(&repeated, &queries).expect("solve repeated circuit"),
-        solve_for_flow_measurements(&expanded, &queries).expect("solve expanded circuit")
+        solve_for_flow_measurements(&repeated, &queries, &Default::default())
+            .expect("solve repeated circuit"),
+        solve_for_flow_measurements(&expanded, &queries, &Default::default())
+            .expect("solve expanded circuit")
     );
 
     assert_eq!(
         solve_for_flow_measurements(
             &circuit("M 0\nREPEAT 1000001 {\n    TICK\n}\n"),
             &[flow("Z -> 1")],
+            &Default::default()
         )
         .expect("solver work above the retired cap completes"),
-        solve_for_flow_measurements(&circuit("M 0\n"), &[flow("Z -> 1")])
+        solve_for_flow_measurements(&circuit("M 0\n"), &[flow("Z -> 1")], &Default::default())
             .expect("solve the unrepeated circuit")
     );
 }
@@ -148,7 +162,7 @@ fn pfm_b4_flow_solver_small_arbitrary_queries_match_exhaustive_checker() {
     ] {
         let circuit = circuit(circuit_text);
         let queries = two_qubit_unsigned_queries();
-        let solved = solve_for_flow_measurements(&circuit, &queries)
+        let solved = solve_for_flow_measurements(&circuit, &queries, &Default::default())
             .expect("solve arbitrary PFM-B4 query corpus");
         for (query, actual) in queries.iter().zip(solved) {
             let expected = exhaustive_checker_solution(&circuit, query);
@@ -181,6 +195,7 @@ fn pfm_b4_flow_solver_rank_deficient_inconsistent_and_underdetermined() {
         solve_for_flow_measurements(
             &duplicate,
             &[flow("1 -> Z"), flow("Z -> 1"), flow("1 -> Y")],
+            &Default::default()
         )
         .expect("solve duplicate measurement rows"),
         vec![Some(vec![1]), Some(vec![1]), None]
@@ -195,6 +210,7 @@ fn pfm_b4_flow_solver_rank_deficient_inconsistent_and_underdetermined() {
                 flow(&format!("1 -> {product}")),
                 flow(&format!("{product} -> 1")),
             ],
+            &Default::default()
         )
         .expect("solve underdetermined product"),
         vec![Some(vec![4]), Some(vec![4])]
@@ -214,7 +230,8 @@ fn pfm_b4_flow_solver_handles_sparse_high_qubits_and_uses_pauli_projection() {
     ];
 
     assert_eq!(
-        solve_for_flow_measurements(&circuit, &queries).expect("solve sparse high qubit"),
+        solve_for_flow_measurements(&circuit, &queries, &Default::default())
+            .expect("solve sparse high qubit"),
         vec![Some(vec![0]), Some(vec![0]), Some(vec![0])]
     );
 }
@@ -235,11 +252,12 @@ fn pfm_b4_flow_solver_generated_cross_engine_corpus() {
             let circuit = Circuit::from_stim_str(&text).map_err(|error| {
                 TestCaseError::fail(format!("generated circuit did not parse: {error}\n{text}"))
             })?;
-            let generators = circuit_flow_generators(&circuit).map_err(|error| {
-                TestCaseError::fail(format!(
-                    "generated circuit did not produce flows: {error}\n{text}"
-                ))
-            })?;
+            let generators =
+                circuit_flow_generators(&circuit, &Default::default()).map_err(|error| {
+                    TestCaseError::fail(format!(
+                        "generated circuit did not produce flows: {error}\n{text}"
+                    ))
+                })?;
             let checks = flow_holds(&circuit, &generators);
             prop_assert!(
                 checks.iter().all(|check| *check),
@@ -258,12 +276,16 @@ fn pfm_b4_flow_solver_generated_cross_engine_corpus() {
                     [],
                     [],
                 );
-                let solved = solve_for_flow_measurements(&circuit, std::slice::from_ref(&query))
-                    .map_err(|error| {
-                        TestCaseError::fail(format!(
-                            "generated query failed to solve: {error}\n{text}\n{query}"
-                        ))
-                    })?;
+                let solved = solve_for_flow_measurements(
+                    &circuit,
+                    std::slice::from_ref(&query),
+                    &Default::default(),
+                )
+                .map_err(|error| {
+                    TestCaseError::fail(format!(
+                        "generated query failed to solve: {error}\n{text}\n{query}"
+                    ))
+                })?;
                 let Some(measurements) = solved.into_iter().next().flatten() else {
                     return Err(TestCaseError::fail(format!(
                         "generated query was unexpectedly unsolved\n{text}\n{query}"

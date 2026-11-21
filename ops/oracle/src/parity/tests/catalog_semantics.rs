@@ -4,7 +4,7 @@ use std::ffi::OsString;
 use std::sync::OnceLock;
 
 use stab_analysis::{
-    DetectingRegionTargetOptions, ErrorAnalyzerOptions, MissingDetectorOptions,
+    DetectingRegionOptions, ErrorAnalyzerOptions, GaugeDetectors, MissingDetectorOptions,
     all_detecting_region_targets, all_detecting_region_ticks,
     circuit_detecting_regions_for_targets, circuit_flow_generators, circuit_inverse_unitary,
     circuit_to_detector_error_model, decomposed_circuit, gate_tableau, missing_detectors,
@@ -253,13 +253,11 @@ fn p5_catalog_circuit_to_dem_matches_pinned_stim() {
     compare_catalog_matrix("dem", &cases, |source| {
         let circuit = Circuit::from_stim_str(source).map_err(|error| error.to_string())?;
         let options = ErrorAnalyzerOptions {
-            allow_gauge_detectors: true,
-            approximate_disjoint_errors_threshold: Some(
-                Probability::try_new(1.0).expect("unit probability"),
-            ),
+            gauge_detectors: GaugeDetectors::Allow,
+            approximate_disjoint_errors: Some(Probability::try_new(1.0).expect("unit probability")),
             ..ErrorAnalyzerOptions::default()
         };
-        circuit_to_detector_error_model(&circuit, options)
+        circuit_to_detector_error_model(&circuit, &options)
             .map(|model| without_terminal_newlines(model.to_dem_string()))
             .map_err(|error| error.to_string())
     });
@@ -280,7 +278,7 @@ fn p5_catalog_flow_generators_match_pinned_stim() {
     let gate_count = Gate::all().len();
     compare_catalog_matrix("flows", &cases, |source| {
         let circuit = Circuit::from_stim_str(source).map_err(|error| error.to_string())?;
-        circuit_flow_generators(&circuit)
+        circuit_flow_generators(&circuit, &Default::default())
             .map(flow_text)
             .map_err(|error| error.to_string())
     });
@@ -660,13 +658,15 @@ fn fixed_tableau_detecting_shapes(
 }
 
 fn detecting_regions_text(circuit: &Circuit) -> Result<String, String> {
-    let targets = all_detecting_region_targets(circuit).map_err(|error| error.to_string())?;
-    let ticks = all_detecting_region_ticks(circuit).map_err(|error| error.to_string())?;
+    let targets = all_detecting_region_targets(circuit, &Default::default())
+        .map_err(|error| error.to_string())?;
+    let ticks = all_detecting_region_ticks(circuit, &Default::default())
+        .map_err(|error| error.to_string())?;
     circuit_detecting_regions_for_targets(
         circuit,
-        DetectingRegionTargetOptions {
-            targets,
-            ticks,
+        &targets,
+        &ticks,
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: true,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -798,7 +798,7 @@ fn missing_detector_text(
     let circuit = Circuit::from_stim_str(source).map_err(|error| error.to_string())?;
     missing_detectors(
         &circuit,
-        MissingDetectorOptions {
+        &MissingDetectorOptions {
             ignore_non_deterministic_measurements,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -1040,7 +1040,7 @@ fn base_gate_flow_text(circuit: &Circuit) -> Result<String, String> {
             ));
         }
     }
-    circuit_flow_generators(circuit)
+    circuit_flow_generators(circuit, &Default::default())
         .map(flow_text)
         .map_err(|error| error.to_string())
 }

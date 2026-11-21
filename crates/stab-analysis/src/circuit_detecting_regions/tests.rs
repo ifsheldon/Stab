@@ -31,9 +31,9 @@ fn regions(text: &str, detectors: Vec<DemDetectorId>, ticks: Vec<u64>) -> Detect
     let circuit = Circuit::from_stim_str(text).unwrap();
     circuit_detecting_regions(
         &circuit,
-        DetectingRegionOptions {
-            detectors,
-            ticks: ticks.into_iter().map(tick).collect(),
+        &detectors,
+        &ticks.into_iter().map(tick).collect::<Vec<_>>(),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -113,9 +113,9 @@ fn detecting_regions_target_api_matches_mx_python_example() {
     .unwrap();
     let actual = circuit_detecting_regions_for_targets(
         &circuit,
-        DetectingRegionTargetOptions {
-            targets: all_detecting_region_targets(&circuit).unwrap(),
-            ticks: all_detecting_region_ticks(&circuit).unwrap(),
+        &all_detecting_region_targets(&circuit, &Default::default()).unwrap(),
+        &all_detecting_region_ticks(&circuit, &Default::default()).unwrap(),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -140,9 +140,9 @@ fn detecting_regions_target_api_supports_mzz_example() {
     .unwrap();
     let actual = circuit_detecting_regions_for_targets(
         &circuit,
-        DetectingRegionTargetOptions {
-            targets: vec![DemTarget::relative_detector(0).unwrap()],
-            ticks: all_detecting_region_ticks(&circuit).unwrap(),
+        &[DemTarget::relative_detector(0).unwrap()],
+        &all_detecting_region_ticks(&circuit, &Default::default()).unwrap(),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -166,9 +166,9 @@ fn detecting_regions_target_api_ignores_tags_and_ordinary_noise_like_upstream() 
     .unwrap();
     let actual = circuit_detecting_regions_for_targets(
         &circuit,
-        DetectingRegionTargetOptions {
-            targets: all_detecting_region_targets(&circuit).unwrap(),
-            ticks: all_detecting_region_ticks(&circuit).unwrap(),
+        &all_detecting_region_targets(&circuit, &Default::default()).unwrap(),
+        &all_detecting_region_ticks(&circuit, &Default::default()).unwrap(),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -254,9 +254,9 @@ fn detecting_regions_target_shape_supports_pauli_product_measurements() {
     let observable = DemTarget::logical_observable(0).unwrap();
     let actual = circuit_detecting_regions_for_targets(
         &circuit,
-        DetectingRegionTargetOptions {
-            targets: vec![detector_0, detector_1, observable],
-            ticks: ticks(&[0]),
+        &[detector_0, detector_1, observable],
+        &ticks(&[0]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -282,15 +282,16 @@ fn detecting_regions_target_shape_supports_spp_unitary_products() {
         .unwrap();
         let decomposed = crate::decomposed_circuit(&circuit).unwrap();
         let observable = DemTarget::logical_observable(0).unwrap();
-        let options = DetectingRegionTargetOptions {
-            targets: vec![observable],
-            ticks: ticks(&[0, 1]),
+        let targets = [observable];
+        let ticks = ticks(&[0, 1]);
+        let options = DetectingRegionOptions {
             ignore_anticommutation_errors: true,
-            memory_budget: stab_model::MemoryBudget::DEFAULT,
-            cancellation: stab_model::Cancellation::never(),
+            ..DetectingRegionOptions::default()
         };
-        let actual = circuit_detecting_regions_for_targets(&circuit, options.clone()).unwrap();
-        let expected = circuit_detecting_regions_for_targets(&decomposed, options).unwrap();
+        let actual =
+            circuit_detecting_regions_for_targets(&circuit, &targets, &ticks, &options).unwrap();
+        let expected =
+            circuit_detecting_regions_for_targets(&decomposed, &targets, &ticks, &options).unwrap();
 
         assert_eq!(actual, expected, "{gate_name}");
         assert_eq!(
@@ -315,9 +316,9 @@ fn detecting_regions_target_shape_rejects_anti_hermitian_pauli_products() {
         let circuit = Circuit::from_stim_str(text).unwrap();
         let error = circuit_detecting_regions_for_targets(
             &circuit,
-            DetectingRegionTargetOptions {
-                targets: all_detecting_region_targets(&circuit).unwrap(),
-                ticks: all_detecting_region_ticks(&circuit).unwrap(),
+            &all_detecting_region_targets(&circuit, &Default::default()).unwrap(),
+            &all_detecting_region_ticks(&circuit, &Default::default()).unwrap(),
+            &DetectingRegionOptions {
                 ignore_anticommutation_errors: false,
                 memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
@@ -341,9 +342,9 @@ fn detecting_regions_target_shape_keeps_reset_and_unitaries_plain() {
             Ok(circuit) => {
                 let error = circuit_detecting_regions(
                     &circuit,
-                    DetectingRegionOptions {
-                        detectors: vec![detector(0)],
-                        ticks: ticks(&[0]),
+                    &[detector(0)],
+                    &ticks(&[0]),
+                    &DetectingRegionOptions {
                         ignore_anticommutation_errors: false,
                         memory_budget: stab_model::MemoryBudget::DEFAULT,
                         cancellation: stab_model::Cancellation::never(),
@@ -378,13 +379,13 @@ fn detecting_regions_target_api_supports_logical_observable_targets() {
     .unwrap();
     let actual = circuit_detecting_regions_for_targets(
         &circuit,
-        DetectingRegionTargetOptions {
-            targets: vec![
-                DemTarget::logical_observable(0).unwrap(),
-                DemTarget::logical_observable(1).unwrap(),
-                DemTarget::logical_observable(1).unwrap(),
-            ],
-            ticks: ticks(&[0, 1]),
+        &[
+            DemTarget::logical_observable(0).unwrap(),
+            DemTarget::logical_observable(1).unwrap(),
+            DemTarget::logical_observable(1).unwrap(),
+        ],
+        &ticks(&[0, 1]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -418,9 +419,9 @@ fn detecting_regions_target_api_rejects_invalid_targets() {
     ] {
         let error = circuit_detecting_regions_for_targets(
             &circuit,
-            DetectingRegionTargetOptions {
-                targets: vec![target],
-                ticks: ticks(&[0]),
+            &[target],
+            &ticks(&[0]),
+            &DetectingRegionOptions {
                 ignore_anticommutation_errors: false,
                 memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
@@ -447,9 +448,9 @@ fn detecting_regions_target_shape_supports_measurement_pads() {
     let observable = DemTarget::logical_observable(0).unwrap();
     let actual = circuit_detecting_regions_for_targets(
         &circuit,
-        DetectingRegionTargetOptions {
-            targets: vec![detector_target, observable],
-            ticks: ticks(&[0]),
+        &[detector_target, observable],
+        &ticks(&[0]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -465,9 +466,9 @@ fn detecting_regions_target_shape_supports_measurement_pads() {
             .unwrap();
     let all_pad_regions = circuit_detecting_regions(
         &all_pad_circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0), detector(1)],
-            ticks: ticks(&[0]),
+        &[detector(0), detector(1)],
+        &ticks(&[0]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -503,9 +504,9 @@ fn detecting_regions_target_shape_supports_heralded_record_noise() {
         let circuit = Circuit::from_stim_str(text).unwrap();
         let actual = circuit_detecting_regions_for_targets(
             &circuit,
-            DetectingRegionTargetOptions {
-                targets: vec![DemTarget::relative_detector(0).unwrap()],
-                ticks: ticks(&[0]),
+            &[DemTarget::relative_detector(0).unwrap()],
+            &ticks(&[0]),
+            &DetectingRegionOptions {
                 ignore_anticommutation_errors: false,
                 memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
@@ -526,9 +527,9 @@ fn detecting_regions_target_shape_keeps_heralded_noise_plain_qubit_scoped() {
             Ok(circuit) => {
                 let error = circuit_detecting_regions_for_targets(
                     &circuit,
-                    DetectingRegionTargetOptions {
-                        targets: vec![DemTarget::relative_detector(0).unwrap()],
-                        ticks: ticks(&[0]),
+                    &[DemTarget::relative_detector(0).unwrap()],
+                    &ticks(&[0]),
+                    &DetectingRegionOptions {
                         ignore_anticommutation_errors: false,
                         memory_budget: stab_model::MemoryBudget::DEFAULT,
                         cancellation: stab_model::Cancellation::never(),
@@ -554,7 +555,7 @@ fn detecting_regions_target_shape_keeps_heralded_noise_plain_qubit_scoped() {
 #[test]
 fn detecting_regions_target_api_admits_dense_helpers_against_the_memory_budget() {
     let high_observable = Circuit::from_stim_str("OBSERVABLE_INCLUDE(4294967295) Z0\n").unwrap();
-    let error = all_detecting_region_targets(&high_observable).unwrap_err();
+    let error = all_detecting_region_targets(&high_observable, &Default::default()).unwrap_err();
     let AnalysisError::ResourceLimit(resource) = error else {
         panic!("expected typed target-helper rejection, got {error}");
     };
@@ -566,7 +567,7 @@ fn detecting_regions_target_api_admits_dense_helpers_against_the_memory_budget()
     let above_retired_cap =
         Circuit::from_stim_str("M 0\nREPEAT 1000001 {\n    DETECTOR rec[-1]\n}\n").unwrap();
     assert_eq!(
-        all_detecting_region_targets(&above_retired_cap)
+        all_detecting_region_targets(&above_retired_cap, &Default::default())
             .unwrap()
             .len(),
         1_000_001
@@ -660,9 +661,9 @@ fn detecting_regions_rejects_unknown_detector() {
     let circuit = Circuit::from_stim_str("MXX 0 1\nDETECTOR rec[-1]\n").unwrap();
     let error = circuit_detecting_regions(
         &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(1)],
-            ticks: ticks(&[]),
+        &[detector(1)],
+        &ticks(&[]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -677,9 +678,9 @@ fn detecting_regions_rejects_out_of_range_tick() {
     let circuit = Circuit::from_stim_str("TICK\nMXX 0 1\nDETECTOR rec[-1]\n").unwrap();
     let error = circuit_detecting_regions(
         &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: ticks(&[1]),
+        &[detector(0)],
+        &ticks(&[1]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -694,9 +695,9 @@ fn detecting_regions_anticommutation_supports_ignored_mode() {
     let circuit = Circuit::from_stim_str("TICK\nR 0\nTICK\nMX 0\nDETECTOR rec[-1]\n").unwrap();
     let actual = circuit_detecting_regions(
         &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: ticks(&[0, 1]),
+        &[detector(0)],
+        &ticks(&[0, 1]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: true,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -709,9 +710,9 @@ fn detecting_regions_anticommutation_supports_ignored_mode() {
     let implicit_start = Circuit::from_stim_str("TICK\nMX 0\nDETECTOR rec[-1]\n").unwrap();
     let actual = circuit_detecting_regions(
         &implicit_start,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: ticks(&[0]),
+        &[detector(0)],
+        &ticks(&[0]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: true,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -722,9 +723,9 @@ fn detecting_regions_anticommutation_supports_ignored_mode() {
 
     let empty_ticks = circuit_detecting_regions(
         &implicit_start,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: ticks(&[]),
+        &[detector(0)],
+        &ticks(&[]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: true,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -735,9 +736,9 @@ fn detecting_regions_anticommutation_supports_ignored_mode() {
 
     let empty_targets = circuit_detecting_regions(
         &implicit_start,
-        DetectingRegionOptions {
-            detectors: vec![],
-            ticks: ticks(&[0]),
+        &[],
+        &ticks(&[0]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: true,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -760,9 +761,9 @@ fn detecting_regions_anticommutation_rejects_false_mode() {
     .unwrap();
     let error = circuit_detecting_regions(
         &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: ticks(&[0]),
+        &[detector(0)],
+        &ticks(&[0]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -783,9 +784,9 @@ fn detecting_regions_anticommutation_rejects_implicit_start_state() {
         let circuit = Circuit::from_stim_str(text).unwrap();
         let error = circuit_detecting_regions_for_targets(
             &circuit,
-            DetectingRegionTargetOptions {
-                targets: all_detecting_region_targets(&circuit).unwrap(),
-                ticks: all_detecting_region_ticks(&circuit).unwrap(),
+            &all_detecting_region_targets(&circuit, &Default::default()).unwrap(),
+            &all_detecting_region_ticks(&circuit, &Default::default()).unwrap(),
+            &DetectingRegionOptions {
                 ignore_anticommutation_errors: false,
                 memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
@@ -802,9 +803,9 @@ fn detecting_regions_anticommutation_rejects_product_measurement_start_state() {
     let circuit = Circuit::from_stim_str("TICK\nMXX 0 1\nDETECTOR rec[-1]\n").unwrap();
     let error = circuit_detecting_regions(
         &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: ticks(&[0]),
+        &[detector(0)],
+        &ticks(&[0]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -821,9 +822,9 @@ fn detecting_regions_anticommutation_rejects_false_mode_with_empty_filters() {
     for (detectors, ticks) in [(vec![detector(0)], Vec::new()), (vec![], ticks(&[0]))] {
         let error = circuit_detecting_regions(
             &circuit,
-            DetectingRegionOptions {
-                detectors,
-                ticks,
+            &detectors,
+            &ticks,
+            &DetectingRegionOptions {
                 ignore_anticommutation_errors: false,
                 memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
@@ -841,9 +842,9 @@ fn detecting_regions_gauge_ignores_measurement_collapse_when_requested() {
         Circuit::from_stim_str("RX 0\nTICK\nM 0\nTICK\nMX 0\nDETECTOR rec[-1]\n").unwrap();
     let ignored = circuit_detecting_regions(
         &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: ticks(&[0, 1]),
+        &[detector(0)],
+        &ticks(&[0, 1]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: true,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -855,9 +856,9 @@ fn detecting_regions_gauge_ignores_measurement_collapse_when_requested() {
 
     let error = circuit_detecting_regions(
         &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: ticks(&[0, 1]),
+        &[detector(0)],
+        &ticks(&[0, 1]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -923,9 +924,9 @@ fn detecting_regions_clifford_supports_swap_gate() {
     let circuit = Circuit::from_stim_str("R 0 1\nTICK\nSWAP 0 1\nM 0\nDETECTOR rec[-1]\n").unwrap();
     let actual = circuit_detecting_regions(
         &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: ticks(&[0]),
+        &[detector(0)],
+        &ticks(&[0]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -941,9 +942,9 @@ fn detecting_regions_clifford_supports_promoted_controlled_pauli_gate() {
         Circuit::from_stim_str("R 0\nRX 1\nTICK\nXCX 0 1\nM 0\nDETECTOR rec[-1]\n").unwrap();
     let actual = circuit_detecting_regions(
         &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: ticks(&[0]),
+        &[detector(0)],
+        &ticks(&[0]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -1090,9 +1091,9 @@ fn detecting_regions_target_shape_rejects_unsupported_feedback_shapes() {
         let circuit = Circuit::from_stim_str(circuit).unwrap();
         let error = circuit_detecting_regions(
             &circuit,
-            DetectingRegionOptions {
-                detectors: vec![detector(0)],
-                ticks: ticks(&[0]),
+            &[detector(0)],
+            &ticks(&[0]),
+            &DetectingRegionOptions {
                 ignore_anticommutation_errors: false,
                 memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
@@ -1140,9 +1141,9 @@ fn detecting_regions_target_shape_rejects_unpromoted_sweep_shapes() {
         let circuit = Circuit::from_stim_str(circuit).unwrap();
         let error = circuit_detecting_regions(
             &circuit,
-            DetectingRegionOptions {
-                detectors: vec![detector(0)],
-                ticks: ticks(&[0]),
+            &[detector(0)],
+            &ticks(&[0]),
+            &DetectingRegionOptions {
                 ignore_anticommutation_errors: false,
                 memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),

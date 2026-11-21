@@ -4,7 +4,7 @@ use stab_model::{
 };
 
 use super::{
-    ErrorAnalyzerOptions,
+    DecompositionFailure, ErrorAnalyzerOptions, GaugeDetectors, RemnantEdges,
     decompose::decompose_accumulated_errors,
     error_accumulator::{ErrorAccumulator, TagId},
 };
@@ -41,13 +41,13 @@ struct AnalyzerScratch {
 
 pub(super) fn try_analyze(
     circuit: &Circuit,
-    options: ErrorAnalyzerOptions,
+    options: &ErrorAnalyzerOptions,
 ) -> AnalysisResult<DetectorErrorModel> {
     // Folded and unrolled analysis both recurse once per repeat level, and the reversed model
     // they emit nests no deeper, so the shared nesting envelope is admitted before any work;
     // expanded work itself is not capped.
     super::budget::validate_analyzer_repeat_nesting(circuit)?;
-    ReverseFoldAnalyzer::new(circuit, options)?.analyze(circuit)
+    ReverseFoldAnalyzer::new(circuit, options.clone())?.analyze(circuit)
 }
 
 /// Holds `'c`, the analyzed circuit, so the pending `ELSE_CORRELATED_ERROR` chain borrows its
@@ -81,7 +81,7 @@ impl<'c> ReverseFoldAnalyzer<'c> {
             circuit.simulated_qubit_count(),
             measurement_count,
             detector_count,
-            options.allow_gauge_detectors,
+            options.gauge_detectors == GaugeDetectors::Allow,
         );
         tracker.set_cancellation(options.cancellation.clone());
         tracker.set_memory_budget(
@@ -351,12 +351,11 @@ impl<'c> ReverseFoldAnalyzer<'c> {
 
     fn flush(&mut self) -> AnalysisResult<()> {
         self.sync_error_budget_base();
-        if self.options.decompose_errors {
+        if let Some(decomposition) = self.options.decomposition {
             decompose_accumulated_errors(
                 &mut self.errors,
-                self.options
-                    .block_decomposition_from_introducing_remnant_edges,
-                self.options.ignore_decomposition_failures,
+                decomposition.remnant_edges == RemnantEdges::Block,
+                decomposition.on_failure == DecompositionFailure::Ignore,
             )?;
         }
         for class in self.errors.sorted_classes()?.into_iter().rev() {

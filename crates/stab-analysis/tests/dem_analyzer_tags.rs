@@ -4,19 +4,19 @@
     reason = "compatibility tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_analysis::{ErrorAnalyzerOptions, LoopFolding, circuit_to_detector_error_model};
 use stab_model::Circuit;
 
 fn analyze(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
-    circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+    circuit_to_detector_error_model(&circuit, &ErrorAnalyzerOptions::default())
         .expect("analyze")
         .to_dem_string()
 }
 
 fn analyze_bytes(text: &[u8], options: ErrorAnalyzerOptions) -> Vec<u8> {
     let circuit = Circuit::from_stim_bytes(text).expect("circuit");
-    circuit_to_detector_error_model(&circuit, options)
+    circuit_to_detector_error_model(&circuit, &options)
         .expect("analyze")
         .to_dem_bytes()
 }
@@ -74,8 +74,8 @@ fn dem_analyzer_preserves_tags_when_folding_prefixed_repeat() {
     .expect("circuit");
     let dem = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -128,7 +128,7 @@ fn folded_dem_analyzer_keeps_distinct_opaque_error_tags_unmerged() {
               DETECTOR rec[-1]\n\
           }\n",
         ErrorAnalyzerOptions {
-            fold_loops: true,
+            loops: LoopFolding::Fold,
             ..ErrorAnalyzerOptions::default()
         },
     );

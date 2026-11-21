@@ -4,7 +4,7 @@ use stab_model::{
     DemInstruction, DemInstructionView, DemItem, DemRepeatBlock, DetectorErrorModel, Probability,
 };
 
-use super::flatten::{DemFlattenLimits, validate_flattening_budget_with_limits};
+use super::flatten::{DemFlattenOptions, validate_flattening_budget};
 use crate::AnalysisResult;
 
 /// Returns a compact copy of `model` with every instruction and repeat-block tag removed.
@@ -29,30 +29,19 @@ pub fn detector_error_model_without_tags(model: &DetectorErrorModel) -> Detector
 ///
 /// `shift_detectors` instructions are removed after their detector and coordinate shifts are
 /// applied to following instructions. Instruction tags are preserved, while repeat-block tags
-/// disappear with the expanded repeat blocks. The transform validates the existing Stab
-/// flattening budget before materialization and returns the same overflow or resource-limit errors
-/// as [`flattened_detector_error_model`].
+/// disappear with the expanded repeat blocks. Resource admission against the options' memory
+/// budget completes before the output model is created or mutated. Repeat nesting remains subject
+/// to Stab's fixed model-safety invariant and is not configurable through `options`.
 pub fn flattened_detector_error_model(
     model: &DetectorErrorModel,
+    options: &DemFlattenOptions,
 ) -> AnalysisResult<DetectorErrorModel> {
-    flattened_detector_error_model_with_limits(model, DemFlattenLimits::default())
-}
-
-/// Returns a materialized DEM under the given repeat-expansion resource policy.
-///
-/// Resource admission completes before the output model is created or mutated. Repeat nesting
-/// remains subject to Stab's fixed model-safety invariant and is not configurable through
-/// `limits`.
-pub fn flattened_detector_error_model_with_limits(
-    model: &DetectorErrorModel,
-    limits: DemFlattenLimits,
-) -> AnalysisResult<DetectorErrorModel> {
-    let budget = validate_flattening_budget_with_limits(model, "flattened", &limits)?;
+    let budget = validate_flattening_budget(model, "flattened", options)?;
     let mut flattened = DetectorErrorModel::new();
     flattened.try_reserve_items_exact(budget.materialized_capacity()?)?;
     for instruction in model
         .iter_flattened_instructions()
-        .with_cancellation(limits.cancellation().clone())
+        .with_cancellation(options.cancellation.clone())
     {
         flattened.push_instruction(instruction?);
     }

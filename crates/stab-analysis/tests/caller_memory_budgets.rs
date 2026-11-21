@@ -9,13 +9,12 @@
 
 use stab_algebra::{Flow, PauliString};
 use stab_analysis::{
-    AnalysisError, AnalysisOperation, FlowGeneratorOptions, FlowVerdict, InverseQecOptions,
-    MissingDetectorOptions, PauliConjugationOptions, ResourceKind, TimeReversedForFlowsOptions,
-    UnsignedFlowCheckOptions, all_detecting_region_targets_with_budget,
-    all_detecting_region_ticks_with_budget, check_unsigned_stabilizer_flows,
-    circuit_flow_generators_with_options, circuit_inverse_qec_with_options,
-    circuit_time_reversed_for_flows_with_options, missing_detectors, pauli_after_circuit,
-    pauli_after_circuit_with_options, pauli_before_circuit, pauli_before_circuit_with_options,
+    AnalysisError, AnalysisOperation, DetectingRegionListOptions, FlowGeneratorOptions,
+    FlowMeasurementOptions, FlowVerdict, InverseQecOptions, MissingDetectorOptions,
+    PauliConjugationOptions, ResourceKind, TimeReversedForFlowsOptions, UnsignedFlowCheckOptions,
+    all_detecting_region_targets, all_detecting_region_ticks, check_unsigned_stabilizer_flows,
+    circuit_flow_generators, circuit_inverse_qec, circuit_time_reversed_for_flows,
+    missing_detectors, pauli_after_circuit, pauli_before_circuit, solve_for_flow_measurements,
 };
 use stab_model::{Circuit, CircuitItem, CircuitTick, DemTarget, MemoryBudget, Target};
 
@@ -54,10 +53,10 @@ fn measurement_rich_time_reversal_takes_the_caller_budget() {
     let short = MemoryBudget::from_bytes(required - 1);
     let exact = MemoryBudget::from_bytes(required);
     let reverse = |memory_budget| {
-        circuit_time_reversed_for_flows_with_options(
+        circuit_time_reversed_for_flows(
             &repeated,
             &[],
-            TimeReversedForFlowsOptions {
+            &TimeReversedForFlowsOptions {
                 memory_budget,
                 ..TimeReversedForFlowsOptions::default()
             },
@@ -75,9 +74,9 @@ fn measurement_rich_time_reversal_takes_the_caller_budget() {
     assert_eq!(inverse.count_measurements().expect("count"), 1000);
 
     let inverse_qec = |memory_budget| {
-        circuit_inverse_qec_with_options(
+        circuit_inverse_qec(
             &repeated,
-            InverseQecOptions {
+            &InverseQecOptions {
                 memory_budget,
                 ..InverseQecOptions::default()
             },
@@ -96,7 +95,7 @@ fn measurement_rich_time_reversal_takes_the_caller_budget() {
 #[test]
 fn flow_generation_takes_the_caller_budget() {
     let generate = |text: &str, memory_budget| {
-        circuit_flow_generators_with_options(
+        circuit_flow_generators(
             &circuit(text),
             &FlowGeneratorOptions {
                 memory_budget,
@@ -134,7 +133,7 @@ fn missing_detector_discovery_takes_the_caller_budget() {
     let discover = |memory_budget| {
         missing_detectors(
             &source,
-            MissingDetectorOptions {
+            &MissingDetectorOptions {
                 memory_budget,
                 ..MissingDetectorOptions::default()
             },
@@ -161,17 +160,23 @@ fn detecting_region_helpers_take_the_caller_budget() {
     for (required, refused) in [
         (
             tick_bytes,
-            all_detecting_region_ticks_with_budget(
+            all_detecting_region_ticks(
                 &source,
-                MemoryBudget::from_bytes(tick_bytes - 1),
+                &DetectingRegionListOptions {
+                    memory_budget: MemoryBudget::from_bytes(tick_bytes - 1),
+                    ..Default::default()
+                },
             )
             .map(|ticks| ticks.len()),
         ),
         (
             target_bytes,
-            all_detecting_region_targets_with_budget(
+            all_detecting_region_targets(
                 &source,
-                MemoryBudget::from_bytes(target_bytes - 1),
+                &DetectingRegionListOptions {
+                    memory_budget: MemoryBudget::from_bytes(target_bytes - 1),
+                    ..Default::default()
+                },
             )
             .map(|targets| targets.len()),
         ),
@@ -185,15 +190,27 @@ fn detecting_region_helpers_take_the_caller_budget() {
         );
     }
     assert_eq!(
-        all_detecting_region_ticks_with_budget(&source, MemoryBudget::from_bytes(tick_bytes))
-            .expect("exact tick budget")
-            .len(),
+        all_detecting_region_ticks(
+            &source,
+            &DetectingRegionListOptions {
+                memory_budget: MemoryBudget::from_bytes(tick_bytes),
+                ..Default::default()
+            }
+        )
+        .expect("exact tick budget")
+        .len(),
         3
     );
     assert_eq!(
-        all_detecting_region_targets_with_budget(&source, MemoryBudget::from_bytes(target_bytes))
-            .expect("exact target budget")
-            .len(),
+        all_detecting_region_targets(
+            &source,
+            &DetectingRegionListOptions {
+                memory_budget: MemoryBudget::from_bytes(target_bytes),
+                ..Default::default()
+            }
+        )
+        .expect("exact target budget")
+        .len(),
         2
     );
 }
@@ -271,12 +288,9 @@ fn pauli_conjugation_takes_the_caller_budget() {
         memory_budget: MemoryBudget::from_bytes(bytes),
         ..PauliConjugationOptions::default()
     };
-    for (conjugate, unbudgeted) in [
-        (
-            pauli_after_circuit_with_options as fn(&_, &_, &_) -> _,
-            pauli_after_circuit as fn(&_, &_) -> _,
-        ),
-        (pauli_before_circuit_with_options, pauli_before_circuit),
+    for conjugate in [
+        pauli_after_circuit as fn(&_, &_, &_) -> _,
+        pauli_before_circuit,
     ] {
         assert_refused(
             conjugate(&pauli, &source, &options(required - 1)).expect_err("one byte short"),
@@ -287,7 +301,7 @@ fn pauli_conjugation_takes_the_caller_budget() {
         );
         assert_eq!(
             conjugate(&pauli, &source, &options(required)),
-            unbudgeted(&pauli, &source)
+            conjugate(&pauli, &source, &Default::default())
         );
     }
 
@@ -298,13 +312,41 @@ fn pauli_conjugation_takes_the_caller_budget() {
     text.push('Z');
     let pauli: PauliString = text.parse().expect("Pauli fixture");
     let walked = options(1024);
-    let after = pauli_after_circuit(&pauli, &wide).expect("conjugate after");
+    let after = pauli_after_circuit(&pauli, &wide, &Default::default()).expect("conjugate after");
     assert_eq!(
-        pauli_after_circuit_with_options(&pauli, &wide, &walked),
+        pauli_after_circuit(&pauli, &wide, &walked),
         Ok(after.clone())
     );
+    assert_eq!(pauli_before_circuit(&after, &wide, &walked), Ok(pauli));
+}
+
+#[test]
+fn flow_measurement_solving_admits_its_elimination_table_against_the_caller_budget() {
+    // The budget admits the 400-qubit circuit's generator rows, which the solver then expands into
+    // one bit per Pauli component for its elimination table; that table is refused before it is
+    // built.
+    let qubits = (0..400).map(|qubit| qubit.to_string()).collect::<Vec<_>>();
+    let source = circuit(&format!("H {}\n", qubits.join(" ")));
+    let query: Vec<Flow> = vec!["X0 -> Z0".parse().expect("flow fixture")];
+    let budget = MemoryBudget::from_bytes(flow_row_bytes(400, 0));
+    let error = solve_for_flow_measurements(
+        &source,
+        &query,
+        &FlowMeasurementOptions {
+            memory_budget: budget,
+            ..FlowMeasurementOptions::default()
+        },
+    )
+    .expect_err("the elimination table exceeds the budget");
+    let limit = error
+        .resource_limit_error()
+        .unwrap_or_else(|| panic!("expected a typed budget refusal, got {error}"));
+    assert_eq!(limit.operation(), AnalysisOperation::FlowMeasurementSolving);
+    assert_eq!(limit.resource(), ResourceKind::ProjectedPayloadBytes);
+    assert_eq!(limit.limit(), budget.bytes());
+    assert!(limit.actual() > budget.bytes());
     assert_eq!(
-        pauli_before_circuit_with_options(&after, &wide, &walked),
-        Ok(pauli)
+        solve_for_flow_measurements(&source, &query, &FlowMeasurementOptions::default()),
+        Ok(vec![Some(Vec::new())])
     );
 }

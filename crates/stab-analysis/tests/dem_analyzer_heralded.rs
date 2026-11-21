@@ -9,14 +9,14 @@ use stab_model::{Circuit, Probability};
 
 fn approximate_options() -> ErrorAnalyzerOptions {
     ErrorAnalyzerOptions {
-        approximate_disjoint_errors_threshold: Some(Probability::try_new(1.0).unwrap()),
+        approximate_disjoint_errors: Some(Probability::try_new(1.0).unwrap()),
         ..ErrorAnalyzerOptions::default()
     }
 }
 
 fn analyze(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
-    circuit_to_detector_error_model(&circuit, approximate_options())
+    circuit_to_detector_error_model(&circuit, &approximate_options())
         .expect("analyze")
         .to_dem_string()
 }
@@ -25,8 +25,8 @@ fn analyze_with_threshold(text: &str, threshold: f64) -> AnalysisResult<String> 
     let circuit = Circuit::from_stim_str(text).expect("circuit");
     circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            approximate_disjoint_errors_threshold: Some(Probability::try_new(threshold).unwrap()),
+        &ErrorAnalyzerOptions {
+            approximate_disjoint_errors: Some(Probability::try_new(threshold).unwrap()),
             ..ErrorAnalyzerOptions::default()
         },
     )

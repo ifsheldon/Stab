@@ -9,7 +9,7 @@ use crate::{
     ResourceLimitError,
 };
 
-/// Options for [`circuit_to_tableau_with_options`].
+/// Options for [`circuit_to_tableau`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct CircuitToTableauOptions {
     /// Skip noise channels instead of refusing a circuit with nonzero noise.
@@ -24,26 +24,6 @@ pub struct CircuitToTableauOptions {
     pub cancellation: Cancellation,
 }
 
-/// Converts a unitary circuit into its Tableau, admitted against the default memory budget.
-///
-/// See [`circuit_to_tableau_with_options`].
-pub fn circuit_to_tableau(
-    circuit: &Circuit,
-    ignore_noise: bool,
-    ignore_measurement: bool,
-    ignore_reset: bool,
-) -> AnalysisResult<Tableau> {
-    circuit_to_tableau_with_options(
-        circuit,
-        &CircuitToTableauOptions {
-            ignore_noise,
-            ignore_measurement,
-            ignore_reset,
-            ..CircuitToTableauOptions::default()
-        },
-    )
-}
-
 /// Converts a unitary circuit into its Tableau.
 ///
 /// The Tableau's packed rows are admitted against the options' memory budget before
@@ -52,7 +32,7 @@ pub fn circuit_to_tableau(
 /// cancellation signal is polled before every composition and once per instruction. Runs of gates
 /// are appended through a [`TableauAppender`], so a one- or two-qubit gate costs `O(n / 64)` word
 /// operations, plus one `O(n^2 / 64)` transpose around each repeat block.
-pub fn circuit_to_tableau_with_options(
+pub fn circuit_to_tableau(
     circuit: &Circuit,
     options: &CircuitToTableauOptions,
 ) -> AnalysisResult<Tableau> {

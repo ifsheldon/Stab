@@ -4,19 +4,21 @@
     reason = "compatibility tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_analysis::{AnalysisError, ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_analysis::{
+    AnalysisError, ErrorAnalyzerOptions, LoopFolding, circuit_to_detector_error_model,
+};
 use stab_model::Circuit;
 
 fn analyze(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
-    circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+    circuit_to_detector_error_model(&circuit, &ErrorAnalyzerOptions::default())
         .expect("analyze")
         .to_dem_string()
 }
 
 fn analyze_error(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
-    circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+    circuit_to_detector_error_model(&circuit, &ErrorAnalyzerOptions::default())
         .expect_err("reject invalid analyzer circuit")
         .to_string()
 }
@@ -316,11 +318,15 @@ fn dem_analyzer_rejects_feedback_record_lookback_before_first_measurement() {
     ] {
         for (fold_loops, expected) in [(false, unfolded), (true, folded)] {
             let options = ErrorAnalyzerOptions {
-                fold_loops,
+                loops: if fold_loops {
+                    LoopFolding::Fold
+                } else {
+                    LoopFolding::Unroll
+                },
                 ..ErrorAnalyzerOptions::default()
             };
             let circuit = Circuit::from_stim_str(rejected).expect("rejected circuit");
-            let error = circuit_to_detector_error_model(&circuit, options.clone())
+            let error = circuit_to_detector_error_model(&circuit, &options)
                 .expect_err("lookback before the first measurement must be rejected");
             assert!(
                 matches!(error, AnalysisError::MeasurementRecordOutOfRange { .. }),
@@ -334,7 +340,7 @@ fn dem_analyzer_rejects_feedback_record_lookback_before_first_measurement() {
                 "{rejected:?} (fold_loops={fold_loops})"
             );
             let circuit = Circuit::from_stim_str(accepted).expect("accepted circuit");
-            let model = circuit_to_detector_error_model(&circuit, options)
+            let model = circuit_to_detector_error_model(&circuit, &options)
                 .expect("in-range feedback lookback must be accepted");
             assert_eq!(
                 model.to_dem_string(),

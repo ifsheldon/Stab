@@ -11,8 +11,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use num_complex::Complex32;
 use stab_algebra::{Endianness, Flow, Tableau};
 use stab_analysis::{
-    circuit_to_tableau, circuit_without_noise, decomposed_circuit, flattened_circuit, gate_flows,
-    gate_tableau, gate_unitary_matrix,
+    CircuitToTableauOptions, circuit_to_tableau, circuit_without_noise, decomposed_circuit,
+    flattened_circuit, gate_flows, gate_tableau, gate_unitary_matrix,
 };
 use stab_model::{Circuit, CircuitItem, Gate};
 
@@ -101,7 +101,7 @@ fn cq2_circuit_api_flattened_transform() {
          }\n",
     );
     assert_eq!(
-        flattened_circuit(&source)
+        flattened_circuit(&source, &Default::default())
             .expect("flatten")
             .to_stim_string(),
         concat!(
@@ -113,7 +113,11 @@ fn cq2_circuit_api_flattened_transform() {
         )
     );
     assert!(
-        flattened_circuit(&circuit("REPEAT 1000000000000 {\n    H 0\n}\n")).is_err(),
+        flattened_circuit(
+            &circuit("REPEAT 1000000000000 {\n    H 0\n}\n"),
+            &Default::default()
+        )
+        .is_err(),
         "materializing beyond the memory budget must fail"
     );
 }
@@ -326,7 +330,8 @@ fn cq2_gate_decomposition_metadata_contract() {
             .expect("unitary gate should have decomposition")
             .to_circuit();
         assert_eq!(
-            circuit_to_tableau(&decomposition, false, false, false).expect("decomposition tableau"),
+            circuit_to_tableau(&decomposition, &CircuitToTableauOptions::default())
+                .expect("decomposition tableau"),
             gate_tableau(gate).expect("gate tableau"),
             "{gate_name} decomposition should match gate tableau"
         );

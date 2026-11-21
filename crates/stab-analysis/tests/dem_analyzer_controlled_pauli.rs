@@ -3,19 +3,19 @@
     reason = "compatibility tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_analysis::{ErrorAnalyzerOptions, ErrorDecomposition, circuit_to_detector_error_model};
 use stab_model::Circuit;
 
 fn analyze(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
-    circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+    circuit_to_detector_error_model(&circuit, &ErrorAnalyzerOptions::default())
         .expect("analyze")
         .to_dem_string()
 }
 
 fn analyze_with_options(text: &str, options: ErrorAnalyzerOptions) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
-    circuit_to_detector_error_model(&circuit, options)
+    circuit_to_detector_error_model(&circuit, &options)
         .expect("analyze")
         .to_dem_string()
 }
@@ -127,7 +127,7 @@ fn dem_analyzer_composite_controlled_pauli_case_matches_upstream_subset() {
         DETECTOR rec[-1] rec[-7]
         ",
         ErrorAnalyzerOptions {
-            decompose_errors: true,
+            decomposition: Some(ErrorDecomposition::default()),
             ..ErrorAnalyzerOptions::default()
         },
     );

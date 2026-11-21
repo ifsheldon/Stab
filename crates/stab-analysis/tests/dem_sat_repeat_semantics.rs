@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 
 use stab_analysis::{
     AnalysisOperation, AnalysisResult, ResourceKind, SatMaterializationLimits,
-    likeliest_error_sat_problem, likeliest_error_sat_problem_with_limits,
+    likeliest_error_sat_problem,
 };
 use stab_model::DetectorErrorModel;
 
@@ -188,13 +188,16 @@ fn likeliest_wcnf_repeat_semantics_match_direct_exhaustion() -> AnalysisResult<(
                             detector_shift,
                             target,
                         );
-                        let compact_wcnf = likeliest_error_sat_problem_with_limits(
+                        let compact_wcnf = likeliest_error_sat_problem(
                             &dem(&compact),
                             QUANTIZATION,
-                            SatMaterializationLimits::default(),
+                            &SatMaterializationLimits::default(),
                         )?;
-                        let unrolled_wcnf =
-                            likeliest_error_sat_problem(&dem(&unrolled), QUANTIZATION)?;
+                        let unrolled_wcnf = likeliest_error_sat_problem(
+                            &dem(&unrolled),
+                            QUANTIZATION,
+                            &Default::default(),
+                        )?;
                         let expected = direct_optimum(&errors);
                         assert_eq!(
                             compact_wcnf, unrolled_wcnf,
@@ -219,10 +222,13 @@ fn likeliest_wcnf_repeat_semantics_match_direct_exhaustion() -> AnalysisResult<(
     assert_eq!(cases, 360);
 
     let shifted = dem("repeat 100001 {\n    error(0.1) L0\n    shift_detectors 1\n}\n");
-    let first_excess = likeliest_error_sat_problem_with_limits(
+    let first_excess = likeliest_error_sat_problem(
         &shifted,
         QUANTIZATION,
-        SatMaterializationLimits::default().with_max_repeat_iterations(100_000),
+        &SatMaterializationLimits {
+            max_repeat_iterations: 100_000,
+            ..SatMaterializationLimits::default()
+        },
     )
     .expect_err("the first aggregate repeat-iteration excess must reject");
     let resource = first_excess
@@ -233,12 +239,14 @@ fn likeliest_wcnf_repeat_semantics_match_direct_exhaustion() -> AnalysisResult<(
     assert_eq!(resource.actual(), 100_001);
     assert_eq!(resource.limit(), 100_000);
 
-    let admitted = likeliest_error_sat_problem_with_limits(
+    let admitted = likeliest_error_sat_problem(
         &shifted,
         QUANTIZATION,
-        SatMaterializationLimits::default()
-            .with_max_repeat_iterations(100_001)
-            .with_max_expanded_instructions(0),
+        &SatMaterializationLimits {
+            max_repeat_iterations: 100_001,
+            max_expanded_instructions: 0,
+            ..SatMaterializationLimits::default()
+        },
     )
     .expect_err("admitted expansion should reach the next aggregate limit");
     let resource = admitted

@@ -151,8 +151,10 @@ fn pfm_b3_folded_traversal_sat() {
              logical_observable L0\n\
          }\n");
     for error in [
-        shortest_error_sat_problem(&repeated).expect_err("folded SAT materialization limit"),
-        likeliest_error_sat_problem(&repeated, 100).expect_err("folded WCNF materialization limit"),
+        shortest_error_sat_problem(&repeated, &Default::default())
+            .expect_err("folded SAT materialization limit"),
+        likeliest_error_sat_problem(&repeated, 100, &Default::default())
+            .expect_err("folded WCNF materialization limit"),
     ] {
         let resource = error
             .resource_limit_error()
@@ -165,7 +167,8 @@ fn pfm_b3_folded_traversal_sat() {
 
     let neutral = dem("repeat 100001 {\n}\n");
     assert_eq!(
-        shortest_error_sat_problem(&neutral).expect("neutral SAT"),
-        shortest_error_sat_problem(&DetectorErrorModel::new()).expect("empty SAT reference")
+        shortest_error_sat_problem(&neutral, &Default::default()).expect("neutral SAT"),
+        shortest_error_sat_problem(&DetectorErrorModel::new(), &Default::default())
+            .expect("empty SAT reference")
     );
 }

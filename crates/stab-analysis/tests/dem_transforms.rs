@@ -34,7 +34,7 @@ fn dem_top_level_tags(model: &DetectorErrorModel) -> Vec<Option<&[u8]>> {
 fn pf4_dem_materialized_flattened_matches_pinned_stim_cases() {
     let empty = DetectorErrorModel::new();
     assert_eq!(
-        flattened_detector_error_model(&empty).expect("flatten empty"),
+        flattened_detector_error_model(&empty, &Default::default()).expect("flatten empty"),
         empty
     );
 
@@ -43,7 +43,7 @@ fn pf4_dem_materialized_flattened_matches_pinned_stim_cases() {
     )
     .expect("parse zero-count repeat");
     assert_eq!(
-        flattened_detector_error_model(&zero_repeat)
+        flattened_detector_error_model(&zero_repeat, &Default::default())
             .expect("flatten zero-count repeat")
             .to_dem_string(),
         ""
@@ -55,7 +55,7 @@ fn pf4_dem_materialized_flattened_matches_pinned_stim_cases() {
     )
     .expect("parse shifted DEM");
     assert_eq!(
-        flattened_detector_error_model(&shifted)
+        flattened_detector_error_model(&shifted, &Default::default())
             .expect("flatten shifted DEM")
             .to_dem_string(),
         "error(0.125) D5 ^ D6 L0\n",
@@ -72,7 +72,7 @@ fn pf4_dem_materialized_flattened_matches_pinned_stim_cases() {
     )
     .expect("parse coordinate DEM");
     assert_eq!(
-        flattened_detector_error_model(&coordinates)
+        flattened_detector_error_model(&coordinates, &Default::default())
             .expect("flatten coordinate DEM")
             .to_dem_string(),
         concat!(
@@ -94,7 +94,7 @@ fn pf4_dem_materialized_flattened_matches_pinned_stim_cases() {
     )
     .expect("parse repeated DEM");
     assert_eq!(
-        flattened_detector_error_model(&repeated)
+        flattened_detector_error_model(&repeated, &Default::default())
             .expect("flatten repeated DEM")
             .to_dem_string(),
         concat!(
@@ -195,7 +195,8 @@ fn pf4_dem_materialized_flattened_refuses_repeats_beyond_the_memory_budget() {
     )
     .expect("parse large repeat DEM");
 
-    let error = flattened_detector_error_model(&dem).expect_err("reject excessive flattening");
+    let error = flattened_detector_error_model(&dem, &Default::default())
+        .expect_err("reject excessive flattening");
 
     assert!(error.to_string().contains("memory budget"), "{error}");
 }
@@ -293,7 +294,7 @@ fn cq2_dem_materialized_transform_matrix_matches_stim() {
     );
     assert_eq!(from_iterator.to_dem_string(), expected);
     assert_eq!(
-        flattened_detector_error_model(&model)
+        flattened_detector_error_model(&model, &Default::default())
             .expect("materialized flattening")
             .to_dem_string(),
         expected
@@ -307,7 +308,7 @@ fn cq2_dem_materialized_transform_matrix_matches_stim() {
         .collect::<ModelResult<Vec<_>>>()
         .expect("bounded lazy prefix");
     assert_eq!(first.len(), 3);
-    assert!(flattened_detector_error_model(&huge).is_err());
+    assert!(flattened_detector_error_model(&huge, &Default::default()).is_err());
 
     // Rounding keeps tags and coordinates and rounds tiny probabilities to zero.
     let model = DetectorErrorModel::from_dem_str(
@@ -404,7 +405,8 @@ fn flattened_dem_preserves_opaque_tags_on_materialized_instructions() {
           shift_detectors[\xfc] 3\n\
           repeat[\xfe] 2 {\n    error[\xfd](0.25) D0 L1\n    detector[\xfb] D1\n    shift_detectors[\xfa] 2\n}\n",
     );
-    let flattened = flattened_detector_error_model(&model).expect("flatten tagged DEM");
+    let flattened =
+        flattened_detector_error_model(&model, &Default::default()).expect("flatten tagged DEM");
 
     assert_eq!(
         flattened.to_dem_bytes(),
@@ -449,7 +451,7 @@ fn pfm_b3_folded_traversal_transforms() {
     let stripped = detector_error_model_without_tags(&source).to_dem_string();
     assert!(stripped.starts_with("repeat 1000000000"), "{stripped}");
     assert!(!stripped.contains('['), "{stripped}");
-    let flatten_error = flattened_detector_error_model(&source)
+    let flatten_error = flattened_detector_error_model(&source, &Default::default())
         .expect_err("materialized flattening beyond the memory budget is refused");
     assert!(
         flatten_error.to_string().contains("memory budget"),

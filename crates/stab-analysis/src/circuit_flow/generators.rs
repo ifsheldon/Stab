@@ -25,7 +25,7 @@ use super::transitions::{ReverseFlowTransition, reverse_flow_transition};
 use resources::admit_flow_generator_rows;
 pub(crate) use resources::measurement_rich_flow_generator_projected_bytes;
 
-/// Options for [`circuit_flow_generators_with_options`].
+/// Options for [`circuit_flow_generators`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FlowGeneratorOptions {
     /// Budget for the owned flow rows, projected before they are built, and for the Tableau of a
@@ -38,14 +38,10 @@ pub struct FlowGeneratorOptions {
 
 /// Returns signed stabilizer-flow generators for supported tableau and measurement-rich circuits.
 ///
-/// Measurement-rich output is admitted by projected owned bytes, and compact repeats are traversed
-/// directly instead of first cloning an expanded circuit; expanded work is not capped.
-pub fn circuit_flow_generators(circuit: &Circuit) -> AnalysisResult<Vec<Flow>> {
-    circuit_flow_generators_with_options(circuit, &FlowGeneratorOptions::default())
-}
-
-/// Returns signed stabilizer-flow generators, polling the options' cancellation signal.
-pub fn circuit_flow_generators_with_options(
+/// Measurement-rich output is admitted by projected owned bytes against the options' memory
+/// budget, and compact repeats are traversed directly instead of first cloning an expanded
+/// circuit; expanded work is not capped but polls the options' cancellation signal.
+pub fn circuit_flow_generators(
     circuit: &Circuit,
     options: &FlowGeneratorOptions,
 ) -> AnalysisResult<Vec<Flow>> {
@@ -69,7 +65,7 @@ fn unitary_flow_generators(
 ) -> AnalysisResult<Vec<Flow>> {
     let qubit_count = circuit.simulated_qubit_count();
     admit_flow_generator_rows(qubit_count, 0, options.memory_budget)?;
-    let tableau = crate::circuit_to_tableau_with_options(
+    let tableau = crate::circuit_to_tableau(
         circuit,
         &crate::CircuitToTableauOptions {
             ignore_noise: true,

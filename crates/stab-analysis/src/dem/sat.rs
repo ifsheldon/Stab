@@ -112,7 +112,7 @@ fn preflight_sat_shape(
 
     let mut countdown = CancellationCountdown::new();
     for error in errors {
-        countdown.tick(limits.cancellation())?;
+        countdown.tick(&limits.cancellation)?;
         if !error_participates_in_constraints(mode, error.probability) {
             continue;
         }
@@ -120,7 +120,7 @@ fn preflight_sat_shape(
             soft_clause_count = checked_sat_add(soft_clause_count, 1, "soft clause count")?;
         }
         for target in &error.targets {
-            countdown.tick(limits.cancellation())?;
+            countdown.tick(&limits.cancellation)?;
             let seen = match target.kind() {
                 DemTargetKind::RelativeDetector(detector) => {
                     let slot = target_index.detector_slot(detector)?;
@@ -188,49 +188,34 @@ fn preflight_sat_shape(
     .validate(limits)
 }
 
-pub fn shortest_error_sat_problem(model: &DetectorErrorModel) -> AnalysisResult<String> {
-    shortest_error_sat_problem_with_limits(model, SatMaterializationLimits::default())
-}
-
 /// Generates an unweighted SAT problem under explicit traversal and materialization limits.
 ///
 /// # Errors
 ///
 /// Returns [`AnalysisError::Cancelled`] once the limits' cancellation signal is observed and
 /// [`AnalysisError::ResourceLimit`] when a limit is exceeded.
-pub fn shortest_error_sat_problem_with_limits(
+pub fn shortest_error_sat_problem(
     model: &DetectorErrorModel,
-    limits: SatMaterializationLimits,
+    limits: &SatMaterializationLimits,
 ) -> AnalysisResult<String> {
-    sat_problem_as_wcnf_string(model, SatProblemMode::Unweighted, &limits)
-}
-
-pub fn likeliest_error_sat_problem(
-    model: &DetectorErrorModel,
-    quantization: u32,
-) -> AnalysisResult<String> {
-    likeliest_error_sat_problem_with_limits(
-        model,
-        quantization,
-        SatMaterializationLimits::default(),
-    )
+    sat_problem_as_wcnf_string(model, SatProblemMode::Unweighted, limits)
 }
 
 /// Generates a weighted SAT problem under explicit traversal and materialization limits.
 ///
 /// # Errors
 ///
-/// Fails like [`shortest_error_sat_problem_with_limits`], and with
-/// [`AnalysisError::InvalidRequest`] when `quantization` is zero.
-pub fn likeliest_error_sat_problem_with_limits(
+/// Fails like [`shortest_error_sat_problem`], and with [`AnalysisError::InvalidRequest`] when
+/// `quantization` is zero.
+pub fn likeliest_error_sat_problem(
     model: &DetectorErrorModel,
     quantization: u32,
-    limits: SatMaterializationLimits,
+    limits: &SatMaterializationLimits,
 ) -> AnalysisResult<String> {
     if quantization < 1 {
         return Err(AnalysisRequestError::ZeroSatQuantization.into());
     }
-    sat_problem_as_wcnf_string(model, SatProblemMode::Weighted { quantization }, &limits)
+    sat_problem_as_wcnf_string(model, SatProblemMode::Weighted { quantization }, limits)
 }
 
 fn sat_problem_as_wcnf_string(
@@ -238,7 +223,7 @@ fn sat_problem_as_wcnf_string(
     mode: SatProblemMode,
     limits: &SatMaterializationLimits,
 ) -> AnalysisResult<String> {
-    limits.cancellation().check()?;
+    limits.cancellation.check()?;
     if model.count_observables()? == 0 || model.count_errors()? == 0 {
         return unsat_wdimacs(limits);
     }
@@ -246,7 +231,7 @@ fn sat_problem_as_wcnf_string(
     if errors.is_empty() {
         return unsat_wdimacs(limits);
     }
-    let target_index = SatTargetIndex::from_errors(&errors, limits.cancellation())?;
+    let target_index = SatTargetIndex::from_errors(&errors, &limits.cancellation)?;
     if target_index.observable_to_slot.is_empty() {
         return unsat_wdimacs(limits);
     }
@@ -266,14 +251,14 @@ fn sat_problem_as_wcnf_string(
         })?;
     let mut countdown = CancellationCountdown::new();
     for _ in &errors {
-        countdown.tick(limits.cancellation())?;
+        countdown.tick(&limits.cancellation)?;
         errors_activated.push(instance.new_bool()?);
     }
 
     let mut detectors_activated = vec![BoolRef::false_ref(); target_index.detector_to_slot.len()];
     let mut observables_flipped = vec![BoolRef::false_ref(); target_index.observable_to_slot.len()];
     for (error_index, error) in errors.iter().enumerate() {
-        countdown.tick(limits.cancellation())?;
+        countdown.tick(&limits.cancellation)?;
         let error_ref = errors_activated.get(error_index).copied().ok_or_else(|| {
             AnalysisError::internal(
                 AnalysisOperation::SatMaterialization,
@@ -288,7 +273,7 @@ fn sat_problem_as_wcnf_string(
                 &target_index,
                 &mut detectors_activated,
                 &mut observables_flipped,
-                limits.cancellation(),
+                &limits.cancellation,
                 &mut countdown,
             )?;
         }
@@ -296,7 +281,7 @@ fn sat_problem_as_wcnf_string(
     }
 
     for detector in detectors_activated {
-        countdown.tick(limits.cancellation())?;
+        countdown.tick(&limits.cancellation)?;
         if detector.variable_index().is_some() {
             instance.add_clause(Clause::hard(vec![detector.not()]))?;
         }
@@ -304,7 +289,7 @@ fn sat_problem_as_wcnf_string(
 
     let mut observable_clause_vars = Vec::new();
     for observable in observables_flipped {
-        countdown.tick(limits.cancellation())?;
+        countdown.tick(&limits.cancellation)?;
         if observable.variable_index().is_some() {
             observable_clause_vars.push(observable);
         }
@@ -318,7 +303,7 @@ fn unsat_wdimacs(limits: &SatMaterializationLimits) -> AnalysisResult<String> {
     validate_limit(
         SatMaterializationResource::OutputBytes,
         UNSAT_WDIMACS.len(),
-        limits.max_output_bytes(),
+        limits.max_output_bytes,
     )?;
     Ok(UNSAT_WDIMACS.to_owned())
 }
@@ -501,11 +486,11 @@ impl SatErrorVisitor<'_> {
                     "DEM SAT problem generation expanded instruction count overflowed",
                 )
             })?;
-        if next > self.limits.max_expanded_instructions() {
+        if next > self.limits.max_expanded_instructions {
             return Err(ResourceLimitError::sat_materialization(
                 SatMaterializationResource::ExpandedInstructions,
                 next,
-                self.limits.max_expanded_instructions(),
+                self.limits.max_expanded_instructions,
             )
             .into());
         }
@@ -525,12 +510,12 @@ impl SatErrorVisitor<'_> {
                 "SAT error mechanism count overflowed",
             )
         })?;
-        if next_error_count > self.limits.max_error_mechanisms() {
+        if next_error_count > self.limits.max_error_mechanisms {
             return Err(ResourceLimitError::sat_materialization(
                 SatMaterializationResource::ErrorMechanisms,
                 sat_resource_amount(next_error_count, "SAT error mechanism count")?,
                 sat_resource_amount(
-                    self.limits.max_error_mechanisms(),
+                    self.limits.max_error_mechanisms,
                     "SAT error mechanism limit",
                 )?,
             )
@@ -550,12 +535,12 @@ impl SatErrorVisitor<'_> {
                     "SAT target occurrence count overflowed",
                 )
             })?;
-        if next_target_occurrences > self.limits.max_target_occurrences() {
+        if next_target_occurrences > self.limits.max_target_occurrences {
             return Err(ResourceLimitError::sat_materialization(
                 SatMaterializationResource::TargetOccurrences,
                 sat_resource_amount(next_target_occurrences, "SAT target occurrence count")?,
                 sat_resource_amount(
-                    self.limits.max_target_occurrences(),
+                    self.limits.max_target_occurrences,
                     "SAT target occurrence limit",
                 )?,
             )
@@ -591,7 +576,7 @@ impl FoldedDemVisitor for SatErrorVisitor<'_> {
         instruction: &DemInstruction,
         state: &DemTraversalState,
     ) -> AnalysisResult<ControlFlow<()>> {
-        self.countdown.tick(self.limits.cancellation())?;
+        self.countdown.tick(&self.limits.cancellation)?;
         match instruction.view() {
             DemInstructionView::Error {
                 probability,
@@ -618,13 +603,13 @@ impl FoldedDemVisitor for SatErrorVisitor<'_> {
             return Ok(DemRepeatSelection::Skip);
         }
         Ok(DemRepeatSelection::Expand {
-            max_total_iterations: self.limits.max_repeat_iterations(),
+            max_total_iterations: self.limits.max_repeat_iterations,
             context: "SAT problem generation",
         })
     }
 
     fn poll_cancellation(&mut self) -> AnalysisResult<()> {
-        Ok(self.countdown.tick(self.limits.cancellation())?)
+        Ok(self.countdown.tick(&self.limits.cancellation)?)
     }
 
     fn repeat_expansion_limit_error(

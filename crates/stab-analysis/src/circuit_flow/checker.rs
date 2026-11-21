@@ -13,7 +13,7 @@ use super::check_algorithm::{FlowCheckAlgorithm, FlowCheckCost};
 use super::verdict::{FlowVerdict, FlowViolation};
 use crate::{
     AnalysisError, AnalysisOperation, AnalysisResult, CircuitToTableauOptions, ResourceKind,
-    ResourceLimitError, circuit_to_tableau_with_options,
+    ResourceLimitError, circuit_to_tableau,
     folded_walk::walk_folded,
     sparse_rev_frame_tracker::{AnticommutationPolicy, SparseReverseFrameTracker},
 };
@@ -178,7 +178,7 @@ fn dense_flow_tableau(
         cancellation: options.cancellation.clone(),
         ..CircuitToTableauOptions::default()
     };
-    match circuit_to_tableau_with_options(circuit, &tableau_options) {
+    match circuit_to_tableau(circuit, &tableau_options) {
         Ok(tableau) => Ok(Some(tableau)),
         Err(AnalysisError::Cancelled(cancelled)) => Err(cancelled.into()),
         Err(_) => Ok(None),

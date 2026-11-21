@@ -1,10 +1,22 @@
 use stab_algebra::{Flow, PauliBasis, PauliString};
-use stab_model::Circuit;
+use stab_model::advanced::CancellationCountdown;
+use stab_model::{Cancellation, Circuit, MemoryBudget};
 
-use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisRequestError, AnalysisResult};
+use crate::{AnalysisOperation, FlowGeneratorOptions, ResourceKind, ResourceLimitError};
 
 use super::circuit_flow_generators;
+
+/// Options of [`solve_for_flow_measurements`].
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct FlowMeasurementOptions {
+    /// Budget for the circuit's flow generators, admitted as by [`FlowGeneratorOptions`], and
+    /// separately for the solver's elimination table and solutions, projected before they are
+    /// built.
+    pub memory_budget: MemoryBudget,
+    /// Signal polled while the flow generators are computed and once per row reduction step.
+    pub cancellation: Cancellation,
+}
 
 /// Finds measurement indices that explain each queried unsigned stabilizer flow.
 ///
@@ -15,16 +27,24 @@ use super::circuit_flow_generators;
 /// to match Stim's internal pre-canonicalization tie break. Like Stim v1.16.0, this operation solves
 /// only each query's input and output Pauli projection; measurement and observable terms already
 /// present on a query are not constraints on the returned parity.
+///
+/// # Errors
+///
+/// Returns [`AnalysisError::Cancelled`] once the options' signal is observed and
+/// [`AnalysisError::ResourceLimit`] when the generators or the elimination table exceed the
+/// options' memory budget.
 pub fn solve_for_flow_measurements(
     circuit: &Circuit,
     flows: &[Flow],
+    options: &FlowMeasurementOptions,
 ) -> AnalysisResult<Vec<Option<Vec<i32>>>> {
+    options.cancellation.check()?;
     validate_non_empty_flow_queries(flows)?;
     if flows.is_empty() {
         return Ok(Vec::new());
     }
 
-    solve_with_generator_rows(circuit, flows)
+    solve_with_generator_rows(circuit, flows, options)
 }
 
 fn validate_non_empty_flow_queries(flows: &[Flow]) -> AnalysisResult<()> {
@@ -39,10 +59,28 @@ fn validate_non_empty_flow_queries(flows: &[Flow]) -> AnalysisResult<()> {
 fn solve_with_generator_rows(
     circuit: &Circuit,
     flows: &[Flow],
+    options: &FlowMeasurementOptions,
 ) -> AnalysisResult<Vec<Option<Vec<i32>>>> {
-    let generators = circuit_flow_generators(circuit)?;
+    let generators = circuit_flow_generators(
+        circuit,
+        &FlowGeneratorOptions {
+            memory_budget: options.memory_budget,
+            cancellation: options.cancellation.clone(),
+        },
+    )?;
     let qubit_count = solved_qubit_count(circuit, flows, &generators);
+    admit_solver_storage(
+        circuit,
+        qubit_count,
+        generators.len(),
+        flows.len(),
+        options.memory_budget,
+    )?;
     let vector_len = qubit_count.saturating_mul(4);
+    let mut reduction = Reduction {
+        cancellation: &options.cancellation,
+        countdown: CancellationCountdown::new(),
+    };
     let mut basis = vec![None; vector_len];
     let mut zero_measurement_rows = Vec::new();
     for generator in generators {
@@ -50,28 +88,80 @@ fn solve_with_generator_rows(
             vector: flow_pauli_vector(&generator, qubit_count),
             measurements: generator.measurements().collect(),
         };
-        add_basis_row(row, &mut basis, &mut zero_measurement_rows)?;
+        add_basis_row(row, &mut basis, &mut zero_measurement_rows, &mut reduction)?;
     }
 
-    let results = flows
-        .iter()
-        .map(|flow| {
-            let mut row = SolveRow {
-                vector: flow_pauli_vector(flow, qubit_count),
-                measurements: Vec::new(),
-            };
-            eliminate_implicit_idle_suffix(
-                &mut row.vector,
-                circuit.simulated_qubit_count(),
-                qubit_count,
-            );
-            reduce_row(&mut row, &basis);
+    let mut results = Vec::with_capacity(flows.len());
+    for flow in flows {
+        let mut row = SolveRow {
+            vector: flow_pauli_vector(flow, qubit_count),
+            measurements: Vec::new(),
+        };
+        eliminate_implicit_idle_suffix(
+            &mut row.vector,
+            circuit.simulated_qubit_count(),
+            qubit_count,
+        );
+        reduction.reduce(&mut row, &basis)?;
+        results.push(
             row.is_zero().then(|| {
                 reduce_measurements_with_zero_rows(row.measurements, &zero_measurement_rows)
-            })
-        })
-        .collect();
+            }),
+        );
+    }
     Ok(results)
+}
+
+/// Admits the elimination table and the solutions before they are built: one basis slot per
+/// vector bit, and for every generator row and every query a bit vector and at most one
+/// measurement index per circuit measurement. The generators themselves are admitted separately
+/// by [`circuit_flow_generators`].
+fn admit_solver_storage(
+    circuit: &Circuit,
+    qubit_count: usize,
+    generator_rows: usize,
+    queries: usize,
+    budget: MemoryBudget,
+) -> AnalysisResult<()> {
+    let vector_len = (qubit_count as u128).saturating_mul(4);
+    let measurements = u128::from(circuit.count_measurements()?);
+    let slot_bytes = vector_len.saturating_mul(size_of::<Option<SolveRow>>() as u128);
+    let row_bytes = (size_of::<SolveRow>() as u128)
+        .saturating_add(vector_len)
+        .saturating_add(measurements.saturating_mul(size_of::<i32>() as u128));
+    let rows = (generator_rows as u128).saturating_add(queries as u128);
+    budget
+        .admit(slot_bytes.saturating_add(rows.saturating_mul(row_bytes)))
+        .map_err(|exceeded| {
+            ResourceLimitError::budget_refusal(
+                AnalysisOperation::FlowMeasurementSolving,
+                ResourceKind::ProjectedPayloadBytes,
+                exceeded,
+            )
+            .into()
+        })
+}
+
+/// Row reduction against the basis, polling the cancellation signal once per row operation.
+struct Reduction<'a> {
+    cancellation: &'a Cancellation,
+    countdown: CancellationCountdown,
+}
+
+impl Reduction<'_> {
+    fn reduce(&mut self, row: &mut SolveRow, basis: &[Option<SolveRow>]) -> AnalysisResult<()> {
+        let mut pivot = 0;
+        while pivot < row.vector.len() {
+            if row.vector.get(pivot).copied().unwrap_or(false)
+                && let Some(Some(basis_row)) = basis.get(pivot)
+            {
+                self.countdown.tick(self.cancellation)?;
+                row.xor_assign(basis_row);
+            }
+            pivot += 1;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -101,8 +191,9 @@ fn add_basis_row(
     mut row: SolveRow,
     basis: &mut [Option<SolveRow>],
     zero_measurement_rows: &mut Vec<Vec<i32>>,
+    reduction: &mut Reduction<'_>,
 ) -> AnalysisResult<()> {
-    reduce_row(&mut row, basis);
+    reduction.reduce(&mut row, basis)?;
     if row.is_zero() {
         if !row.measurements.is_empty() {
             zero_measurement_rows.push(row.measurements);
@@ -119,18 +210,6 @@ fn add_basis_row(
         *slot = Some(row);
     }
     Ok(())
-}
-
-fn reduce_row(row: &mut SolveRow, basis: &[Option<SolveRow>]) {
-    let mut pivot = 0;
-    while pivot < row.vector.len() {
-        if row.vector.get(pivot).copied().unwrap_or(false)
-            && let Some(Some(basis_row)) = basis.get(pivot)
-        {
-            row.xor_assign(basis_row);
-        }
-        pivot += 1;
-    }
 }
 
 fn reduce_measurements_with_zero_rows(

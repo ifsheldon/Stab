@@ -4,7 +4,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use serde::Deserialize;
-use stab_analysis::{TimeReversedForFlowsOptions, circuit_time_reversed_for_flows_with_options};
+use stab_analysis::{TimeReversedForFlowsOptions, circuit_time_reversed_for_flows};
 use stab_core::Flow;
 
 use super::{FixtureError, FixtureRow, parse_core_circuit};
@@ -42,10 +42,10 @@ pub(super) fn core_time_reverse_flows_output(
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let reversed = circuit_time_reversed_for_flows_with_options(
+    let reversed = circuit_time_reversed_for_flows(
         &circuit,
         &flows,
-        TimeReversedForFlowsOptions {
+        &TimeReversedForFlowsOptions {
             dont_turn_measurements_into_resets: case.dont_turn_measurements_into_resets,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),

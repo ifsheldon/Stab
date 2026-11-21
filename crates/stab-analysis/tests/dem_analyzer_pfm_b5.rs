@@ -5,7 +5,10 @@
     reason = "integration parity tests use fixed generated cases and direct invariant diagnostics"
 )]
 
-use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_analysis::{
+    ErrorAnalyzerOptions, ErrorDecomposition, GaugeDetectors, LoopFolding, RemnantEdges,
+    circuit_to_detector_error_model,
+};
 use stab_model::{
     Circuit, DemInstruction, DemInstructionKind, DemItem, DemTargetKind, DetectorErrorModel,
 };
@@ -82,7 +85,7 @@ fn assert_gauge_loop() {
         analyze(
             GAUGE_CIRCUIT,
             ErrorAnalyzerOptions {
-                allow_gauge_detectors: true,
+                gauge_detectors: GaugeDetectors::Allow,
                 ..ErrorAnalyzerOptions::default()
             },
         )
@@ -96,7 +99,7 @@ fn assert_nested_gauge_loop() {
         analyze(
             NESTED_GAUGE_CIRCUIT,
             ErrorAnalyzerOptions {
-                allow_gauge_detectors: true,
+                gauge_detectors: GaugeDetectors::Allow,
                 ..ErrorAnalyzerOptions::default()
             },
         )
@@ -127,8 +130,10 @@ fn assert_repetition_code_loop() {
     let actual = analyze(
         REPETITION_CIRCUIT,
         ErrorAnalyzerOptions {
-            decompose_errors: true,
-            block_decomposition_from_introducing_remnant_edges: true,
+            decomposition: Some(ErrorDecomposition {
+                remnant_edges: RemnantEdges::Block,
+                ..Default::default()
+            }),
             ..ErrorAnalyzerOptions::default()
         },
     );
@@ -235,9 +240,13 @@ fn analyze_with_fold(
     mut options: ErrorAnalyzerOptions,
     fold_loops: bool,
 ) -> DetectorErrorModel {
-    options.fold_loops = fold_loops;
+    options.loops = if fold_loops {
+        LoopFolding::Fold
+    } else {
+        LoopFolding::Unroll
+    };
     let circuit = Circuit::from_stim_str(text).expect("valid analyzer fixture");
-    circuit_to_detector_error_model(&circuit, options).expect("folded detector error model")
+    circuit_to_detector_error_model(&circuit, &options).expect("folded detector error model")
 }
 
 fn assert_folded_matches_unrolled(text: &str, options: ErrorAnalyzerOptions) {

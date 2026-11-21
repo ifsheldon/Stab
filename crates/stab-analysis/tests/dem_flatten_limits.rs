@@ -5,16 +5,18 @@
 )]
 
 use stab_analysis::{
-    AnalysisOperation, AnalysisResult, DemFlattenLimits, ResourceKind,
-    flattened_detector_error_model, flattened_detector_error_model_with_limits,
+    AnalysisOperation, DemFlattenOptions, ResourceKind, flattened_detector_error_model,
 };
 use stab_model::{
     DemInstruction, DemItem, DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel,
     MemoryBudget,
 };
 
-fn budget(bytes: u64) -> DemFlattenLimits {
-    DemFlattenLimits::default().with_memory_budget(MemoryBudget::from_bytes(bytes))
+fn budget(bytes: u64) -> DemFlattenOptions {
+    DemFlattenOptions {
+        memory_budget: MemoryBudget::from_bytes(bytes),
+        ..DemFlattenOptions::default()
+    }
 }
 
 fn nested_repeat_model() -> DetectorErrorModel {
@@ -48,15 +50,15 @@ fn materialized_bytes_admit_the_exact_budget_and_reject_the_first_excess_before_
         * (std::mem::size_of::<DemItem>()
             + std::mem::size_of::<DemTarget>()
             + std::mem::size_of::<f64>()) as u64;
-    let flattened = flattened_detector_error_model_with_limits(&model, budget(exact_bytes))
+    let flattened = flattened_detector_error_model(&model, &budget(exact_bytes))
         .expect("the exact budget materializes");
     assert_eq!(flattened.items().len(), 6);
 
     let mut rejected = None;
     let measured = allocation_counter::measure(|| {
-        rejected = Some(flattened_detector_error_model_with_limits(
+        rejected = Some(flattened_detector_error_model(
             &model,
-            budget(exact_bytes - 1),
+            &budget(exact_bytes - 1),
         ));
     });
     let error = rejected
@@ -85,7 +87,7 @@ fn repeat_counts_above_the_retired_caps_flatten_within_the_budget() {
     )
     .expect("parse repeat above the retired per-block cap");
     assert_eq!(
-        flattened_detector_error_model(&model)
+        flattened_detector_error_model(&model, &Default::default())
             .expect("expansion within the default budget")
             .items()
             .len(),
@@ -98,7 +100,7 @@ fn repeat_counts_above_the_retired_caps_flatten_within_the_budget() {
          }\n",
     )
     .expect("parse hostile compact repeat");
-    let error = flattened_detector_error_model(&hostile)
+    let error = flattened_detector_error_model(&hostile, &Default::default())
         .expect_err("a compact repeat far beyond the budget is refused before allocation");
     assert_eq!(
         error
@@ -116,7 +118,7 @@ fn caller_raised_budget_cannot_exceed_platform_materialization_capacity() {
         single_error_model(),
         None,
     ));
-    let error = flattened_detector_error_model_with_limits(&model, budget(u64::MAX))
+    let error = flattened_detector_error_model(&model, &budget(u64::MAX))
         .expect_err("platform vector capacity must reject before allocation");
     let resource = error
         .resource_limit_error()
@@ -143,7 +145,7 @@ fn repeat_multiplier_overflow_is_rejected_before_materialization() {
     model.push_repeat_block(DemRepeatBlock::new(DemRepeatCount::new(2), inner, None));
     let original = model.clone();
 
-    let error = flattened_detector_error_model_with_limits(&model, budget(u64::MAX))
+    let error = flattened_detector_error_model(&model, &budget(u64::MAX))
         .expect_err("reject repeat multiplier overflow");
 
     assert_eq!(
@@ -165,31 +167,11 @@ fn repeat_nesting_remains_a_fixed_non_configurable_invariant() {
         model = outer;
     }
 
-    let error = flattened_detector_error_model_with_limits(&model, budget(u64::MAX))
+    let error = flattened_detector_error_model(&model, &budget(u64::MAX))
         .expect_err("resource policy must not relax repeat nesting");
 
     assert_eq!(
         error.to_string(),
         "invalid detector error model: DEM flattened repeat nesting exceeds current limit 256"
     );
-}
-
-#[test]
-fn default_entry_points_are_equivalent() -> AnalysisResult<()> {
-    let model = nested_repeat_model();
-    let free = flattened_detector_error_model(&model)?;
-    let explicit_defaults =
-        flattened_detector_error_model_with_limits(&model, DemFlattenLimits::default())?;
-
-    assert_eq!(free, explicit_defaults);
-    assert_eq!(
-        DemFlattenLimits::default().memory_budget(),
-        MemoryBudget::DEFAULT
-    );
-    assert_eq!(
-        model,
-        nested_repeat_model(),
-        "flattening must not mutate its source"
-    );
-    Ok(())
 }

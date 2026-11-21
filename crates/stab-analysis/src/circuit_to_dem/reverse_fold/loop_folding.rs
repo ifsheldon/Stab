@@ -7,6 +7,7 @@ use stab_model::{
 
 use super::ReverseFoldAnalyzer;
 use crate::AnalysisOperation;
+use crate::LoopFolding;
 use crate::sparse_rev_frame_tracker::SparseReverseFrameTracker;
 use crate::{AnalysisError, AnalysisResult};
 
@@ -38,7 +39,7 @@ impl<'c> ReverseFoldAnalyzer<'c> {
         if iterations == 0 {
             return Ok(());
         }
-        if !self.options.fold_loops {
+        if self.options.loops == LoopFolding::Unroll {
             return self.undo_loop_by_unrolling(body, iterations);
         }
 

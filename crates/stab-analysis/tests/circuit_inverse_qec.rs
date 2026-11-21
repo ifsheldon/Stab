@@ -8,8 +8,7 @@ use std::str::FromStr;
 use stab_algebra::Flow;
 use stab_analysis::{
     InverseQecOptions, TimeReversedForFlowsOptions, circuit_inverse_qec,
-    circuit_inverse_qec_with_options, circuit_time_reversed_for_flows,
-    circuit_time_reversed_for_flows_with_options,
+    circuit_time_reversed_for_flows,
 };
 use stab_model::Circuit;
 
@@ -105,7 +104,7 @@ fn inverse_qec_common_semantic_matrix_matches_stim() {
 
     for (name, input, expected) in cases {
         assert_eq!(
-            circuit_inverse_qec(&circuit(input)).expect(name),
+            circuit_inverse_qec(&circuit(input), &Default::default()).expect(name),
             circuit(expected),
             "{name}"
         );
@@ -118,13 +117,13 @@ fn inverse_qec_keep_measurements_uses_the_general_reverse_flow_contract() {
     let expected = circuit("MX 0\nH 0\nM 0\nDETECTOR rec[-2] rec[-1]\n");
 
     assert_eq!(
-        circuit_inverse_qec_with_options(
+        circuit_inverse_qec(
             &input,
-            InverseQecOptions {
+            &InverseQecOptions {
                 keep_measurements: true,
                 memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
-            },
+            }
         )
         .expect("inverse mixed QEC circuit while retaining measurements"),
         expected
@@ -134,7 +133,7 @@ fn inverse_qec_keep_measurements_uses_the_general_reverse_flow_contract() {
 #[test]
 fn inverse_qec_rejects_anticommuting_measure_reset() {
     let input = circuit("R 0\nMX 0\nMR 0\nDETECTOR rec[-1]\n");
-    let error = circuit_inverse_qec(&input)
+    let error = circuit_inverse_qec(&input, &Default::default())
         .expect_err("anticommuting reset, measurement, and measure-reset packet")
         .to_string();
     assert!(error.contains("anti-commuted"), "{error}");
@@ -206,7 +205,8 @@ fn time_reversal_for_flows_common_semantic_matrix_matches_stim() {
         ),
     ];
     for (name, input, expected) in empty_flow_cases {
-        let (actual, flows) = circuit_time_reversed_for_flows(&circuit(input), &[]).expect(name);
+        let (actual, flows) =
+            circuit_time_reversed_for_flows(&circuit(input), &[], &Default::default()).expect(name);
         assert_eq!(actual, circuit(expected), "{name}");
         assert!(flows.is_empty(), "{name}");
     }
@@ -275,7 +275,8 @@ fn time_reversal_for_flows_common_semantic_matrix_matches_stim() {
             .map(|text| flow(text))
             .collect::<Vec<_>>();
         let (actual, actual_flows) =
-            circuit_time_reversed_for_flows(&circuit(input), &input_flows).expect(name);
+            circuit_time_reversed_for_flows(&circuit(input), &input_flows, &Default::default())
+                .expect(name);
         assert_eq!(actual, circuit(expected), "{name}");
         assert_eq!(
             actual_flows,
@@ -389,7 +390,8 @@ fn circuit_inverse_qec_supports_measure_reset_pass_through_detector_flow() {
         let expected = circuit(expected_text);
 
         assert_eq!(
-            circuit_inverse_qec(&input).expect("inverse measure-reset pass-through"),
+            circuit_inverse_qec(&input, &Default::default())
+                .expect("inverse measure-reset pass-through"),
             expected,
             "{input_text}"
         );
@@ -428,7 +430,8 @@ fn circuit_inverse_qec_simplifies_measure_reset_pass_through_detector_parity() {
         let expected = circuit(expected_text);
 
         assert_eq!(
-            circuit_inverse_qec(&input).expect("inverse measure-reset detector parity"),
+            circuit_inverse_qec(&input, &Default::default())
+                .expect("inverse measure-reset detector parity"),
             expected,
             "{input_text}"
         );
@@ -839,8 +842,7 @@ fn time_reversed_for_flows_matches_stim_and_reversed_flows_hold() {
             cancellation: stab_model::Cancellation::never(),
         };
         let (actual, actual_flows) =
-            circuit_time_reversed_for_flows_with_options(&circuit(input), &input_flows, options)
-                .expect(name);
+            circuit_time_reversed_for_flows(&circuit(input), &input_flows, &options).expect(name);
         assert_eq!(actual_flows.len(), input_flows.len(), "{name}");
         assert!(
             flow_holds(&actual, &actual_flows)
@@ -869,7 +871,8 @@ fn time_reversed_for_flows_rejects_flows_the_input_does_not_satisfy() {
     assert!(
         circuit_time_reversed_for_flows(
             &circuit("REPEAT 1001 {\n    SWAP 0 1\n}\n"),
-            &[flow("X0 -> X1")]
+            &[flow("X0 -> X1")],
+            &Default::default()
         )
         .is_ok()
     );
@@ -908,9 +911,10 @@ fn time_reversed_for_flows_rejects_flows_the_input_does_not_satisfy() {
             .iter()
             .map(|text| flow(text))
             .collect::<Vec<_>>();
-        let error = circuit_time_reversed_for_flows(&circuit(input), &input_flows)
-            .expect_err(name)
-            .to_string();
+        let error =
+            circuit_time_reversed_for_flows(&circuit(input), &input_flows, &Default::default())
+                .expect_err(name)
+                .to_string();
         assert!(error.contains(expected_error), "{name}: {error}");
     }
 }
@@ -922,7 +926,7 @@ fn inverse_qec_rejects_negative_zero_record_offsets() {
         "R 0\nM 0\nMR 0\nDETECTOR rec[-0]\n",
     ] {
         assert!(
-            circuit_inverse_qec(&circuit(circuit_text)).is_err(),
+            circuit_inverse_qec(&circuit(circuit_text), &Default::default()).is_err(),
             "{circuit_text}"
         );
     }
@@ -931,8 +935,9 @@ fn inverse_qec_rejects_negative_zero_record_offsets() {
 #[test]
 fn time_reversed_for_flows_general_engine_preserves_noisy_measurements() {
     let input = circuit("M(0.125) 0\n");
-    let (inverse, flows) = circuit_time_reversed_for_flows(&input, &[flow("Z0 -> rec[-1]")])
-        .expect("reverse noisy measurement flow");
+    let (inverse, flows) =
+        circuit_time_reversed_for_flows(&input, &[flow("Z0 -> rec[-1]")], &Default::default())
+            .expect("reverse noisy measurement flow");
 
     assert_eq!(inverse, input);
     assert_eq!(flows, vec![flow("1 -> Z0 xor rec[-1]")]);
@@ -949,9 +954,12 @@ fn time_reversed_for_flows_preserves_duplicate_reset_semantics() {
         ("MRY 0 0\n", "1 -> Y0", "Y0 -> rec[-2]"),
         ("MR 0 1 0\n", "1 -> Z0*Z1", "Z0*Z1 -> rec[-3] xor rec[-2]"),
     ] {
-        let (inverse, reversed_flows) =
-            circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
-                .expect("reverse duplicate reset semantics");
+        let (inverse, reversed_flows) = circuit_time_reversed_for_flows(
+            &circuit(circuit_text),
+            &[flow(input_flow)],
+            &Default::default(),
+        )
+        .expect("reverse duplicate reset semantics");
         assert_eq!(reversed_flows, vec![flow(expected_flow)], "{circuit_text}");
         assert!(
             flow_holds(&inverse, &reversed_flows)
@@ -967,6 +975,7 @@ fn time_reversed_for_flows_rejects_observable_dependencies_before_expansion() {
     let error = circuit_time_reversed_for_flows(
         &circuit("REPEAT 1000001 {\nR 0\n}\n"),
         &[flow("1 -> Z0 xor obs[7]")],
+        &Default::default(),
     )
     .expect_err("reject under-specified observable reversal")
     .to_string();
@@ -981,21 +990,29 @@ fn time_reversed_for_flows_rejects_observable_dependencies_before_expansion() {
     )
     .expect("canonical cancelled observable terms");
     assert!(
-        circuit_time_reversed_for_flows(&Circuit::new(), &[cancelled]).is_ok(),
+        circuit_time_reversed_for_flows(&Circuit::new(), &[cancelled], &Default::default()).is_ok(),
         "cancelled observable terms do not survive the Flow boundary"
     );
 
-    let error = circuit_time_reversed_for_flows(&circuit("R 0\n"), &[flow("1 -> Z0 xor rec[0]")])
-        .expect_err("reset flow cannot reference a nonexistent measurement")
-        .to_string();
+    let error = circuit_time_reversed_for_flows(
+        &circuit("R 0\n"),
+        &[flow("1 -> Z0 xor rec[0]")],
+        &Default::default(),
+    )
+    .expect_err("reset flow cannot reference a nonexistent measurement")
+    .to_string();
     assert!(error.contains("out of range measurement"), "{error}");
 }
 
 #[test]
 fn time_reversed_for_flows_accepts_and_normalizes_signed_inputs_like_stim() {
     for signed in ["-X -> X", "X -> -X"] {
-        let (_, reversed) = circuit_time_reversed_for_flows(&circuit("I 0\n"), &[flow(signed)])
-            .expect("signed flow is validated without its sign");
+        let (_, reversed) = circuit_time_reversed_for_flows(
+            &circuit("I 0\n"),
+            &[flow(signed)],
+            &Default::default(),
+        )
+        .expect("signed flow is validated without its sign");
         assert_eq!(reversed, [flow("X -> X")], "{signed}");
     }
 }

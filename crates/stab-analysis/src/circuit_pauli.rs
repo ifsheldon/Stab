@@ -8,11 +8,10 @@ use stab_model::{
 use crate::instruction_shape;
 use crate::{
     AnalysisError, AnalysisOperation, AnalysisRequestError, AnalysisResult,
-    CircuitToTableauOptions, PauliCollapse, ResourceKind, ResourceLimitError,
-    circuit_to_tableau_with_options,
+    CircuitToTableauOptions, PauliCollapse, ResourceKind, ResourceLimitError, circuit_to_tableau,
 };
 
-/// Options for [`pauli_after_circuit_with_options`] and [`pauli_before_circuit_with_options`].
+/// Options for [`pauli_after_circuit`] and [`pauli_before_circuit`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct PauliConjugationOptions {
     /// Budget for the circuit's Tableau and the conjugated Pauli string. A Tableau the budget
@@ -20,13 +19,6 @@ pub struct PauliConjugationOptions {
     pub memory_budget: MemoryBudget,
     /// Signal polled once per folded item, Tableau composition, and expanded instruction.
     pub cancellation: Cancellation,
-}
-
-/// Returns the Pauli observable after the circuit under the default memory budget.
-///
-/// See [`pauli_after_circuit_with_options`].
-pub fn pauli_after_circuit(pauli: &PauliString, circuit: &Circuit) -> AnalysisResult<PauliString> {
-    pauli_after_circuit_with_options(pauli, circuit, &PauliConjugationOptions::default())
 }
 
 /// Returns the Pauli observable after the circuit, when its value remains well defined.
@@ -42,7 +34,7 @@ pub fn pauli_after_circuit(pauli: &PauliString, circuit: &Circuit) -> AnalysisRe
 /// [`AnalysisError::ResourceLimit`] when the conjugated string exceeds the budget, and
 /// [`AnalysisError::PauliNotPreserved`] when the observable is not well defined after the
 /// circuit.
-pub fn pauli_after_circuit_with_options(
+pub fn pauli_after_circuit(
     pauli: &PauliString,
     circuit: &Circuit,
     options: &PauliConjugationOptions,
@@ -60,22 +52,15 @@ pub fn pauli_after_circuit_with_options(
     Ok(result)
 }
 
-/// Returns the Pauli observable before the circuit under the default memory budget.
-///
-/// See [`pauli_before_circuit_with_options`].
-pub fn pauli_before_circuit(pauli: &PauliString, circuit: &Circuit) -> AnalysisResult<PauliString> {
-    pauli_before_circuit_with_options(pauli, circuit, &PauliConjugationOptions::default())
-}
-
 /// Returns the Pauli observable before the circuit, when its value remains well defined.
 ///
-/// This walks the circuit backwards like [`pauli_after_circuit_with_options`] walks it forwards,
+/// This walks the circuit backwards like [`pauli_after_circuit`] walks it forwards,
 /// and fails the same way.
 ///
 /// # Errors
 ///
-/// Fails like [`pauli_after_circuit_with_options`].
-pub fn pauli_before_circuit_with_options(
+/// Fails like [`pauli_after_circuit`].
+pub fn pauli_before_circuit(
     pauli: &PauliString,
     circuit: &Circuit,
     options: &PauliConjugationOptions,
@@ -107,7 +92,7 @@ fn conjugation_tableau(
         cancellation: options.cancellation.clone(),
         ..CircuitToTableauOptions::default()
     };
-    match circuit_to_tableau_with_options(circuit, &tableau_options) {
+    match circuit_to_tableau(circuit, &tableau_options) {
         Ok(tableau) => Ok(Some(tableau)),
         Err(AnalysisError::Cancelled(cancelled)) => Err(cancelled.into()),
         Err(_) => Ok(None),

@@ -3,7 +3,7 @@
     reason = "decorated correlated-error fixtures are fixed test inputs"
 )]
 
-use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_analysis::{ErrorAnalyzerOptions, LoopFolding, circuit_to_detector_error_model};
 use stab_model::{Circuit, Probability};
 
 /// Pinned Stim's correlated-error handlers consult only the Pauli X/Z bits
@@ -27,28 +27,26 @@ fn correlated_error_decorations_do_not_change_the_analyzed_model() {
 }
 
 fn assert_analyzed_models_match(plain: &str, decorated: &str) {
-    for fold_loops in [false, true] {
+    for loops in [LoopFolding::Unroll, LoopFolding::Fold] {
         let options = ErrorAnalyzerOptions {
-            fold_loops,
-            approximate_disjoint_errors_threshold: Some(
-                Probability::try_new(1.0).expect("unit threshold"),
-            ),
+            loops,
+            approximate_disjoint_errors: Some(Probability::try_new(1.0).expect("unit threshold")),
             ..ErrorAnalyzerOptions::default()
         };
         let plain_model = circuit_to_detector_error_model(
             &Circuit::from_stim_str(plain).expect("plain fixture parses"),
-            options.clone(),
+            &options,
         )
         .expect("plain fixture analyzes");
         let decorated_model = circuit_to_detector_error_model(
             &Circuit::from_stim_str(decorated).expect("decorated fixture parses"),
-            options,
+            &options,
         )
         .expect("decorated fixture analyzes");
         assert_eq!(
             decorated_model.to_dem_string(),
             plain_model.to_dem_string(),
-            "fold_loops={fold_loops} {decorated:?}"
+            "loops={loops:?} {decorated:?}"
         );
     }
 }

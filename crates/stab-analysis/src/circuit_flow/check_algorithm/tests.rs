@@ -17,7 +17,6 @@ use crate::circuit_flow::{FlowVerdict, FlowViolation};
 use crate::circuit_inverse::{TimeReversedForFlowsOptions, time_reversed_for_flows_using};
 use crate::{
     AnalysisError, AnalysisOperation, AnalysisResult, CircuitToTableauOptions, circuit_to_tableau,
-    circuit_to_tableau_with_options,
 };
 use stab_model::{Cancellation, Cancelled, MemoryBudget};
 
@@ -51,7 +50,7 @@ fn time_reversed(
     time_reversed_for_flows_using(
         circuit,
         flows,
-        TimeReversedForFlowsOptions::default(),
+        &TimeReversedForFlowsOptions::default(),
         select,
     )
     .map(|(inverse, reversed)| (inverse.to_stim_string(), reversed))
@@ -236,7 +235,13 @@ fn random_flows(
     qubit_count: usize,
     specs: &[(Vec<u8>, Vec<u8>, usize, bool)],
 ) -> AnalysisResult<Vec<Flow>> {
-    let tableau = circuit_to_tableau(circuit, true, false, false)?;
+    let tableau = circuit_to_tableau(
+        circuit,
+        &CircuitToTableauOptions {
+            ignore_noise: true,
+            ..Default::default()
+        },
+    )?;
     specs
         .iter()
         .map(|(input, output, width, valid)| {
@@ -326,7 +331,7 @@ fn a_refused_tableau_falls_back_to_the_sparse_tracker_but_cancellation_does_not(
         memory_budget: MemoryBudget::from_bytes(1024),
         ..UnsignedFlowCheckOptions::default()
     };
-    let refusal = circuit_to_tableau_with_options(
+    let refusal = circuit_to_tableau(
         &circuit,
         &CircuitToTableauOptions {
             ignore_noise: true,

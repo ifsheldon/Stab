@@ -5,7 +5,7 @@
 )]
 
 use stab_algebra::Tableau;
-use stab_analysis::{circuit_inverse_unitary, circuit_to_tableau};
+use stab_analysis::{CircuitToTableauOptions, circuit_inverse_unitary, circuit_to_tableau};
 use stab_model::Circuit;
 
 #[test]
@@ -90,9 +90,10 @@ fn circuit_inverse_unitary_composes_to_identity_tableau() {
     ",
     );
     let inverse = circuit_inverse_unitary(&input).expect("inverse");
-    let input_tableau = circuit_to_tableau(&input, false, false, false).expect("input tableau");
+    let input_tableau =
+        circuit_to_tableau(&input, &CircuitToTableauOptions::default()).expect("input tableau");
     let inverse_tableau =
-        circuit_to_tableau(&inverse, false, false, false).expect("inverse tableau");
+        circuit_to_tableau(&inverse, &CircuitToTableauOptions::default()).expect("inverse tableau");
     assert_eq!(
         input_tableau
             .then(&inverse_tableau)

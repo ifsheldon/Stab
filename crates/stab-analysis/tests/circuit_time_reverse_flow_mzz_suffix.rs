@@ -50,7 +50,8 @@ fn mzz_unitary_suffix_matches_pinned_stim_flow_through_h_cx_s() -> Result<(), St
     ];
 
     let (actual_circuit, actual_flows) =
-        circuit_time_reversed_for_flows(&input, &flows).map_err(|error| error.to_string())?;
+        circuit_time_reversed_for_flows(&input, &flows, &Default::default())
+            .map_err(|error| error.to_string())?;
 
     require_eq(
         &actual_circuit,
@@ -87,7 +88,7 @@ fn mzz_unitary_suffix_rejects_unsatisfied_flows() -> Result<(), String> {
     ",
     )?;
     let wrong_flow = flow("X0*X1 -> X0*X1 xor rec[-1]")?;
-    let error = match circuit_time_reversed_for_flows(&input, &[wrong_flow]) {
+    let error = match circuit_time_reversed_for_flows(&input, &[wrong_flow], &Default::default()) {
         Ok(_) => return Err("wrong suffix output unexpectedly satisfied".to_owned()),
         Err(error) => error.to_string(),
     };
@@ -106,10 +107,11 @@ fn mzz_unitary_suffix_rejects_observable_term_loss() -> Result<(), String> {
     ",
     )?;
     let observable_flow = flow("X0*X1 -> X0*Z1 xor rec[-1] xor obs[0]")?;
-    let error = match circuit_time_reversed_for_flows(&input, &[observable_flow]) {
-        Ok(_) => return Err("observable term was silently dropped".to_owned()),
-        Err(error) => error.to_string(),
-    };
+    let error =
+        match circuit_time_reversed_for_flows(&input, &[observable_flow], &Default::default()) {
+            Ok(_) => return Err("observable term was silently dropped".to_owned()),
+            Err(error) => error.to_string(),
+        };
     require_contains(&error, "obs[0]", "observable-bearing flow rejection")
 }
 
@@ -119,6 +121,7 @@ fn mzz_unitary_suffix_rejects_feedback() -> Result<(), String> {
     let error = match circuit_time_reversed_for_flows(
         &circuit(circuit_text)?,
         &[flow("Z0 -> Z0 xor rec[-1]")?],
+        &Default::default(),
     ) {
         Ok(_) => return Err("feedback MZZ shape unexpectedly succeeded".to_owned()),
         Err(error) => error.to_string(),

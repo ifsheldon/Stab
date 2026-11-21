@@ -14,9 +14,9 @@ fn detector_zero_region_at_tick_zero(circuit_text: &str) -> Result<String, Strin
     let detector = detector(0)?;
     let regions = circuit_detecting_regions(
         &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector],
-            ticks: vec![CircuitTick::new(0)],
+        &[detector],
+        &[CircuitTick::new(0)],
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -36,9 +36,9 @@ fn detecting_region_error(circuit_text: &str) -> Result<String, String> {
     let circuit = Circuit::from_stim_str(circuit_text).map_err(|error| error.to_string())?;
     match circuit_detecting_regions(
         &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)?],
-            ticks: vec![CircuitTick::new(0)],
+        &[detector(0)?],
+        &[CircuitTick::new(0)],
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -57,9 +57,9 @@ fn detecting_regions_treat_stim_negative_zero_detector_as_empty() -> Result<(), 
         .map_err(|error| error.to_string())?;
     let regions = circuit_detecting_regions(
         &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)?],
-            ticks: vec![CircuitTick::new(0)],
+        &[detector(0)?],
+        &[CircuitTick::new(0)],
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: true,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),

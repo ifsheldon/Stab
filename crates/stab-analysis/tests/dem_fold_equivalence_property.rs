@@ -13,7 +13,7 @@ use std::fmt::Write as _;
 
 use proptest::prelude::*;
 use proptest::test_runner::{FileFailurePersistence, RngAlgorithm, RngSeed};
-use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_analysis::{ErrorAnalyzerOptions, LoopFolding, circuit_to_detector_error_model};
 use stab_model::Circuit;
 
 #[path = "support/dem_semantics.rs"]
@@ -247,8 +247,12 @@ fn assert_fold_modes_agree(text: &str) {
     let analyze = |fold_loops| {
         circuit_to_detector_error_model(
             &circuit,
-            ErrorAnalyzerOptions {
-                fold_loops,
+            &ErrorAnalyzerOptions {
+                loops: if fold_loops {
+                    LoopFolding::Fold
+                } else {
+                    LoopFolding::Unroll
+                },
                 ..ErrorAnalyzerOptions::default()
             },
         )

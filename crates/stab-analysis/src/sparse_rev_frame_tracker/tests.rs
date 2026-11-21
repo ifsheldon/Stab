@@ -9,7 +9,7 @@ use super::*;
 use stab_algebra::{PauliSign, SingleQubitClifford};
 use stab_model::{CircuitItem, Gate, MeasureRecordOffset, Target};
 
-use crate::{circuit_to_tableau, decomposed_circuit};
+use crate::{CircuitToTableauOptions, circuit_to_tableau, decomposed_circuit};
 
 fn measurement_record_count(circuit: &Circuit) -> AnalysisResult<usize> {
     usize::try_from(circuit.count_measurements()?).map_err(|_| {
@@ -143,7 +143,8 @@ fn sparse_rev_frame_tracker_undo_single_qubit_cliffords_match_tableau() {
         let parsed_gate = Gate::from_name(gate.canonical_name()).unwrap();
         let inverse_gate = parsed_gate.generalized_inverse();
         let expected_circuit = circuit(&format!("{} 0\n", inverse_gate.canonical_name()));
-        let expected_tableau = circuit_to_tableau(&expected_circuit, false, false, false).unwrap();
+        let expected_tableau =
+            circuit_to_tableau(&expected_circuit, &CircuitToTableauOptions::default()).unwrap();
         let instruction = instruction(&format!("{} 0\n", gate.canonical_name()));
         for (input_text, input_basis) in basis_cases {
             let mut actual = tracker_from_pauli_text(input_text);
@@ -195,7 +196,8 @@ fn sparse_rev_frame_tracker_undo_fixed_two_qubit_gates_match_tableau() {
         let gate = Gate::from_name(gate_name).unwrap();
         let inverse_gate = gate.inverse().unwrap();
         let expected_circuit = circuit(&format!("{} 0 1\n", inverse_gate.canonical_name()));
-        let expected_tableau = circuit_to_tableau(&expected_circuit, false, false, false).unwrap();
+        let expected_tableau =
+            circuit_to_tableau(&expected_circuit, &CircuitToTableauOptions::default()).unwrap();
         let instruction = instruction(&format!("{gate_name} 0 1\n"));
         for left_basis in basis_cases {
             for right_basis in basis_cases {
@@ -234,7 +236,8 @@ fn pf6_sparse_rev_spp_matches_decomposed_tableau_unsigned() {
         let instruction = instruction(&format!("{gate_name} X0*Y1*Z2\n"));
         let expected_circuit = circuit(&format!("{inverse_name} X0*Y1*Z2\n"));
         let expected_circuit = decomposed_circuit(&expected_circuit).unwrap();
-        let expected_tableau = circuit_to_tableau(&expected_circuit, false, false, false).unwrap();
+        let expected_tableau =
+            circuit_to_tableau(&expected_circuit, &CircuitToTableauOptions::default()).unwrap();
         for left_basis in basis_cases {
             for middle_basis in basis_cases {
                 for right_basis in basis_cases {
@@ -269,10 +272,11 @@ fn pf6_sparse_rev_spp_handles_multiple_groups_and_inverted_products() {
     let instruction = instruction(instruction_text);
     let expected_circuit = circuit(instruction_text);
     let expected_circuit = decomposed_circuit(&expected_circuit).unwrap();
-    let expected_tableau = circuit_to_tableau(&expected_circuit, false, false, false)
-        .unwrap()
-        .inverse()
-        .unwrap();
+    let expected_tableau =
+        circuit_to_tableau(&expected_circuit, &CircuitToTableauOptions::default())
+            .unwrap()
+            .inverse()
+            .unwrap();
     let mut actual = tracker_from_pauli_text("ZYX");
     actual.undo_instruction(&instruction).unwrap();
 

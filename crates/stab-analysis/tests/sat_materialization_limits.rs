@@ -6,8 +6,7 @@
 
 use stab_analysis::{
     AnalysisOperation, AnalysisResult, ResourceKind, SatMaterializationLimits,
-    likeliest_error_sat_problem, likeliest_error_sat_problem_with_limits,
-    shortest_error_sat_problem, shortest_error_sat_problem_with_limits,
+    likeliest_error_sat_problem, shortest_error_sat_problem,
 };
 use stab_model::DetectorErrorModel;
 
@@ -21,14 +20,14 @@ fn shortest(
     model: &DetectorErrorModel,
     limits: SatMaterializationLimits,
 ) -> AnalysisResult<String> {
-    shortest_error_sat_problem_with_limits(model, limits)
+    shortest_error_sat_problem(model, &limits)
 }
 
 fn likeliest(
     model: &DetectorErrorModel,
     limits: SatMaterializationLimits,
 ) -> AnalysisResult<String> {
-    likeliest_error_sat_problem_with_limits(model, 100, limits)
+    likeliest_error_sat_problem(model, 100, &limits)
 }
 
 fn assert_first_excess(
@@ -65,55 +64,97 @@ fn sat_materialization_limits_admit_exact_boundaries_and_preserve_source() -> An
     let defaults = SatMaterializationLimits::default();
     let ordinary = dem("error(0.1) D0 L0\nerror(0.2) D0\n");
     assert_eq!(
-        shortest_error_sat_problem_with_limits(&ordinary, defaults.clone())?,
-        shortest_error_sat_problem(&ordinary)?
+        shortest_error_sat_problem(&ordinary, &defaults)?,
+        shortest_error_sat_problem(&ordinary, &Default::default())?
     );
     assert_eq!(
-        likeliest_error_sat_problem_with_limits(&ordinary, 100, defaults.clone())?,
-        likeliest_error_sat_problem(&ordinary, 100)?
+        likeliest_error_sat_problem(&ordinary, 100, &defaults)?,
+        likeliest_error_sat_problem(&ordinary, 100, &Default::default())?
     );
 
     for (source, accepted, rejected, resource) in [
         (
             "repeat 2 {\nrepeat 2 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n}\n",
-            defaults.clone().with_max_repeat_iterations(6),
-            defaults.clone().with_max_repeat_iterations(5),
+            SatMaterializationLimits {
+                max_repeat_iterations: 6,
+                ..defaults.clone()
+            },
+            SatMaterializationLimits {
+                max_repeat_iterations: 5,
+                ..defaults.clone()
+            },
             ResourceKind::RepeatIterations,
         ),
         (
             "error(0.1) D0 L0\nshift_detectors 1\n",
-            defaults.clone().with_max_expanded_instructions(2),
-            defaults.clone().with_max_expanded_instructions(1),
+            SatMaterializationLimits {
+                max_expanded_instructions: 2,
+                ..defaults.clone()
+            },
+            SatMaterializationLimits {
+                max_expanded_instructions: 1,
+                ..defaults.clone()
+            },
             ResourceKind::ExpandedOperations,
         ),
         (
             "error(0.1) D0 L0\nerror(0.2) D0\n",
-            defaults.clone().with_max_error_mechanisms(2),
-            defaults.clone().with_max_error_mechanisms(1),
+            SatMaterializationLimits {
+                max_error_mechanisms: 2,
+                ..defaults.clone()
+            },
+            SatMaterializationLimits {
+                max_error_mechanisms: 1,
+                ..defaults.clone()
+            },
             ResourceKind::ErrorMechanisms,
         ),
         (
             "error(0.1) D0 L0\n",
-            defaults.clone().with_max_target_occurrences(2),
-            defaults.clone().with_max_target_occurrences(1),
+            SatMaterializationLimits {
+                max_target_occurrences: 2,
+                ..defaults.clone()
+            },
+            SatMaterializationLimits {
+                max_target_occurrences: 1,
+                ..defaults.clone()
+            },
             ResourceKind::TargetOccurrences,
         ),
         (
             "error(0.1) D0 L0\nerror(0.2) D0\n",
-            defaults.clone().with_max_variables(3),
-            defaults.clone().with_max_variables(2),
+            SatMaterializationLimits {
+                max_variables: 3,
+                ..defaults.clone()
+            },
+            SatMaterializationLimits {
+                max_variables: 2,
+                ..defaults.clone()
+            },
             ResourceKind::Variables,
         ),
         (
             "error(0.1) D0 L0\nerror(0.2) D0\n",
-            defaults.clone().with_max_clauses(8),
-            defaults.clone().with_max_clauses(7),
+            SatMaterializationLimits {
+                max_clauses: 8,
+                ..defaults.clone()
+            },
+            SatMaterializationLimits {
+                max_clauses: 7,
+                ..defaults.clone()
+            },
             ResourceKind::Clauses,
         ),
         (
             "error(0.1) D0 L0\nerror(0.2) D0\n",
-            defaults.clone().with_max_clause_literals(16),
-            defaults.clone().with_max_clause_literals(15),
+            SatMaterializationLimits {
+                max_clause_literals: 16,
+                ..defaults.clone()
+            },
+            SatMaterializationLimits {
+                max_clause_literals: 15,
+                ..defaults.clone()
+            },
             ResourceKind::ClauseLiterals,
         ),
     ] {
@@ -130,13 +171,22 @@ fn sat_materialization_limits_admit_exact_boundaries_and_preserve_source() -> An
     ] {
         let output = run(&model, defaults.clone())?;
         assert_eq!(
-            run(&model, defaults.clone().with_max_output_bytes(output.len()))?,
+            run(
+                &model,
+                SatMaterializationLimits {
+                    max_output_bytes: output.len(),
+                    ..defaults.clone()
+                }
+            )?,
             output,
             "{name} exact output boundary"
         );
         let error = run(
             &model,
-            defaults.clone().with_max_output_bytes(output.len() - 1),
+            SatMaterializationLimits {
+                max_output_bytes: output.len() - 1,
+                ..defaults.clone()
+            },
         )
         .expect_err("first output byte beyond the limit must be rejected");
         let resource = error

@@ -13,14 +13,17 @@ pub use error_decomp::{
     DisjointPauliProbabilities, IndependentPauliProbabilities, independent_to_disjoint_xyz_errors,
     try_disjoint_to_independent_xyz_errors,
 };
-pub use options::ErrorAnalyzerOptions;
+pub use options::{
+    DecompositionFailure, ErrorAnalyzerOptions, ErrorDecomposition, GaugeDetectors, LoopFolding,
+    RemnantEdges,
+};
 
 pub fn circuit_to_detector_error_model(
     circuit: &Circuit,
-    options: ErrorAnalyzerOptions,
+    options: &ErrorAnalyzerOptions,
 ) -> AnalysisResult<DetectorErrorModel> {
     // The sparse reverse tracker is the only sensitivity-propagation engine
-    // (WS2b Stage 4 deleted the original forward analyzer); with `fold_loops`
-    // off it unrolls every loop, admitting only its retained output against the budget.
+    // (WS2b Stage 4 deleted the original forward analyzer); with
+    // `LoopFolding::Unroll` it unrolls every loop, admitting only its retained output against the budget.
     reverse_fold::try_analyze(circuit, options)
 }

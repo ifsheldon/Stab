@@ -83,7 +83,7 @@ impl ReverseFoldAnalyzer<'_> {
             return self.record_correlated_error(leading, probability);
         }
         let mut stacked = std::mem::take(&mut self.stacked_else_correlated);
-        let Some(threshold) = self.options.approximate_disjoint_errors_threshold else {
+        let Some(threshold) = self.options.approximate_disjoint_errors else {
             return Err(AnalysisError::NoiseRequiresApproximation {
                 gate: GateKind::ELSE_CORRELATED_ERROR,
                 excess: None,
@@ -341,7 +341,7 @@ impl ReverseFoldAnalyzer<'_> {
         {
             return Ok(());
         }
-        let Some(threshold) = self.options.approximate_disjoint_errors_threshold else {
+        let Some(threshold) = self.options.approximate_disjoint_errors else {
             return Err(AnalysisError::NoiseRequiresApproximation { gate, excess: None });
         };
         if let Some(probability) = probabilities
@@ -445,7 +445,7 @@ impl ReverseFoldAnalyzer<'_> {
             xor_merge_into(previous, basis, slot);
         }
 
-        if self.options.decompose_errors {
+        if self.options.decomposition.is_some() {
             locally_decompose_combinations(bases, combinations, &mut self.scratch.joined)?;
         }
         if probabilities_are_disjoint {

@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use clap::Args;
-use stab_analysis::{FeedbackInliningLimits, circuit_with_inlined_feedback_with_limits};
+use stab_analysis::{FeedbackInliningOptions, circuit_with_inlined_feedback};
 use stab_engine::{
     DetectionConversionLimits, DetectionRunError, DetectionSamplingCompiler,
     DetectionSamplingSession, LaneWidth, MeasurementToDetectionCompiler,
@@ -391,9 +391,12 @@ where
     let (circuit, mut circuit_hold) = ledger.parse_circuit(circuit_bytes)?;
     let circuit = if args.ran_without_feedback {
         let inlining = ledger.stage();
-        let inlined = circuit_with_inlined_feedback_with_limits(
+        let inlined = circuit_with_inlined_feedback(
             &circuit,
-            FeedbackInliningLimits::new(inlining.get()),
+            &FeedbackInliningOptions {
+                memory_budget: inlining.get(),
+                ..FeedbackInliningOptions::default()
+            },
         )
         .map_err(|error| inlining.refusal(error))?;
         drop(circuit);

@@ -104,27 +104,27 @@ impl SatShape {
         validate_limit(
             SatMaterializationResource::ErrorMechanisms,
             self.error_mechanisms,
-            limits.max_error_mechanisms(),
+            limits.max_error_mechanisms,
         )?;
         validate_limit(
             SatMaterializationResource::TargetOccurrences,
             self.target_occurrences,
-            limits.max_target_occurrences(),
+            limits.max_target_occurrences,
         )?;
         validate_limit(
             SatMaterializationResource::Variables,
             self.variables,
-            limits.max_variables(),
+            limits.max_variables,
         )?;
         validate_limit(
             SatMaterializationResource::Clauses,
             self.clauses,
-            limits.max_clauses(),
+            limits.max_clauses,
         )?;
         validate_limit(
             SatMaterializationResource::ClauseLiterals,
             self.clause_literals,
-            limits.max_clause_literals(),
+            limits.max_clause_literals,
         )?;
         Ok(self)
     }
@@ -174,7 +174,7 @@ impl MaxSatInstance {
         validate_limit(
             SatMaterializationResource::Variables,
             next,
-            self.limits.max_variables(),
+            self.limits.max_variables,
         )?;
         self.num_variables = next;
         Ok(BoolRef::variable(variable))
@@ -182,9 +182,9 @@ impl MaxSatInstance {
 
     pub(super) fn add_clause(&mut self, clause: Clause) -> AnalysisResult<()> {
         if clause.vars.len() >= CancellationCountdown::INTERVAL as usize {
-            self.limits.cancellation().check()?;
+            self.limits.cancellation.check()?;
         } else {
-            self.countdown.tick(self.limits.cancellation())?;
+            self.countdown.tick(&self.limits.cancellation)?;
         }
         if let ClauseWeight::Soft(weight) = clause.weight {
             if !weight.is_finite() || weight <= 0.0 {
@@ -204,7 +204,7 @@ impl MaxSatInstance {
         validate_limit(
             SatMaterializationResource::Clauses,
             clause_count,
-            self.limits.max_clauses(),
+            self.limits.max_clauses,
         )?;
         let literal_count = self
             .clause_literals
@@ -218,7 +218,7 @@ impl MaxSatInstance {
         validate_limit(
             SatMaterializationResource::ClauseLiterals,
             literal_count,
-            self.limits.max_clause_literals(),
+            self.limits.max_clause_literals,
         )?;
         self.clauses.push(clause);
         self.clause_literals = literal_count;
@@ -270,7 +270,7 @@ impl MaxSatInstance {
         validate_limit(
             SatMaterializationResource::OutputBytes,
             output_bound,
-            self.limits.max_output_bytes(),
+            self.limits.max_output_bytes,
         )?;
         let mut out = String::new();
         out.try_reserve(output_bound).map_err(|_| {
@@ -291,7 +291,7 @@ impl MaxSatInstance {
 
         let mut countdown = CancellationCountdown::new();
         for clause in &self.clauses {
-            countdown.tick(self.limits.cancellation())?;
+            countdown.tick(&self.limits.cancellation)?;
             let weight = self.quantized_weight(mode, top, &clause.weight)?;
             if weight == 0 {
                 continue;
@@ -300,7 +300,7 @@ impl MaxSatInstance {
                 AnalysisError::internal(AnalysisOperation::SatMaterialization, "SAT format failed")
             })?;
             for var in &clause.vars {
-                countdown.tick(self.limits.cancellation())?;
+                countdown.tick(&self.limits.cancellation)?;
                 let Some(index) = var.variable_index() else {
                     continue;
                 };
@@ -342,14 +342,14 @@ impl MaxSatInstance {
 
         let mut countdown = CancellationCountdown::new();
         for clause in &self.clauses {
-            countdown.tick(self.limits.cancellation())?;
+            countdown.tick(&self.limits.cancellation)?;
             let weight = self.quantized_weight(mode, top, &clause.weight)?;
             if weight == 0 {
                 continue;
             }
             bytes = checked_output_add(bytes, decimal_digits(weight))?;
             for var in &clause.vars {
-                countdown.tick(self.limits.cancellation())?;
+                countdown.tick(&self.limits.cancellation)?;
                 let Some(index) = var.variable_index() else {
                     continue;
                 };

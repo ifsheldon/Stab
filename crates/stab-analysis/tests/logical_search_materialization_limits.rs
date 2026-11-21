@@ -104,7 +104,10 @@ fn logical_search_limits_return_typed_failures_without_mutating_source() -> Anal
     assert!(
         graphlike(
             &annotations,
-            defaults.clone().with_max_expanded_error_mechanisms(1),
+            LogicalErrorSearchLimits {
+                max_expanded_error_mechanisms: 1,
+                ..defaults.clone()
+            },
         )?
         .found()
         .is_some()
@@ -115,33 +118,46 @@ fn logical_search_limits_return_typed_failures_without_mutating_source() -> Anal
             "graphlike repeat count",
             graphlike as SearchRunner,
             "repeat 2 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n",
-            defaults.clone().with_max_repeat_unroll(2),
+            LogicalErrorSearchLimits {
+                max_repeat_unroll: 2,
+                ..defaults.clone()
+            },
         ),
         (
             "hypergraph repeat iterations",
             hypergraph as SearchRunner,
             "repeat 2 {\nrepeat 2 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n}\n",
-            defaults.clone().with_max_repeat_iterations(6),
+            LogicalErrorSearchLimits {
+                max_repeat_iterations: 6,
+                ..defaults.clone()
+            },
         ),
         (
             "hypergraph targets per mechanism",
             hypergraph as SearchRunner,
             "error(0.1) D0 D1 L0\n",
-            defaults
-                .clone()
-                .with_max_error_target_occurrences_per_mechanism(3),
+            LogicalErrorSearchLimits {
+                max_error_target_occurrences_per_mechanism: 3,
+                ..defaults.clone()
+            },
         ),
         (
             "graphlike total targets",
             graphlike as SearchRunner,
             "error(0.1) D0 L0\nerror(0.1) D1 L1\n",
-            defaults.clone().with_max_total_error_target_occurrences(4),
+            LogicalErrorSearchLimits {
+                max_total_error_target_occurrences: 4,
+                ..defaults.clone()
+            },
         ),
         (
             "hypergraph detector nodes",
             hypergraph as SearchRunner,
             "error(0.1) D0 L0\nerror(0.1) D1 L1\n",
-            defaults.clone().with_max_effective_detector_nodes(2),
+            LogicalErrorSearchLimits {
+                max_effective_detector_nodes: 2,
+                ..defaults.clone()
+            },
         ),
     ] {
         assert_search_boundary_admitted(name, run, source, limits);
@@ -153,106 +169,142 @@ fn logical_search_limits_return_typed_failures_without_mutating_source() -> Anal
             "graphlike repeat count",
             graphlike as SearchRunner,
             "repeat 2 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n",
-            defaults.clone().with_max_repeat_unroll(1),
+            LogicalErrorSearchLimits {
+                max_repeat_unroll: 1,
+                ..defaults.clone()
+            },
             ResourceKind::RepeatCount,
         ),
         (
             "hypergraph repeat iterations",
             hypergraph as SearchRunner,
             "repeat 2 {\nrepeat 2 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n}\n",
-            defaults.clone().with_max_repeat_iterations(5),
+            LogicalErrorSearchLimits {
+                max_repeat_iterations: 5,
+                ..defaults.clone()
+            },
             ResourceKind::RepeatIterations,
         ),
         (
             "graphlike mechanisms",
             graphlike as SearchRunner,
             "error(0.1) D0 L0\nerror(0.2) D0\n",
-            defaults.clone().with_max_expanded_error_mechanisms(1),
+            LogicalErrorSearchLimits {
+                max_expanded_error_mechanisms: 1,
+                ..defaults.clone()
+            },
             ResourceKind::ErrorMechanisms,
         ),
         (
             "hypergraph targets per mechanism",
             hypergraph as SearchRunner,
             "error(0.1) D0 D1 L0\n",
-            defaults
-                .clone()
-                .with_max_error_target_occurrences_per_mechanism(2),
+            LogicalErrorSearchLimits {
+                max_error_target_occurrences_per_mechanism: 2,
+                ..defaults.clone()
+            },
             ResourceKind::ErrorTargetOccurrencesPerMechanism,
         ),
         (
             "graphlike total targets",
             graphlike as SearchRunner,
             "error(0.1) D0 L0\nerror(0.1) D1 L1\n",
-            defaults.clone().with_max_total_error_target_occurrences(3),
+            LogicalErrorSearchLimits {
+                max_total_error_target_occurrences: 3,
+                ..defaults.clone()
+            },
             ResourceKind::TotalErrorTargetOccurrences,
         ),
         (
             "hypergraph detector nodes",
             hypergraph as SearchRunner,
             "error(0.1) D0 L0\nerror(0.1) D1 L1\n",
-            defaults.clone().with_max_effective_detector_nodes(1),
+            LogicalErrorSearchLimits {
+                max_effective_detector_nodes: 1,
+                ..defaults.clone()
+            },
             ResourceKind::EffectiveDetectorNodes,
         ),
         (
             "graphlike unique edges",
             graphlike as SearchRunner,
             "error(0.1) D0 L0\nerror(0.1) D0 L1\n",
-            defaults.clone().with_max_unique_graph_edges(1),
+            LogicalErrorSearchLimits {
+                max_unique_graph_edges: 1,
+                ..defaults.clone()
+            },
             ResourceKind::UniqueGraphEdges,
         ),
         (
             "graphlike stored graph terms",
             graphlike as SearchRunner,
             "error(0.1) D0 L0 L1\n",
-            defaults.clone().with_max_stored_graph_terms(2),
+            LogicalErrorSearchLimits {
+                max_stored_graph_terms: 2,
+                ..defaults.clone()
+            },
             ResourceKind::StoredGraphTerms,
         ),
         (
             "hypergraph edge degree",
             hypergraph as SearchRunner,
             "error(0.1) D0 D1 L0\n",
-            defaults.clone().with_max_hyperedge_degree(1),
+            LogicalErrorSearchLimits {
+                max_hyperedge_degree: 1,
+                ..defaults.clone()
+            },
             ResourceKind::HyperedgeDegree,
         ),
         (
             "hypergraph edge incidences",
             hypergraph as SearchRunner,
             "error(0.1) D0 D1 L0\nerror(0.1) D0 D1 L1\n",
-            defaults
-                .clone()
-                .with_max_hyperedge_degree(2)
-                .with_max_hyperedge_incidences(2),
+            LogicalErrorSearchLimits {
+                max_hyperedge_degree: 2,
+                max_hyperedge_incidences: 2,
+                ..defaults.clone()
+            },
             ResourceKind::HyperedgeIncidences,
         ),
         (
             "graphlike search states",
             graphlike as SearchRunner,
             "error(0.1) D0 L0\nerror(0.1) D0 L1\nerror(0.1) D0 L2\n",
-            defaults.clone().with_max_search_states(4),
+            LogicalErrorSearchLimits {
+                max_search_states: 4,
+                ..defaults.clone()
+            },
             ResourceKind::SearchStates,
         ),
         (
             "hypergraph transitions",
             hypergraph as SearchRunner,
             "error(0.1) D0 L0\nerror(0.1) D0 L1\nerror(0.1) D0 L2\n",
-            defaults.clone().with_max_search_transitions(0),
+            LogicalErrorSearchLimits {
+                max_search_transitions: 0,
+                ..defaults.clone()
+            },
             ResourceKind::SearchTransitions,
         ),
         (
             "graphlike state terms",
             graphlike as SearchRunner,
             variable_payload.as_str(),
-            defaults.clone().with_max_search_state_terms(8),
+            LogicalErrorSearchLimits {
+                max_search_state_terms: 8,
+                ..defaults.clone()
+            },
             ResourceKind::SearchStateTerms,
         ),
         (
             "hypergraph retained state terms",
             hypergraph as SearchRunner,
             variable_payload.as_str(),
-            defaults
-                .clone()
-                .with_max_search_state_terms(64)
-                .with_max_stored_search_state_terms(8),
+            LogicalErrorSearchLimits {
+                max_search_state_terms: 64,
+                max_stored_search_state_terms: 8,
+                ..defaults.clone()
+            },
             ResourceKind::StoredSearchStateTerms,
         ),
     ] {
@@ -284,7 +336,10 @@ fn exhausted_search_budget_is_not_reported_as_not_found() {
             name,
             run,
             &source,
-            defaults.clone().with_max_search_states(8),
+            LogicalErrorSearchLimits {
+                max_search_states: 8,
+                ..defaults.clone()
+            },
             ResourceKind::SearchStates,
         );
     }

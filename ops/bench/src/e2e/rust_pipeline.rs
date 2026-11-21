@@ -54,7 +54,7 @@ pub(super) fn execute(
     .with_after_clifford_depolarization(probability(0.00625)?);
     let generated = params.generate().map_err(|source| source.to_string())?;
     let circuit = generated.circuit();
-    let model = circuit_to_detector_error_model(circuit, ErrorAnalyzerOptions::default())
+    let model = circuit_to_detector_error_model(circuit, &ErrorAnalyzerOptions::default())
         .map_err(|source| source.to_string())?;
     let mut decoder =
         ExactMlDecoderSession::try_compile_model(&model).map_err(|source| source.to_string())?;

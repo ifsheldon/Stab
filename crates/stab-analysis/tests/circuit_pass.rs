@@ -10,8 +10,8 @@ use std::convert::Infallible;
 
 use stab_analysis::{
     AnalysisOperation, CircuitPass, CircuitPassContext, CircuitPassError, CircuitPassInput,
-    CircuitPassLimits, CircuitPassOutput, CircuitPassResources, CircuitPassStage, ResourceKind,
-    WithoutNoiseOptions, WithoutNoisePass, circuit_without_noise, run_circuit_pass,
+    CircuitPassOutput, CircuitPassResources, CircuitPassStage, ResourceKind, WithoutNoiseOptions,
+    WithoutNoisePass, circuit_without_noise, run_circuit_pass,
 };
 use stab_model::{
     Circuit, MemoryBudget, RepeatCount, RepeatNestingLimit, advanced::repeat_block_with_tag_bytes,
@@ -184,19 +184,23 @@ fn circuit_pass_resource_admission_is_atomic_across_framework_stages() {
     for (source, limits, expected_resource) in [
         (
             circuit("H 0\n"),
-            CircuitPassLimits::default().with_memory_budget(MemoryBudget::from_bytes(
-                payload.projected_payload_bytes() - 1,
-            )),
+            CircuitPassContext {
+                memory_budget: MemoryBudget::from_bytes(payload.projected_payload_bytes() - 1),
+                ..Default::default()
+            },
             ResourceKind::ProjectedPayloadBytes,
         ),
         (
             nested,
-            CircuitPassLimits::default().with_repeat_nesting(zero_nesting),
+            CircuitPassContext {
+                repeat_nesting: zero_nesting,
+                ..Default::default()
+            },
             ResourceKind::RepeatNesting,
         ),
     ] {
         let pass = ObservedIdentityPass::default();
-        let error = run_circuit_pass(&pass, &source, &(), &CircuitPassContext::new(limits))
+        let error = run_circuit_pass(&pass, &source, &(), &limits)
             .expect_err("reject input before dispatch");
         let resource = error.resource_limit_error().expect("input resource error");
         assert_eq!(resource.resource(), expected_resource);
@@ -212,14 +216,20 @@ fn circuit_pass_resource_admission_is_atomic_across_framework_stages() {
     for (projection, limits, expected_resource) in [
         (
             projected_payload,
-            CircuitPassLimits::default().with_memory_budget(MemoryBudget::from_bytes(
-                projected_payload.projected_payload_bytes() - 1,
-            )),
+            CircuitPassContext {
+                memory_budget: MemoryBudget::from_bytes(
+                    projected_payload.projected_payload_bytes() - 1,
+                ),
+                ..Default::default()
+            },
             ResourceKind::ProjectedPayloadBytes,
         ),
         (
             projected_nesting,
-            CircuitPassLimits::default().with_repeat_nesting(one_nesting),
+            CircuitPassContext {
+                repeat_nesting: one_nesting,
+                ..Default::default()
+            },
             ResourceKind::RepeatNesting,
         ),
     ] {
@@ -227,13 +237,8 @@ fn circuit_pass_resource_admission_is_atomic_across_framework_stages() {
             projection,
             ran: Cell::new(false),
         };
-        let error = run_circuit_pass(
-            &pass,
-            &Circuit::new(),
-            &(),
-            &CircuitPassContext::new(limits),
-        )
-        .expect_err("reject projected output before dispatch");
+        let error = run_circuit_pass(&pass, &Circuit::new(), &(), &limits)
+            .expect_err("reject projected output before dispatch");
         let resource = error
             .resource_limit_error()
             .expect("projection resource error");
@@ -252,7 +257,10 @@ fn circuit_pass_resource_admission_is_atomic_across_framework_stages() {
         &deep_output_pass,
         &Circuit::new(),
         &(),
-        &CircuitPassContext::new(CircuitPassLimits::default().with_repeat_nesting(one_nesting)),
+        &CircuitPassContext {
+            repeat_nesting: one_nesting,
+            ..Default::default()
+        },
     )
     .expect_err("reject actual output beyond the admitted nesting limit");
     assert_eq!(
@@ -289,13 +297,14 @@ fn circuit_pass_validates_output_and_preserves_typed_diagnostics() {
         &admitted_pass,
         &admitted_source,
         &(),
-        &CircuitPassContext::new(
-            CircuitPassLimits::default().with_memory_budget(MemoryBudget::from_bytes(
+        &CircuitPassContext {
+            memory_budget: MemoryBudget::from_bytes(
                 CircuitPassResources::try_new(1, 1, 0, 0, 0)
                     .expect("single instruction")
                     .projected_payload_bytes(),
-            )),
-        ),
+            ),
+            ..Default::default()
+        },
     )
     .expect("admit input and output at the exact budget");
     assert!(admitted_pass.ran.get());

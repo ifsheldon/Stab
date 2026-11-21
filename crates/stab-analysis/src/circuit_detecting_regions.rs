@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use stab_algebra::{FlexPauliString, PauliBasis};
+use stab_model::advanced::CancellationCountdown;
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, CircuitTick, DemDetectorId, DemTarget,
     DemTargetKind, FoldedCircuitSummary, FoldedCount, FoldedWalkError, GateKind, MemoryBudget,
@@ -18,10 +19,10 @@ use crate::{
 const DETECTING_REGION_LIVE_STATE_UNIT_BYTES: u64 = 64;
 const DETECTING_REGION_OUTPUT_ENTRY_OVERHEAD_BYTES: u64 = 64;
 
+/// Options of [`circuit_detecting_regions`] and [`circuit_detecting_regions_for_targets`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DetectingRegionOptions {
-    pub detectors: Vec<DemDetectorId>,
-    pub ticks: Vec<CircuitTick>,
+    /// Record anticommutation with a reset or measurement instead of failing on it.
     pub ignore_anticommutation_errors: bool,
     /// Budget for the retained tracker state, recurrence-probe clones, and output regions.
     pub memory_budget: MemoryBudget,
@@ -29,61 +30,59 @@ pub struct DetectingRegionOptions {
     pub cancellation: Cancellation,
 }
 
+/// Options of [`all_detecting_region_targets`] and [`all_detecting_region_ticks`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct DetectingRegionTargetOptions {
-    pub targets: Vec<DemTarget>,
-    pub ticks: Vec<CircuitTick>,
-    pub ignore_anticommutation_errors: bool,
-    /// Budget for the retained tracker state, recurrence-probe clones, and output regions.
+pub struct DetectingRegionListOptions {
+    /// Budget for the dense output vector, admitted before it is allocated.
     pub memory_budget: MemoryBudget,
-    /// Signal polled once per undone instruction and repeat iteration.
+    /// Signal polled while the output vector is filled.
     pub cancellation: Cancellation,
 }
 
 pub type DetectingRegionMap = BTreeMap<DemDetectorId, BTreeMap<CircuitTick, FlexPauliString>>;
 pub type DetectingRegionTargetMap = BTreeMap<DemTarget, BTreeMap<CircuitTick, FlexPauliString>>;
 
+/// Returns the detecting region of each of `detectors` at each of `ticks`.
+///
+/// See [`circuit_detecting_regions_for_targets`].
 pub fn circuit_detecting_regions(
     circuit: &Circuit,
-    options: DetectingRegionOptions,
+    detectors: &[DemDetectorId],
+    ticks: &[CircuitTick],
+    options: &DetectingRegionOptions,
 ) -> AnalysisResult<DetectingRegionMap> {
-    let target_regions = circuit_detecting_regions_for_targets(
-        circuit,
-        DetectingRegionTargetOptions {
-            targets: options
-                .detectors
-                .into_iter()
-                .map(DemTarget::from_detector)
-                .collect(),
-            ticks: options.ticks,
-            ignore_anticommutation_errors: options.ignore_anticommutation_errors,
-            memory_budget: options.memory_budget,
-            cancellation: options.cancellation,
-        },
-    )?;
+    let targets = detectors
+        .iter()
+        .copied()
+        .map(DemTarget::from_detector)
+        .collect::<Vec<_>>();
+    let target_regions = circuit_detecting_regions_for_targets(circuit, &targets, ticks, options)?;
     Ok(target_regions
         .into_iter()
         .filter_map(|(target, regions)| target.detector().map(|detector| (detector, regions)))
         .collect())
 }
 
+/// Returns the detecting region of each detector or observable of `targets` at each of `ticks`.
+///
+/// Repeated targets and ticks are reported once. The retained tracker state and the output
+/// regions are admitted against the options' memory budget.
 pub fn circuit_detecting_regions_for_targets(
     circuit: &Circuit,
-    options: DetectingRegionTargetOptions,
+    targets: &[DemTarget],
+    ticks: &[CircuitTick],
+    options: &DetectingRegionOptions,
 ) -> AnalysisResult<DetectingRegionTargetMap> {
-    let mut budget = DetectingRegionBudget::for_request(
-        options.memory_budget,
-        options.targets.len(),
-        options.ticks.len(),
-    )?;
+    let mut budget =
+        DetectingRegionBudget::for_request(options.memory_budget, targets.len(), ticks.len())?;
     validate_supported_subset(circuit)?;
     let anticommutation_policy = if options.ignore_anticommutation_errors {
         AnticommutationPolicy::Record
     } else {
         AnticommutationPolicy::Fail
     };
-    let targets = options.targets.into_iter().collect::<BTreeSet<_>>();
-    let ticks = options.ticks.into_iter().collect::<BTreeSet<_>>();
+    let targets = targets.iter().copied().collect::<BTreeSet<_>>();
+    let ticks = ticks.iter().copied().collect::<BTreeSet<_>>();
     // One folded walk supplies every whole-circuit count the extraction needs.
     let summary = folded_summary(circuit, &options.cancellation)?;
     let detector_count = exact_count(summary.detectors(), "detector")?;
@@ -108,7 +107,7 @@ pub fn circuit_detecting_regions_for_targets(
         detector_count,
         anticommutation_policy,
     );
-    tracker.set_cancellation(options.cancellation);
+    tracker.set_cancellation(options.cancellation.clone());
     tracker.set_memory_budget(
         AnalysisOperation::DetectingRegions,
         ResourceKind::LiveStateUnits,
@@ -134,29 +133,28 @@ pub fn circuit_detecting_regions_for_targets(
     Ok(regions)
 }
 
-/// Lists every detector and observable target, admitted against [`MemoryBudget::DEFAULT`].
-///
-/// See [`all_detecting_region_targets_with_budget`].
-pub fn all_detecting_region_targets(circuit: &Circuit) -> AnalysisResult<Vec<DemTarget>> {
-    all_detecting_region_targets_with_budget(circuit, MemoryBudget::DEFAULT)
-}
-
-/// Lists every detector and observable target after admitting the dense vector against `budget`.
-pub fn all_detecting_region_targets_with_budget(
+/// Lists every detector and observable target after admitting the dense vector against the
+/// options' memory budget.
+pub fn all_detecting_region_targets(
     circuit: &Circuit,
-    budget: MemoryBudget,
+    options: &DetectingRegionListOptions,
 ) -> AnalysisResult<Vec<DemTarget>> {
+    options.cancellation.check()?;
     let detector_count = circuit.count_detectors()?;
     let observable_count = circuit.count_observables()?;
-    let target_capacity = dense_target_helper_capacity(detector_count, observable_count, budget)?;
+    let target_capacity =
+        dense_target_helper_capacity(detector_count, observable_count, options.memory_budget)?;
     let mut targets = Vec::new();
     targets.try_reserve_exact(target_capacity).map_err(|_| {
         detecting_region_resource_error(ResourceKind::MaterializedUnits, target_capacity as u64, 0)
     })?;
+    let mut countdown = CancellationCountdown::new();
     for detector in 0..detector_count {
+        countdown.tick(&options.cancellation)?;
         targets.push(DemTarget::relative_detector(detector)?);
     }
     for observable in 0..observable_count {
+        countdown.tick(&options.cancellation)?;
         targets.push(DemTarget::logical_observable(observable)?);
     }
     Ok(targets)
@@ -178,25 +176,24 @@ fn dense_target_helper_capacity(
     })
 }
 
-/// Lists every tick of `circuit`, admitted against [`MemoryBudget::DEFAULT`].
-///
-/// See [`all_detecting_region_ticks_with_budget`].
-pub fn all_detecting_region_ticks(circuit: &Circuit) -> AnalysisResult<Vec<CircuitTick>> {
-    all_detecting_region_ticks_with_budget(circuit, MemoryBudget::DEFAULT)
-}
-
-/// Lists every tick of `circuit` after admitting the dense vector against `budget`.
-pub fn all_detecting_region_ticks_with_budget(
+/// Lists every tick of `circuit` after admitting the dense vector against the options' memory
+/// budget.
+pub fn all_detecting_region_ticks(
     circuit: &Circuit,
-    budget: MemoryBudget,
+    options: &DetectingRegionListOptions,
 ) -> AnalysisResult<Vec<CircuitTick>> {
+    options.cancellation.check()?;
     let tick_count = circuit.count_ticks()?;
-    let capacity = admit_helper_bytes(budget, tick_count, size_of::<CircuitTick>())?;
+    let capacity = admit_helper_bytes(options.memory_budget, tick_count, size_of::<CircuitTick>())?;
     let mut ticks = Vec::new();
     ticks.try_reserve_exact(capacity).map_err(|_| {
         detecting_region_resource_error(ResourceKind::MaterializedUnits, tick_count, 0)
     })?;
-    ticks.extend((0..tick_count).map(CircuitTick::new));
+    let mut countdown = CancellationCountdown::new();
+    for tick in 0..tick_count {
+        countdown.tick(&options.cancellation)?;
+        ticks.push(CircuitTick::new(tick));
+    }
     Ok(ticks)
 }
 

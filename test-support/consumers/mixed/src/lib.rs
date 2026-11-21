@@ -18,8 +18,8 @@ pub fn exercise_unified_dependencies() -> Result<(usize, usize), Box<dyn Error>>
     ))?;
 
     let circuit = stab_core::Circuit::from_stim_str("M 0\n")?;
-    let direct = stab_analysis::circuit_with_inlined_feedback(&circuit)?;
-    let facade = stab_core::analysis::circuit_with_inlined_feedback(&circuit)?;
+    let direct = stab_analysis::circuit_with_inlined_feedback(&circuit, &Default::default())?;
+    let facade = stab_core::analysis::circuit_with_inlined_feedback(&circuit, &Default::default())?;
     if direct != facade {
         return Err(std::io::Error::other("facade and owner transform outputs differ").into());
     }

@@ -332,7 +332,7 @@ fn circuit_flow_generators_measurement_subset_flows_satisfy_checker() {
         ",
     ] {
         let circuit = circuit(text);
-        let flows = circuit_flow_generators(&circuit).expect(text);
+        let flows = circuit_flow_generators(&circuit, &Default::default()).expect(text);
         assert_eq!(
             flow_holds(&circuit, &flows),
             vec![true; flows.len()],
@@ -369,7 +369,7 @@ fn circuit_flow_generators_promotes_composed_measurement_subset() {
         ",
     ] {
         let circuit = circuit(text);
-        let flows = circuit_flow_generators(&circuit).expect(text);
+        let flows = circuit_flow_generators(&circuit, &Default::default()).expect(text);
         assert_eq!(
             flow_holds(&circuit, &flows),
             vec![true; flows.len()],
@@ -406,7 +406,7 @@ fn circuit_flow_generators_promotes_unitary_mixed_measurement_subset() {
         ",
     ] {
         let circuit = circuit(text);
-        let flows = circuit_flow_generators(&circuit).expect(text);
+        let flows = circuit_flow_generators(&circuit, &Default::default()).expect(text);
         assert_eq!(
             flow_holds(&circuit, &flows),
             vec![true; flows.len()],
@@ -415,16 +415,19 @@ fn circuit_flow_generators_promotes_unitary_mixed_measurement_subset() {
     }
 
     assert_eq!(
-        circuit_flow_generators(&circuit(
-            "
+        circuit_flow_generators(
+            &circuit(
+                "
             REPEAT 2 {
                 M 0
                 H 0
             }
             "
-        ))
+            ),
+            &Default::default()
+        )
         .expect("repeat unitary-mixed generators"),
-        circuit_flow_generators(&circuit("M 0\nH 0\nM 0\nH 0\n"))
+        circuit_flow_generators(&circuit("M 0\nH 0\nM 0\nH 0\n"), &Default::default())
             .expect("expanded unitary-mixed generators")
     );
 }
@@ -468,8 +471,9 @@ fn circuit_flow_generators_measurement_subset_ignores_annotations_and_noise() {
         ",
     );
 
-    let expected = circuit_flow_generators(&base).expect("base generators");
-    let actual = circuit_flow_generators(&decorated).expect("decorated generators");
+    let expected = circuit_flow_generators(&base, &Default::default()).expect("base generators");
+    let actual =
+        circuit_flow_generators(&decorated, &Default::default()).expect("decorated generators");
     assert_eq!(actual, expected);
 }
 
@@ -487,11 +491,12 @@ fn circuit_flow_generators_measurement_subset_composes_spp_unitaries() {
         ",
     ] {
         let original = circuit(text);
-        let flows = circuit_flow_generators(&original).expect(text);
+        let flows = circuit_flow_generators(&original, &Default::default()).expect(text);
         let decomposed = decomposed_circuit(&original).expect("decompose SPP circuit");
         assert_eq!(
             flows,
-            circuit_flow_generators(&decomposed).expect("decomposed generators"),
+            circuit_flow_generators(&decomposed, &Default::default())
+                .expect("decomposed generators"),
             "{text}"
         );
         assert_eq!(
@@ -653,7 +658,7 @@ fn circuit_flow_generators_measurement_subset_promotes_generated_all_operations_
     for (index, section) in sections.iter().enumerate() {
         text.push_str(section);
         let circuit = circuit(&text);
-        let result = circuit_flow_generators(&circuit);
+        let result = circuit_flow_generators(&circuit, &Default::default());
         assert!(
             result.is_ok(),
             "all-operations prefix section {index} failed: {:?}",
@@ -661,8 +666,8 @@ fn circuit_flow_generators_measurement_subset_promotes_generated_all_operations_
         );
     }
     let all_operations_circuit = circuit(&text);
-    let flows =
-        circuit_flow_generators(&all_operations_circuit).expect("all-operations generators");
+    let flows = circuit_flow_generators(&all_operations_circuit, &Default::default())
+        .expect("all-operations generators");
     assert!(!flows.is_empty());
     let expected = [
         "1 -> rec[0]",
@@ -776,10 +781,12 @@ fn circuit_flow_generators_promotes_bounded_repeat_measurement_subset() {
         ),
     ] {
         let repeat_circuit = circuit(repeat_text);
-        let repeat_flows = circuit_flow_generators(&repeat_circuit).expect(repeat_text);
+        let repeat_flows =
+            circuit_flow_generators(&repeat_circuit, &Default::default()).expect(repeat_text);
         assert_eq!(
             repeat_flows,
-            circuit_flow_generators(&circuit(expanded_text)).expect(expanded_text)
+            circuit_flow_generators(&circuit(expanded_text), &Default::default())
+                .expect(expanded_text)
         );
         assert_eq!(
             flow_holds(&repeat_circuit, &repeat_flows),
@@ -883,7 +890,8 @@ fn circuit_flow_generators_measurement_subset_supports_mixed_feedback_capable_gr
 #[test]
 fn circuit_flow_generators_measurement_subset_supports_measurement_free_mixed_sweep_groups() {
     let circuit = circuit("CX sweep[0] 0 1 2\n");
-    let flows = circuit_flow_generators(&circuit).expect("mixed sweep generators");
+    let flows =
+        circuit_flow_generators(&circuit, &Default::default()).expect("mixed sweep generators");
     assert_eq!(
         flows.iter().map(ToString::to_string).collect::<Vec<_>>(),
         [
@@ -900,7 +908,7 @@ fn circuit_flow_generators_measurement_subset_supports_measurement_free_mixed_sw
 
 #[test]
 fn circuit_flow_generators_measurement_subset_folds_ignored_only_circuits_without_caps() {
-    let high = circuit_flow_generators(&circuit("QUBIT_COORDS(0) 2048\n"))
+    let high = circuit_flow_generators(&circuit("QUBIT_COORDS(0) 2048\n"), &Default::default())
         .expect("high-index ignored annotation generators");
     assert_eq!(high.len(), 4098);
     let first = high.first().expect("high-index first identity flow");
@@ -922,7 +930,7 @@ fn circuit_flow_generators_measurement_subset_folds_ignored_only_circuits_withou
 
 #[test]
 fn circuit_flow_generators_measurement_subset_rejects_anti_hermitian_mpp_products() {
-    let error = circuit_flow_generators(&circuit("MPP X0*Y0\n"))
+    let error = circuit_flow_generators(&circuit("MPP X0*Y0\n"), &Default::default())
         .expect_err("anti-Hermitian MPP product")
         .to_string();
     assert!(
@@ -930,7 +938,7 @@ fn circuit_flow_generators_measurement_subset_rejects_anti_hermitian_mpp_product
         "unexpected anti-Hermitian MPP error: {error}"
     );
 
-    let error = circuit_flow_generators(&circuit("SPP X0*Z0\n"))
+    let error = circuit_flow_generators(&circuit("SPP X0*Z0\n"), &Default::default())
         .expect_err("anti-Hermitian SPP product")
         .to_string();
     assert!(
@@ -938,7 +946,7 @@ fn circuit_flow_generators_measurement_subset_rejects_anti_hermitian_mpp_product
         "unexpected anti-Hermitian SPP error: {error}"
     );
 
-    let error = circuit_flow_generators(&circuit("SPP X0*Z0\nM 0\n"))
+    let error = circuit_flow_generators(&circuit("SPP X0*Z0\nM 0\n"), &Default::default())
         .expect_err("composed anti-Hermitian SPP product")
         .to_string();
     assert!(
@@ -948,7 +956,7 @@ fn circuit_flow_generators_measurement_subset_rejects_anti_hermitian_mpp_product
 }
 
 fn generator_strings(text: &str) -> Vec<String> {
-    circuit_flow_generators(&circuit(text))
+    circuit_flow_generators(&circuit(text), &Default::default())
         .expect("flow generators")
         .into_iter()
         .map(|flow| flow.to_string())

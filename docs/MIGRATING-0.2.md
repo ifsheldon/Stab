@@ -444,6 +444,47 @@ Refusals that were misreported are now typed:
 - A budget refusal raised while a sample run is writing reports `resource-limit-exceeded` instead of `sampling-execution-failed`.
 - The JSON `span` of a refusal that has no source position is `null` instead of an empty span at byte zero.
 
+## One Function Per Analysis Operation
+
+Every `stab-analysis` operation is one function that takes its options by reference; the `_with_options`, `_with_limits`, and `_with_budget` twins are removed, and callers of a former plain form pass `&Default::default()`.
+Options types have public fields and no `with_*` builders, and carry their limits as `memory_budget` and `cancellation`.
+Earlier sections of this guide that name a removed twin describe the intermediate API.
+
+| Removed | Replacement |
+| --- | --- |
+| `circuit_to_tableau(c, bool, bool, bool)` and `circuit_to_tableau_with_options` | `circuit_to_tableau(c, &CircuitToTableauOptions)` |
+| `pauli_after_circuit_with_options`, `pauli_before_circuit_with_options` | `pauli_after_circuit(p, c, &PauliConjugationOptions)`, `pauli_before_circuit(p, c, &PauliConjugationOptions)` |
+| `circuit_inverse_qec_with_options`, `circuit_time_reversed_for_flows_with_options` | `circuit_inverse_qec(c, &InverseQecOptions)`, `circuit_time_reversed_for_flows(c, flows, &TimeReversedForFlowsOptions)` |
+| `circuit_flow_generators_with_options` | `circuit_flow_generators(c, &FlowGeneratorOptions)` |
+| `solve_for_flow_measurements(c, flows)` | `solve_for_flow_measurements(c, flows, &FlowMeasurementOptions)` |
+| `circuit_with_inlined_feedback_with_limits` and `FeedbackInliningLimits` | `circuit_with_inlined_feedback(c, &FeedbackInliningOptions)` |
+| `flattened_circuit_with_limits`, `flattened_circuit_operations_with_limits`, and `CircuitFlattenLimits` | `flattened_circuit(c, &CircuitFlattenOptions)`, `flattened_circuit_operations(c, &CircuitFlattenOptions)` |
+| `flattened_detector_error_model_with_limits` and `DemFlattenLimits` | `flattened_detector_error_model(m, &DemFlattenOptions)` |
+| `shortest_error_sat_problem_with_limits`, `likeliest_error_sat_problem_with_limits` | `shortest_error_sat_problem(m, &SatMaterializationLimits)`, `likeliest_error_sat_problem(m, quantization, &SatMaterializationLimits)` |
+| `all_detecting_region_targets_with_budget`, `all_detecting_region_ticks_with_budget` | `all_detecting_region_targets(c, &DetectingRegionListOptions)`, `all_detecting_region_ticks(c, &DetectingRegionListOptions)` |
+| `circuit_detecting_regions(c, DetectingRegionOptions { detectors, ticks, .. })` | `circuit_detecting_regions(c, &detectors, &ticks, &DetectingRegionOptions)` |
+| `circuit_detecting_regions_for_targets` with `DetectingRegionTargetOptions` | `circuit_detecting_regions_for_targets(c, &targets, &ticks, &DetectingRegionOptions)` |
+| `missing_detectors(c, options)` and `circuit_to_detector_error_model(c, options)` by value | The same functions taking `&options` |
+| `CircuitPassLimits`, `CircuitPassContext::{new, limits, with_cancellation}` | `CircuitPassContext { memory_budget, repeat_nesting, cancellation }` |
+| `with_*` builders and getters on `SatMaterializationLimits` and `LogicalErrorSearchLimits` | Public fields with struct-update syntax |
+
+`ErrorAnalyzerOptions` no longer holds five independent booleans:
+
+| Removed field | Replacement |
+| --- | --- |
+| `fold_loops` | `loops: LoopFolding::{Unroll, Fold}` |
+| `decompose_errors` | `decomposition: Option<ErrorDecomposition>`, where `None` does not decompose |
+| `ignore_decomposition_failures` | `ErrorDecomposition::on_failure: DecompositionFailure::{Fail, Ignore}` |
+| `block_decomposition_from_introducing_remnant_edges` | `ErrorDecomposition::remnant_edges: RemnantEdges::{Allow, Block}` |
+| `allow_gauge_detectors` | `gauge_detectors: GaugeDetectors::{Reject, Allow}` |
+| `approximate_disjoint_errors_threshold` | `approximate_disjoint_errors` |
+
+The two decomposition refinements cannot be set without decomposition.
+`stab analyze_errors` still accepts `--ignore_decomposition_failures` and `--block_decompose_from_introducing_remnant_edges` without `--decompose_errors` and ignores them, as Stim does.
+
+Behavior changes: `solve_for_flow_measurements` admits its elimination table against `FlowMeasurementOptions::memory_budget` and polls its cancellation signal, and `all_detecting_region_targets` and `all_detecting_region_ticks` poll theirs.
+No command output changes.
+
 ## Typed Gate Data
 
 Built-in gate data is typed in `stab-model` and no product crate parses gate text at run time.
@@ -633,7 +674,7 @@ Before 0.2, a workflow often returned `stab_core::CircuitResult<T>`. In 0.2, ret
 fn analyze(circuit: &stab_model::Circuit) -> stab_analysis::AnalysisResult<stab_model::DetectorErrorModel> {
     stab_analysis::circuit_to_detector_error_model(
         circuit,
-        stab_analysis::ErrorAnalyzerOptions::default(),
+        &stab_analysis::ErrorAnalyzerOptions::default(),
     )
 }
 ```

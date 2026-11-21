@@ -27,7 +27,7 @@ trait CircuitTransformTestExt {
 
 impl CircuitTransformTestExt for Circuit {
     fn flattened(&self) -> AnalysisResult<Circuit> {
-        flattened_circuit(self)
+        flattened_circuit(self, &Default::default())
     }
 
     fn without_noise(&self) -> AnalysisResult<Circuit> {
@@ -39,7 +39,7 @@ impl CircuitTransformTestExt for Circuit {
     }
 
     fn with_inlined_feedback(&self) -> AnalysisResult<Circuit> {
-        circuit_with_inlined_feedback(self)
+        circuit_with_inlined_feedback(self, &Default::default())
     }
 }
 
@@ -49,7 +49,7 @@ trait DemTransformTestExt {
 
 impl DemTransformTestExt for DetectorErrorModel {
     fn flattened(&self) -> AnalysisResult<DetectorErrorModel> {
-        flattened_detector_error_model(self)
+        flattened_detector_error_model(self, &Default::default())
     }
 }
 
@@ -58,7 +58,7 @@ fn circuit(text: &str) -> Circuit {
 }
 
 fn sorted_flow_strings(circuit: &Circuit) -> Vec<String> {
-    let mut flows = circuit_flow_generators(circuit)
+    let mut flows = circuit_flow_generators(circuit, &Default::default())
         .expect("generate flows")
         .into_iter()
         .map(|flow| flow.to_string())
@@ -111,13 +111,13 @@ fn assert_no_product_measurement_gates(circuit: &Circuit) {
 #[test]
 fn flattened_matches_pinned_stim_basic_cases() {
     assert_eq!(
-        flattened_circuit(&Circuit::new())
+        flattened_circuit(&Circuit::new(), &Default::default())
             .expect("flatten")
             .to_stim_string(),
         ""
     );
     assert_eq!(
-        flattened_circuit(&circuit("SHIFT_COORDS(1, 2)\n"))
+        flattened_circuit(&circuit("SHIFT_COORDS(1, 2)\n"), &Default::default())
             .expect("flatten")
             .to_stim_string(),
         ""
@@ -205,8 +205,9 @@ H[test2] 0 0
 
 #[test]
 fn flattened_operations_unrolls_without_fusing() {
-    let operations = flattened_circuit_operations(&circuit(
-        "
+    let operations = flattened_circuit_operations(
+        &circuit(
+            "
         H 0
         REPEAT 3 {
             X_ERROR(0.125) 1
@@ -215,7 +216,9 @@ fn flattened_operations_unrolls_without_fusing() {
         M 0 !1
         DETECTOR rec[-1]
     ",
-    ))
+        ),
+        &Default::default(),
+    )
     .expect("flatten operations");
 
     let lines = operations
@@ -509,7 +512,8 @@ fn decomposed_preserves_selected_measurement_rich_flows() {
     ] {
         let input = circuit(text);
         let decomposed = input.decomposed().expect("decompose");
-        let input_flows = circuit_flow_generators(&input).expect("input flows");
+        let input_flows =
+            circuit_flow_generators(&input, &Default::default()).expect("input flows");
 
         assert_no_product_measurement_gates(&decomposed);
         assert_eq!(
@@ -542,7 +546,8 @@ fn with_inlined_feedback_exposes_supported_transform_subset() {
     ",
     );
 
-    let output = circuit_with_inlined_feedback(&circuit).expect("inline feedback");
+    let output =
+        circuit_with_inlined_feedback(&circuit, &Default::default()).expect("inline feedback");
 
     assert_eq!(
         output.to_stim_string(),
@@ -654,10 +659,10 @@ M 3
 DETECTOR rec[-3] rec[-1]
 "
     );
-    let expected_dem = circuit_to_detector_error_model(&input, ErrorAnalyzerOptions::default())
+    let expected_dem = circuit_to_detector_error_model(&input, &ErrorAnalyzerOptions::default())
         .expect("input DEM")
         .to_dem_string();
-    let actual_dem = circuit_to_detector_error_model(&inlined, ErrorAnalyzerOptions::default())
+    let actual_dem = circuit_to_detector_error_model(&inlined, &ErrorAnalyzerOptions::default())
         .expect("inlined DEM")
         .to_dem_string();
     assert_eq!(actual_dem, expected_dem);
@@ -776,12 +781,12 @@ DETECTOR rec[-3] rec[-2] rec[-1]
 "
     );
 
-    let expected_dem = circuit_to_detector_error_model(&input, ErrorAnalyzerOptions::default())
+    let expected_dem = circuit_to_detector_error_model(&input, &ErrorAnalyzerOptions::default())
         .expect("input DEM")
         .flattened()
         .expect("flatten input DEM")
         .to_dem_string();
-    let actual_dem = circuit_to_detector_error_model(&inlined, ErrorAnalyzerOptions::default())
+    let actual_dem = circuit_to_detector_error_model(&inlined, &ErrorAnalyzerOptions::default())
         .expect("inlined DEM")
         .flattened()
         .expect("flatten inlined DEM")
@@ -816,12 +821,12 @@ fn with_inlined_feedback_handles_nested_bounded_repeat_feedback() {
         .expect("inline nested repeat feedback");
 
     assert_no_measurement_feedback_controls(&inlined);
-    let expected_dem = circuit_to_detector_error_model(&input, ErrorAnalyzerOptions::default())
+    let expected_dem = circuit_to_detector_error_model(&input, &ErrorAnalyzerOptions::default())
         .expect("input DEM")
         .flattened()
         .expect("flatten input DEM")
         .to_dem_string();
-    let actual_dem = circuit_to_detector_error_model(&inlined, ErrorAnalyzerOptions::default())
+    let actual_dem = circuit_to_detector_error_model(&inlined, &ErrorAnalyzerOptions::default())
         .expect("inlined DEM")
         .flattened()
         .expect("flatten inlined DEM")
@@ -865,10 +870,10 @@ fn with_inlined_feedback_supports_xcz_ycz_feedback() {
 
     assert_no_measurement_feedback_controls(&inlined);
     assert_eq!(inlined, equivalent_inlined);
-    let expected_dem = circuit_to_detector_error_model(&input, ErrorAnalyzerOptions::default())
+    let expected_dem = circuit_to_detector_error_model(&input, &ErrorAnalyzerOptions::default())
         .expect("input DEM")
         .to_dem_string();
-    let actual_dem = circuit_to_detector_error_model(&inlined, ErrorAnalyzerOptions::default())
+    let actual_dem = circuit_to_detector_error_model(&inlined, &ErrorAnalyzerOptions::default())
         .expect("inlined DEM")
         .to_dem_string();
     assert_eq!(actual_dem, expected_dem);

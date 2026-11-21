@@ -8,7 +8,7 @@ use std::assert_matches;
 use stab_algebra::Tableau;
 use stab_analysis::{
     AnalysisError, AnalysisOperation, AnalysisResult, CircuitToTableauOptions, ResourceKind,
-    circuit_to_tableau, circuit_to_tableau_with_options,
+    circuit_to_tableau,
 };
 use stab_model::{Cancellation, Circuit, MemoryBudget};
 
@@ -28,7 +28,15 @@ impl CircuitTableauTestExt for Circuit {
         ignore_measurement: bool,
         ignore_reset: bool,
     ) -> AnalysisResult<Tableau> {
-        circuit_to_tableau(self, ignore_noise, ignore_measurement, ignore_reset)
+        circuit_to_tableau(
+            self,
+            &CircuitToTableauOptions {
+                ignore_noise,
+                ignore_measurement,
+                ignore_reset,
+                ..Default::default()
+            },
+        )
     }
 }
 
@@ -431,13 +439,12 @@ fn circuit_to_tableau_admits_bytes_and_squares_repeats_cancellably() {
         ..CircuitToTableauOptions::default()
     };
     assert_eq!(
-        circuit_to_tableau_with_options(&wide, &options(required))
+        circuit_to_tableau(&wide, &options(required))
             .expect("exact budget")
             .len(),
         1_000
     );
-    let error = circuit_to_tableau_with_options(&wide, &options(required - 1))
-        .expect_err("first excess byte");
+    let error = circuit_to_tableau(&wide, &options(required - 1)).expect_err("first excess byte");
     let resource = error.resource_limit_error().expect("typed budget refusal");
     assert_eq!(resource.operation(), AnalysisOperation::TableauConversion);
     assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
@@ -448,7 +455,7 @@ fn circuit_to_tableau_admits_bytes_and_squares_repeats_cancellably() {
 
     let cancellation = Cancellation::new();
     cancellation.cancel();
-    let cancelled = circuit_to_tableau_with_options(
+    let cancelled = circuit_to_tableau(
         &circuit(&format!("REPEAT {count} {{\n{body}}}\n")),
         &CircuitToTableauOptions {
             cancellation,
@@ -465,7 +472,7 @@ fn circuit_to_tableau_admits_bytes_and_squares_repeats_cancellably() {
         std::thread::sleep(std::time::Duration::from_millis(50));
         signal.cancel();
     });
-    let cancelled = circuit_to_tableau_with_options(
+    let cancelled = circuit_to_tableau(
         &circuit(&format!("REPEAT {count} {{\n{body}CX 2 1099\n}}\n")),
         &CircuitToTableauOptions {
             cancellation,

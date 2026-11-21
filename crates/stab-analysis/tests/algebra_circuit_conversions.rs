@@ -9,8 +9,8 @@ use std::str::FromStr;
 
 use stab_algebra::{PauliBasis, PauliString, SignIteration, Tableau, TableauIterator};
 use stab_analysis::{
-    AnalysisError, AnalysisRequestError, circuit_to_tableau, pauli_after_circuit,
-    pauli_before_circuit, tableau_to_circuit,
+    AnalysisError, AnalysisRequestError, CircuitToTableauOptions, circuit_to_tableau,
+    pauli_after_circuit, pauli_before_circuit, tableau_to_circuit,
 };
 use stab_model::{Circuit, CircuitItem, GateKind, QubitId};
 
@@ -39,7 +39,7 @@ fn algebra_circuit_conversions_match_stim() {
         "ISWAP 0 1\n",
         "H 0 1 2\nCX 0 1 1 2\nS 0 2\nCX 2 0\n",
     ] {
-        let tableau = circuit_to_tableau(&circuit(source), false, false, false)
+        let tableau = circuit_to_tableau(&circuit(source), &CircuitToTableauOptions::default())
             .expect("source circuit tableau");
         assert_synthesis_round_trip(&tableau);
     }
@@ -50,7 +50,7 @@ fn algebra_circuit_conversions_match_stim() {
 fn tableau_synthesis_round_trips_representative_wide_cliffords() {
     for width in [16, 64, 65, 130, 256] {
         let source = structured_clifford(width);
-        let tableau = circuit_to_tableau(&source, false, false, false)
+        let tableau = circuit_to_tableau(&source, &CircuitToTableauOptions::default())
             .expect("structured source circuit tableau");
         assert_synthesis_round_trip(&tableau);
     }
@@ -60,11 +60,12 @@ fn assert_pauli_circuit_conjugation() {
     // Adapted from Stim v1.16.0 pauli_string.after_circuit and before_circuit tests.
     let unitary = circuit("H 1\nCX 1 2\nS 2\n");
     assert_eq!(
-        pauli_after_circuit(&pauli("+_XYZ"), &unitary).expect("unitary after"),
+        pauli_after_circuit(&pauli("+_XYZ"), &unitary, &Default::default()).expect("unitary after"),
         pauli("-__XZ")
     );
     assert_eq!(
-        pauli_before_circuit(&pauli("-__XZ"), &unitary).expect("unitary before"),
+        pauli_before_circuit(&pauli("-__XZ"), &unitary, &Default::default())
+            .expect("unitary before"),
         pauli("+_XYZ")
     );
 
@@ -72,33 +73,39 @@ fn assert_pauli_circuit_conjugation() {
         "QUBIT_COORDS(2, 3) 5\nREPEAT 5 {\n    DETECTOR rec[-1]\n}\nH 1\nTICK\nOBSERVABLE_INCLUDE(0) rec[-1]\nCX 1 2\nS 2\nSHIFT_COORDS(1, 2, 3)\n",
     );
     assert_eq!(
-        pauli_after_circuit(&pauli("+_XYZ"), &annotated).expect("ignore annotations"),
+        pauli_after_circuit(&pauli("+_XYZ"), &annotated, &Default::default())
+            .expect("ignore annotations"),
         pauli("-__XZ")
     );
 
     assert_eq!(
-        pauli_before_circuit(&pauli("+Z"), &circuit("R 0\n")).expect("undo reset"),
+        pauli_before_circuit(&pauli("+Z"), &circuit("R 0\n"), &Default::default())
+            .expect("undo reset"),
         pauli("+_")
     );
     assert_eq!(
-        pauli_after_circuit(&pauli("+_"), &circuit("R 0\n")).expect("avoid reset"),
+        pauli_after_circuit(&pauli("+_"), &circuit("R 0\n"), &Default::default())
+            .expect("avoid reset"),
         pauli("+_")
     );
-    assert!(pauli_after_circuit(&pauli("+Z"), &circuit("R 0\n")).is_err());
-    assert!(pauli_before_circuit(&pauli("+X"), &circuit("R 0\n")).is_err());
+    assert!(pauli_after_circuit(&pauli("+Z"), &circuit("R 0\n"), &Default::default()).is_err());
+    assert!(pauli_before_circuit(&pauli("+X"), &circuit("R 0\n"), &Default::default()).is_err());
 
     assert_eq!(
-        pauli_after_circuit(&pauli("+Z_"), &circuit("M 0\nH 1\n")).expect("commuting measurement"),
+        pauli_after_circuit(&pauli("+Z_"), &circuit("M 0\nH 1\n"), &Default::default())
+            .expect("commuting measurement"),
         pauli("+Z_")
     );
-    assert!(pauli_after_circuit(&pauli("+X_"), &circuit("M 0\nH 1\n")).is_err());
+    assert!(
+        pauli_after_circuit(&pauli("+X_"), &circuit("M 0\nH 1\n"), &Default::default()).is_err()
+    );
 
     let mpp = circuit("MPP X2*Y3*Z4 X5*X6\nH 1\n");
     assert_eq!(
-        pauli_after_circuit(&pauli("+_XXYZXX"), &mpp).expect("commuting MPP"),
+        pauli_after_circuit(&pauli("+_XXYZXX"), &mpp, &Default::default()).expect("commuting MPP"),
         pauli("+_ZXYZXX")
     );
-    assert!(pauli_after_circuit(&pauli("+__XXYZX"), &mpp).is_err());
+    assert!(pauli_after_circuit(&pauli("+__XXYZX"), &mpp, &Default::default()).is_err());
 
     for (gate, commuting, anticommuting) in [
         ("CX rec[-1] 0", "+X_", "+Z_"),
@@ -109,28 +116,31 @@ fn assert_pauli_circuit_conjugation() {
     ] {
         let controlled = circuit(&format!("M 1\n{gate}\n"));
         assert_eq!(
-            pauli_after_circuit(&pauli(commuting), &controlled).expect("commuting feedback"),
+            pauli_after_circuit(&pauli(commuting), &controlled, &Default::default())
+                .expect("commuting feedback"),
             pauli(commuting),
             "{gate} after"
         );
         assert_eq!(
-            pauli_before_circuit(&pauli(commuting), &controlled).expect("commuting feedback"),
+            pauli_before_circuit(&pauli(commuting), &controlled, &Default::default())
+                .expect("commuting feedback"),
             pauli(commuting),
             "{gate} before"
         );
         assert!(
-            pauli_after_circuit(&pauli(anticommuting), &controlled).is_err(),
+            pauli_after_circuit(&pauli(anticommuting), &controlled, &Default::default()).is_err(),
             "{gate} after"
         );
         assert!(
-            pauli_before_circuit(&pauli(anticommuting), &controlled).is_err(),
+            pauli_before_circuit(&pauli(anticommuting), &controlled, &Default::default()).is_err(),
             "{gate} before"
         );
     }
 
     let classical_cz = circuit("M 0\nCZ rec[-1] sweep[0]\n");
     assert_eq!(
-        pauli_after_circuit(&pauli("+Z"), &classical_cz).expect("classical CZ no-op"),
+        pauli_after_circuit(&pauli("+Z"), &classical_cz, &Default::default())
+            .expect("classical CZ no-op"),
         pauli("+Z")
     );
 
@@ -141,11 +151,13 @@ fn assert_pauli_circuit_conjugation() {
         .set(777, PauliBasis::Z)
         .expect("wide expected support");
     assert_eq!(
-        pauli_after_circuit(&wide, &circuit("H 777\n")).expect("wide local Clifford"),
+        pauli_after_circuit(&wide, &circuit("H 777\n"), &Default::default())
+            .expect("wide local Clifford"),
         expected
     );
     assert_eq!(
-        pauli_before_circuit(&expected, &circuit("H 777\n")).expect("wide local inverse"),
+        pauli_before_circuit(&expected, &circuit("H 777\n"), &Default::default())
+            .expect("wide local inverse"),
         wide
     );
 }
@@ -159,13 +171,13 @@ fn pauli_conjugation_rejects_a_pauli_narrower_than_the_circuit_as_a_request_erro
         (
             "S 0\nS 1\n",
             GateKind::S,
-            pauli_after_circuit as fn(&_, &_) -> _,
+            pauli_after_circuit as fn(&_, &_, &_) -> _,
         ),
         ("S 0\nS 1\n", GateKind::S, pauli_before_circuit),
         ("M 1\nS 0\n", GateKind::M, pauli_after_circuit),
     ] {
         assert_eq!(
-            conjugate(&pauli("+Z"), &circuit(text)),
+            conjugate(&pauli("+Z"), &circuit(text), &Default::default()),
             Err(AnalysisError::InvalidRequest(
                 AnalysisRequestError::PauliNarrowerThanCircuit {
                     gate,
@@ -177,7 +189,11 @@ fn pauli_conjugation_rejects_a_pauli_narrower_than_the_circuit_as_a_request_erro
         );
     }
     assert_eq!(
-        pauli_after_circuit(&pauli("+Z"), &circuit("QUBIT_COORDS(1) 4\nTICK\nS 0\n")),
+        pauli_after_circuit(
+            &pauli("+Z"),
+            &circuit("QUBIT_COORDS(1) 4\nTICK\nS 0\n"),
+            &Default::default()
+        ),
         Ok(pauli("+Z"))
     );
 }
@@ -186,19 +202,30 @@ fn pauli_conjugation_rejects_a_pauli_narrower_than_the_circuit_as_a_request_erro
 fn pauli_circuit_conjugation_keeps_compact_unitaries_and_does_not_cap_nonunitary_work() {
     let folded = circuit("REPEAT 1000000000 {\n    H 0\n}\n");
     assert_eq!(
-        pauli_after_circuit(&pauli("+X"), &folded).expect("compact unitary repeat"),
+        pauli_after_circuit(&pauli("+X"), &folded, &Default::default())
+            .expect("compact unitary repeat"),
         pauli("+X")
     );
 
-    assert!(pauli_after_circuit(&pauli("+_"), &circuit("X_ERROR(0) 0\n")).is_err());
-    assert!(pauli_after_circuit(&pauli("+_"), &circuit("H 1\n")).is_err());
-    assert!(pauli_after_circuit(&pauli("+__"), &circuit("MXX 0 1\n")).is_err());
+    assert!(
+        pauli_after_circuit(
+            &pauli("+_"),
+            &circuit("X_ERROR(0) 0\n"),
+            &Default::default()
+        )
+        .is_err()
+    );
+    assert!(pauli_after_circuit(&pauli("+_"), &circuit("H 1\n"), &Default::default()).is_err());
+    assert!(
+        pauli_after_circuit(&pauli("+__"), &circuit("MXX 0 1\n"), &Default::default()).is_err()
+    );
 
     // Nonunitary expansion is CPU work over one fixed-width Pauli string, so work above the
     // retired one-million-instruction cap completes.
     let above_retired_cap = circuit("REPEAT 1000001 {\n    M 0\n}\n");
     assert_eq!(
-        pauli_after_circuit(&pauli("+Z"), &above_retired_cap).expect("uncapped nonunitary work"),
+        pauli_after_circuit(&pauli("+Z"), &above_retired_cap, &Default::default())
+            .expect("uncapped nonunitary work"),
         pauli("+Z")
     );
 }
@@ -206,7 +233,8 @@ fn pauli_circuit_conjugation_keeps_compact_unitaries_and_does_not_cap_nonunitary
 fn assert_synthesis_round_trip(tableau: &Tableau) {
     let circuit = tableau_to_circuit(tableau).expect("synthesize tableau");
     assert_eq!(
-        circuit_to_tableau(&circuit, false, false, false).expect("round-trip tableau"),
+        circuit_to_tableau(&circuit, &CircuitToTableauOptions::default())
+            .expect("round-trip tableau"),
         *tableau
     );
     for item in circuit.items() {

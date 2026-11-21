@@ -39,9 +39,9 @@ fn repeat_skips_unrequested_compact_tick_spans() {
     .unwrap();
     let actual = circuit_detecting_regions(
         &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: ticks(&[0, 500_000_000_000, 999_999_999_999]),
+        &[detector(0)],
+        &ticks(&[0, 500_000_000_000, 999_999_999_999]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -62,13 +62,13 @@ fn repeat_folds_nontrivial_zero_tick_body() {
     assert!(
         circuit_detecting_regions_for_targets(
             &empty,
-            DetectingRegionTargetOptions {
-                targets: vec![],
-                ticks: vec![],
+            &[],
+            &[],
+            &DetectingRegionOptions {
                 ignore_anticommutation_errors: false,
                 memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
-            },
+            }
         )
         .unwrap()
         .is_empty()
@@ -94,9 +94,9 @@ fn large_identity_snapshot_stays_sparse() {
     .unwrap();
     let actual = circuit_detecting_regions(
         &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: ticks(&[1_000_000_000_000]),
+        &[detector(0)],
+        &ticks(&[1_000_000_000_000]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -115,9 +115,9 @@ fn large_active_snapshot_is_admitted_in_bytes() {
     .unwrap();
     let actual = circuit_detecting_regions(
         &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: ticks(&[999_999_999_999]),
+        &[detector(0)],
+        &ticks(&[999_999_999_999]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -139,9 +139,9 @@ fn huge_repeat_reports_semantic_errors_promptly() {
     let circuit = Circuit::from_stim_str("REPEAT 1000000000000 {\n    MPP X0*Z0\n}\n").unwrap();
     let error = circuit_detecting_regions_for_targets(
         &circuit,
-        DetectingRegionTargetOptions {
-            targets: vec![],
-            ticks: vec![],
+        &[],
+        &[],
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -172,22 +172,20 @@ fn repeat_nesting_boundary_is_exact() {
         .stack_size(2 * 1024 * 1024)
         .spawn(|| {
             let max_depth = RepeatNestingLimit::HARD_MAX;
-            let empty_options = || DetectingRegionTargetOptions {
-                targets: vec![],
-                ticks: vec![],
-                ignore_anticommutation_errors: false,
-                memory_budget: stab_model::MemoryBudget::DEFAULT,
-                cancellation: stab_model::Cancellation::never(),
-            };
-            circuit_detecting_regions_for_targets(&nested(max_depth, "TICK\n"), empty_options())
-                .unwrap();
+            circuit_detecting_regions_for_targets(
+                &nested(max_depth, "TICK\n"),
+                &[],
+                &[],
+                &DetectingRegionOptions::default(),
+            )
+            .unwrap();
 
             let active = nested(max_depth, "R 0\nTICK\nX 0\nM 0\nDETECTOR rec[-1]\n");
             let regions = circuit_detecting_regions_for_targets(
                 &active,
-                DetectingRegionTargetOptions {
-                    targets: vec![DemTarget::relative_detector(0).unwrap()],
-                    ticks: vec![CircuitTick::new(0)],
+                &[DemTarget::relative_detector(0).unwrap()],
+                &[CircuitTick::new(0)],
+                &DetectingRegionOptions {
                     ignore_anticommutation_errors: false,
                     memory_budget: stab_model::MemoryBudget::DEFAULT,
                     cancellation: stab_model::Cancellation::never(),
@@ -230,9 +228,9 @@ fn repeat_nesting_boundary_is_exact() {
             }
             let regions = circuit_detecting_regions_for_targets(
                 &folded,
-                DetectingRegionTargetOptions {
-                    targets: vec![DemTarget::relative_detector(0).unwrap()],
-                    ticks: vec![CircuitTick::new(0)],
+                &[DemTarget::relative_detector(0).unwrap()],
+                &[CircuitTick::new(0)],
+                &DetectingRegionOptions {
                     ignore_anticommutation_errors: false,
                     memory_budget: stab_model::MemoryBudget::DEFAULT,
                     cancellation: stab_model::Cancellation::never(),
@@ -244,7 +242,9 @@ fn repeat_nesting_boundary_is_exact() {
             assert_resource_error(
                 circuit_detecting_regions_for_targets(
                     &nested(max_depth + 1, "TICK\n"),
-                    empty_options(),
+                    &[],
+                    &[],
+                    &DetectingRegionOptions::default(),
                 )
                 .unwrap_err(),
                 ResourceKind::RepeatNesting,
@@ -290,9 +290,9 @@ fn live_tracker_sensitivity_is_metered_without_reset_round_overcounting() {
     let tight = MemoryBudget::from_bytes(4096);
     let extracted = circuit_detecting_regions(
         &reset_bounded,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: ticks(&[0]),
+        &[detector(0)],
+        &ticks(&[0]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: tight,
             cancellation: stab_model::Cancellation::never(),
@@ -316,9 +316,9 @@ fn live_tracker_sensitivity_is_metered_without_reset_round_overcounting() {
     let represented_only = MemoryBudget::from_bytes(132 * DETECTING_REGION_LIVE_STATE_UNIT_BYTES);
     let error = circuit_detecting_regions(
         &wide_live,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: ticks(&[0]),
+        &[detector(0)],
+        &ticks(&[0]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: represented_only,
             cancellation: stab_model::Cancellation::never(),
@@ -339,9 +339,9 @@ fn caller_budget_governs_region_requests() {
     let request = |memory_budget| {
         circuit_detecting_regions(
             &circuit,
-            DetectingRegionOptions {
-                detectors: vec![detector(0)],
-                ticks: ticks(&[0]),
+            &[detector(0)],
+            &ticks(&[0]),
+            &DetectingRegionOptions {
                 ignore_anticommutation_errors: false,
                 memory_budget,
                 cancellation: stab_model::Cancellation::never(),

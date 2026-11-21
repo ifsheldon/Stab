@@ -9,14 +9,14 @@ use stab_model::{Circuit, Probability};
 
 fn analyze(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
-    circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+    circuit_to_detector_error_model(&circuit, &ErrorAnalyzerOptions::default())
         .expect("analyze")
         .to_dem_string()
 }
 
 fn analyze_with_options(text: &str, options: ErrorAnalyzerOptions) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
-    circuit_to_detector_error_model(&circuit, options)
+    circuit_to_detector_error_model(&circuit, &options)
         .expect("analyze")
         .to_dem_string()
 }
@@ -65,7 +65,7 @@ fn dem_analyzer_pauli_channel1_crosses_product_measurements_like_stim() {
             "../../../oracle/fixtures/inputs/analyze_errors_pauli_channel1_product_measurements.stim"
         ),
         ErrorAnalyzerOptions {
-            approximate_disjoint_errors_threshold: Some(Probability::try_new(1.0).unwrap()),
+            approximate_disjoint_errors: Some(Probability::try_new(1.0).unwrap()),
             ..ErrorAnalyzerOptions::default()
         },
     );
@@ -87,7 +87,7 @@ fn dem_analyzer_rejects_measurement_record_before_beginning_like_upstream() {
         ",
     ] {
         let parsed = Circuit::from_stim_str(circuit).expect("circuit");
-        let error = circuit_to_detector_error_model(&parsed, ErrorAnalyzerOptions::default())
+        let error = circuit_to_detector_error_model(&parsed, &ErrorAnalyzerOptions::default())
             .unwrap_err()
             .to_string();
         assert!(error.contains("out of range"));

@@ -21,7 +21,7 @@ pub(in crate::dem) fn search_graph_nonzero_error_targets(
     policy: SearchGraphTargetPolicy,
     limits: &LogicalErrorSearchLimits,
 ) -> AnalysisResult<BTreeSet<DemDetectorId>> {
-    let mut counts = DemErrorTargetCounts::new(limits.max_effective_detector_nodes());
+    let mut counts = DemErrorTargetCounts::new(limits.max_effective_detector_nodes);
     visit_search_graph_errors_with_limits(
         traversal,
         context,
@@ -47,7 +47,7 @@ pub(in crate::dem) fn visit_search_graph_errors_with_limits<F>(
 where
     F: FnMut(&DemInstruction, u64) -> AnalysisResult<()>,
 {
-    limits.cancellation().check()?;
+    limits.cancellation.check()?;
     traversal.validate_repeat_depth(context)?;
     let block_policies = SearchBlockPolicies::new(traversal.root());
     let mut visitor = SearchErrorVisitor {
@@ -84,13 +84,13 @@ where
         instruction: &DemInstruction,
         state: &DemTraversalState,
     ) -> AnalysisResult<ControlFlow<()>> {
-        self.countdown.tick(self.limits.cancellation())?;
+        self.countdown.tick(&self.limits.cancellation)?;
         if is_nonzero_probability_error(instruction) {
             let visited_error_mechanisms = self
                 .visited_error_mechanisms
                 .checked_add(1)
                 .ok_or_else(|| traversal_error(self.context, "error mechanism count overflowed"))?;
-            let mechanism_limit = self.limits.max_expanded_error_mechanisms();
+            let mechanism_limit = self.limits.max_expanded_error_mechanisms;
             if visited_error_mechanisms > mechanism_limit {
                 return Err(ResourceLimitError::logical_error_search(
                     self.context,
@@ -101,7 +101,7 @@ where
                 .into());
             }
             let target_occurrences = instruction.targets().len();
-            let per_mechanism_limit = self.limits.max_error_target_occurrences_per_mechanism();
+            let per_mechanism_limit = self.limits.max_error_target_occurrences_per_mechanism;
             if target_occurrences > per_mechanism_limit {
                 return Err(ResourceLimitError::logical_error_search(
                     self.context,
@@ -117,7 +117,7 @@ where
                 .ok_or_else(|| {
                     traversal_error(self.context, "total target occurrence count overflowed")
                 })?;
-            let total_target_limit = self.limits.max_total_error_target_occurrences();
+            let total_target_limit = self.limits.max_total_error_target_occurrences;
             if visited_target_occurrences > total_target_limit {
                 return Err(ResourceLimitError::logical_error_search(
                     self.context,
@@ -148,7 +148,7 @@ where
             return Ok(DemRepeatSelection::FoldOnce);
         }
         let repeat_count = repeat.repeat_count().get();
-        let repeat_limit = self.limits.max_repeat_unroll();
+        let repeat_limit = self.limits.max_repeat_unroll;
         if repeat_count > repeat_limit {
             return Err(ResourceLimitError::logical_error_search(
                 self.context,
@@ -159,13 +159,13 @@ where
             .into());
         }
         Ok(DemRepeatSelection::Expand {
-            max_total_iterations: self.limits.max_repeat_iterations(),
+            max_total_iterations: self.limits.max_repeat_iterations,
             context: self.context,
         })
     }
 
     fn poll_cancellation(&mut self) -> AnalysisResult<()> {
-        Ok(self.countdown.tick(self.limits.cancellation())?)
+        Ok(self.countdown.tick(&self.limits.cancellation)?)
     }
 
     fn repeat_expansion_limit_error(
@@ -544,10 +544,14 @@ mod tests {
             }
         };
         let forwarded = Cell::new(0);
-        let mechanism_limits =
-            LogicalErrorSearchLimits::default().with_max_expanded_error_mechanisms(u64::MAX);
-        let target_limits =
-            LogicalErrorSearchLimits::default().with_max_total_error_target_occurrences(usize::MAX);
+        let mechanism_limits = LogicalErrorSearchLimits {
+            max_expanded_error_mechanisms: u64::MAX,
+            ..LogicalErrorSearchLimits::default()
+        };
+        let target_limits = LogicalErrorSearchLimits {
+            max_total_error_target_occurrences: usize::MAX,
+            ..LogicalErrorSearchLimits::default()
+        };
         let mut mechanism_visitor = SearchErrorVisitor {
             context: "test search",
             limits: &mechanism_limits,
@@ -623,8 +627,10 @@ mod tests {
     fn rejected_error_payload_is_not_forwarded_to_search_graph_work() {
         let model = DetectorErrorModel::from_dem_str("error(0.1) D0 D1 L0\n").unwrap();
         let traversal = FoldedDemTraversal::new(&model).unwrap();
-        let limits =
-            LogicalErrorSearchLimits::default().with_max_error_target_occurrences_per_mechanism(2);
+        let limits = LogicalErrorSearchLimits {
+            max_error_target_occurrences_per_mechanism: 2,
+            ..LogicalErrorSearchLimits::default()
+        };
         let mut visited = 0;
         let error =
             visit_search_graph_errors_with_limits(&traversal, "test search", &limits, |_, _| {

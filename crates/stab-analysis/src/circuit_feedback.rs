@@ -16,58 +16,23 @@ use crate::{
 /// The unrolled reversed buffer and the rebuilt output circuit each retain the expansion.
 const FEEDBACK_RETAINED_COPIES: u64 = 2;
 
-/// Resource and cancellation policy for feedback inlining.
-///
-/// The memory budget bounds the conservative size of the unrolled intermediate and output
-/// circuits, projected before unrolling; expanded work itself is not capped. The cancellation
-/// signal is polled once per undone instruction and unrolled repeat iteration.
+/// Options of [`circuit_with_inlined_feedback`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct FeedbackInliningLimits {
-    memory_budget: MemoryBudget,
-    cancellation: Cancellation,
-}
-
-impl FeedbackInliningLimits {
-    pub const fn new(memory_budget: MemoryBudget) -> Self {
-        Self {
-            memory_budget,
-            cancellation: Cancellation::never(),
-        }
-    }
-
-    pub const fn memory_budget(&self) -> MemoryBudget {
-        self.memory_budget
-    }
-
-    pub const fn cancellation(&self) -> &Cancellation {
-        &self.cancellation
-    }
-
-    #[must_use]
-    pub const fn with_memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
-        self.memory_budget = memory_budget;
-        self
-    }
-
-    #[must_use]
-    pub fn with_cancellation(mut self, cancellation: Cancellation) -> Self {
-        self.cancellation = cancellation;
-        self
-    }
-}
-
-/// Inlines feedback within the default memory budget.
-pub fn circuit_with_inlined_feedback(circuit: &Circuit) -> AnalysisResult<Circuit> {
-    circuit_with_inlined_feedback_with_limits(circuit, FeedbackInliningLimits::default())
+pub struct FeedbackInliningOptions {
+    /// Budget for the conservative size of the unrolled intermediate and output circuits,
+    /// projected before unrolling; expanded work itself is not capped.
+    pub memory_budget: MemoryBudget,
+    /// Signal polled once per undone instruction and unrolled repeat iteration.
+    pub cancellation: Cancellation,
 }
 
 /// Inlines feedback after admitting the conservative size of its unrolled intermediate and
-/// output circuits against the limits' memory budget, polling the limits' cancellation signal.
-pub fn circuit_with_inlined_feedback_with_limits(
+/// output circuits against the options' memory budget, polling the options' cancellation signal.
+pub fn circuit_with_inlined_feedback(
     circuit: &Circuit,
-    limits: FeedbackInliningLimits,
+    options: &FeedbackInliningOptions,
 ) -> AnalysisResult<Circuit> {
-    validate_feedback_repeat_budget(circuit, limits.memory_budget())?;
+    validate_feedback_repeat_budget(circuit, options.memory_budget)?;
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
         AnalysisError::count_overflow(
             AnalysisOperation::FeedbackInlining,
@@ -81,11 +46,11 @@ pub fn circuit_with_inlined_feedback_with_limits(
         detector_count,
         AnticommutationPolicy::Fail,
     );
-    tracker.set_cancellation(limits.cancellation().clone());
+    tracker.set_cancellation(options.cancellation.clone());
     tracker.set_memory_budget(
         AnalysisOperation::FeedbackInlining,
         ResourceKind::MaterializedBytes,
-        limits.memory_budget(),
+        options.memory_budget,
     );
     let mut helper = WithoutFeedbackHelper {
         reversed_output: Vec::new(),
@@ -644,7 +609,7 @@ mod tests {
 
     fn transform(text: &str) -> String {
         let circuit = Circuit::from_stim_str(text).unwrap();
-        circuit_with_inlined_feedback(&circuit)
+        circuit_with_inlined_feedback(&circuit, &Default::default())
             .unwrap()
             .to_stim_string()
     }
@@ -868,7 +833,7 @@ mod tests {
              DETECTOR rec[-1]\n",
         )
         .unwrap();
-        let error = circuit_with_inlined_feedback(&circuit).unwrap_err();
+        let error = circuit_with_inlined_feedback(&circuit, &Default::default()).unwrap_err();
 
         assert!(error.to_string().contains("anti-Hermitian"));
     }
@@ -882,7 +847,7 @@ mod tests {
              DETECTOR rec[-1]\n",
         )
         .unwrap();
-        let error = circuit_with_inlined_feedback(&circuit).unwrap_err();
+        let error = circuit_with_inlined_feedback(&circuit, &Default::default()).unwrap_err();
 
         assert!(
             error
@@ -900,7 +865,7 @@ mod tests {
         ] {
             let circuit = Circuit::from_stim_str(text).unwrap();
             assert_eq!(
-                circuit_with_inlined_feedback(&circuit).unwrap(),
+                circuit_with_inlined_feedback(&circuit, &Default::default()).unwrap(),
                 Circuit::from_stim_str(expected).unwrap()
             );
         }
@@ -909,14 +874,17 @@ mod tests {
     #[test]
     fn circuit_with_inlined_feedback_preserves_cz_sweep_only_groups() {
         let circuit = Circuit::from_stim_str("CZ sweep[0] sweep[1]\n").unwrap();
-        assert_eq!(circuit_with_inlined_feedback(&circuit).unwrap(), circuit);
+        assert_eq!(
+            circuit_with_inlined_feedback(&circuit, &Default::default()).unwrap(),
+            circuit
+        );
     }
 
     #[test]
     fn circuit_with_inlined_feedback_rejects_non_cz_sweep_only_groups() {
         for gate in ["CX", "CY", "XCZ", "YCZ"] {
             let circuit = Circuit::from_stim_str(&format!("{gate} sweep[0] sweep[1]\n")).unwrap();
-            let error = circuit_with_inlined_feedback(&circuit).unwrap_err();
+            let error = circuit_with_inlined_feedback(&circuit, &Default::default()).unwrap_err();
             let message = error.to_string();
             assert!(
                 message.contains("unsupported controlled-Pauli target orientation"),
@@ -947,7 +915,7 @@ mod tests {
         // A compact repeat whose unrolling would retain far more than the budget is refused
         // before any unrolled output is built.
         let hostile = Circuit::from_stim_str("REPEAT 1000000000000 {\nTICK\n}\n").unwrap();
-        let error = circuit_with_inlined_feedback(&hostile).unwrap_err();
+        let error = circuit_with_inlined_feedback(&hostile, &Default::default()).unwrap_err();
         assert_eq!(
             error.resource_limit_error().unwrap().resource(),
             ResourceKind::MaterializedBytes

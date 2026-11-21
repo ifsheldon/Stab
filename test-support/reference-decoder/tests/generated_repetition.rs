@@ -103,7 +103,7 @@ fn generated_repetition_model(distance: u32) -> DetectorErrorModel {
     .with_before_measure_flip_probability(probability(0.015625))
     .with_after_reset_flip_probability(probability(0.0078125));
     let generated = params.generate().expect("generate repetition circuit");
-    circuit_to_detector_error_model(generated.circuit(), ErrorAnalyzerOptions::default())
+    circuit_to_detector_error_model(generated.circuit(), &ErrorAnalyzerOptions::default())
         .expect("lower repetition circuit")
 }
 

@@ -121,9 +121,11 @@ impl Eq for Graph {}
 impl Graph {
     #[cfg(test)]
     pub(super) fn new(node_count: usize, num_observables: usize) -> Self {
-        let limits = LogicalErrorSearchLimits::default()
-            .with_max_unique_graph_edges(64)
-            .with_max_stored_graph_terms(2_048);
+        let limits = LogicalErrorSearchLimits {
+            max_unique_graph_edges: 64,
+            max_stored_graph_terms: 2_048,
+            ..LogicalErrorSearchLimits::default()
+        };
         Self {
             nodes: vec![Node::default(); node_count],
             detector_index: DetectorIndex::identity(),

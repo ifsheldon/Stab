@@ -15,21 +15,21 @@ use std::time::{Duration, Instant};
 
 use stab_algebra::{Flow, PauliString};
 use stab_analysis::{
-    AnalysisError, CircuitFlattenLimits, CircuitPass, CircuitPassContext, CircuitPassError,
+    AnalysisError, CircuitFlattenOptions, CircuitPass, CircuitPassContext, CircuitPassError,
     CircuitPassInput, CircuitPassOutput, CircuitPassResources, CodeCircuitParams, CodeDistance,
-    CodeTask, DemFlattenLimits, DetectingRegionOptions, ErrorAnalyzerOptions,
-    FeedbackInliningLimits, FlowGeneratorOptions, FlowVerdict, GraphlikeSearchOptions,
-    HypergraphSearchOptions, LogicalErrorSearchLimits, MissingDetectorOptions,
-    PauliConjugationOptions, RoundCount, SatMaterializationLimits, SurfaceCodeTask, SymptomGrowth,
-    TimeReversedForFlowsOptions, UngraphlikeErrors, UnsignedFlowCheckOptions, WithoutNoiseOptions,
-    WithoutNoisePass, check_unsigned_stabilizer_flows, circuit_detecting_regions,
-    circuit_flow_generators_with_options, circuit_time_reversed_for_flows_with_options,
-    circuit_to_detector_error_model, circuit_with_inlined_feedback_with_limits,
-    find_undetectable_logical_error, flattened_circuit_operations_with_limits,
-    flattened_circuit_with_limits, flattened_detector_error_model_with_limits,
-    likeliest_error_sat_problem_with_limits, missing_detectors, pauli_after_circuit_with_options,
-    pauli_before_circuit_with_options, run_circuit_pass, shortest_error_sat_problem_with_limits,
-    shortest_graphlike_undetectable_logical_error,
+    CodeTask, DemFlattenOptions, DetectingRegionListOptions, DetectingRegionOptions,
+    ErrorAnalyzerOptions, ErrorDecomposition, FeedbackInliningOptions, FlowGeneratorOptions,
+    FlowMeasurementOptions, FlowVerdict, GraphlikeSearchOptions, HypergraphSearchOptions,
+    LogicalErrorSearchLimits, MissingDetectorOptions, PauliConjugationOptions, RoundCount,
+    SatMaterializationLimits, SurfaceCodeTask, SymptomGrowth, TimeReversedForFlowsOptions,
+    UngraphlikeErrors, UnsignedFlowCheckOptions, WithoutNoiseOptions, WithoutNoisePass,
+    all_detecting_region_targets, all_detecting_region_ticks, check_unsigned_stabilizer_flows,
+    circuit_detecting_regions, circuit_flow_generators, circuit_time_reversed_for_flows,
+    circuit_to_detector_error_model, circuit_with_inlined_feedback,
+    find_undetectable_logical_error, flattened_circuit, flattened_circuit_operations,
+    flattened_detector_error_model, likeliest_error_sat_problem, missing_detectors,
+    pauli_after_circuit, pauli_before_circuit, run_circuit_pass, shortest_error_sat_problem,
+    shortest_graphlike_undetectable_logical_error, solve_for_flow_measurements,
 };
 use stab_model::advanced::CancellationCountdown;
 use stab_model::{
@@ -65,14 +65,14 @@ fn unrolled_error_analysis_of_an_astronomical_repeat_is_cancellable() {
     };
     assert_cancelled(circuit_to_detector_error_model(
         &circuit(ENDLESS_MEASUREMENTS),
-        options,
+        &options,
     ));
 }
 
 #[test]
 fn flow_generation_and_missing_detectors_over_an_astronomical_repeat_are_cancellable() {
     let fixture = circuit(ENDLESS_UNITARY_THEN_MEASURE);
-    assert_cancelled(circuit_flow_generators_with_options(
+    assert_cancelled(circuit_flow_generators(
         &fixture,
         &FlowGeneratorOptions {
             memory_budget: stab_model::MemoryBudget::DEFAULT,
@@ -81,7 +81,7 @@ fn flow_generation_and_missing_detectors_over_an_astronomical_repeat_are_cancell
     ));
     assert_cancelled(missing_detectors(
         &fixture,
-        MissingDetectorOptions {
+        &MissingDetectorOptions {
             ignore_non_deterministic_measurements: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: cancelled(),
@@ -96,9 +96,12 @@ fn dem_flattening_of_an_astronomical_empty_expansion_is_cancellable() {
         "repeat 1000000000000 {\n    repeat 0 {\n        error(0.1) D0\n    }\n}\n",
     )
     .expect("parse DEM fixture");
-    assert_cancelled(flattened_detector_error_model_with_limits(
+    assert_cancelled(flattened_detector_error_model(
         &model,
-        DemFlattenLimits::default().with_cancellation(cancelled()),
+        &DemFlattenOptions {
+            cancellation: cancelled(),
+            ..DemFlattenOptions::default()
+        },
     ));
     let iterated = model
         .iter_flattened_instructions()
@@ -113,22 +116,28 @@ fn output_bounded_expansions_honor_a_set_signal() {
     let fixture = circuit(
         "REPEAT 100000 {\n    H 0\n    M 0\n    CX rec[-1] 1\n    TICK\n    DETECTOR rec[-1]\n}\n",
     );
-    let limits = CircuitFlattenLimits::default().with_cancellation(cancelled());
-    assert_cancelled(flattened_circuit_with_limits(&fixture, limits.clone()));
-    assert_cancelled(flattened_circuit_operations_with_limits(&fixture, limits));
+    let limits = CircuitFlattenOptions {
+        cancellation: cancelled(),
+        ..CircuitFlattenOptions::default()
+    };
+    assert_cancelled(flattened_circuit(&fixture, &limits));
+    assert_cancelled(flattened_circuit_operations(&fixture, &limits));
     // Inlining refuses non-deterministic detectors, so its fixture resets before measuring.
     let deterministic = circuit(
         "REPEAT 100000 {\n    R 0\n    M 0\n    CX rec[-1] 1\n    TICK\n    DETECTOR rec[-1]\n}\n",
     );
-    assert_cancelled(circuit_with_inlined_feedback_with_limits(
+    assert_cancelled(circuit_with_inlined_feedback(
         &deterministic,
-        FeedbackInliningLimits::default().with_cancellation(cancelled()),
+        &FeedbackInliningOptions {
+            cancellation: cancelled(),
+            ..FeedbackInliningOptions::default()
+        },
     ));
     let measurements = circuit("REPEAT 100000 {\n    H 0\n    M 0\n}\n");
-    assert_cancelled(circuit_time_reversed_for_flows_with_options(
+    assert_cancelled(circuit_time_reversed_for_flows(
         &measurements,
         &[],
-        TimeReversedForFlowsOptions {
+        &TimeReversedForFlowsOptions {
             dont_turn_measurements_into_resets: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: cancelled(),
@@ -136,9 +145,9 @@ fn output_bounded_expansions_honor_a_set_signal() {
     ));
     assert_cancelled(circuit_detecting_regions(
         &fixture,
-        DetectingRegionOptions {
-            detectors: vec![DemDetectorId::try_new(0).expect("detector id")],
-            ticks: vec![CircuitTick::new(0)],
+        &[DemDetectorId::try_new(0).expect("detector id")],
+        &[CircuitTick::new(0)],
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: true,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: cancelled(),
@@ -218,12 +227,8 @@ fn pauli_conjugation_through_an_astronomical_measured_repeat_is_cancellable() {
         cancellation,
         ..PauliConjugationOptions::default()
     };
-    assert_cancelled_in_flight(|signal| {
-        pauli_after_circuit_with_options(&pauli, &fixture, &options(signal))
-    });
-    assert_cancelled_in_flight(|signal| {
-        pauli_before_circuit_with_options(&pauli, &fixture, &options(signal))
-    });
+    assert_cancelled_in_flight(|signal| pauli_after_circuit(&pauli, &fixture, &options(signal)));
+    assert_cancelled_in_flight(|signal| pauli_before_circuit(&pauli, &fixture, &options(signal)));
 }
 
 /// A pass that never finishes unless it observes the context's signal, which it reports through
@@ -255,7 +260,7 @@ impl CircuitPass for EndlessPass {
         let mut countdown = CancellationCountdown::new();
         loop {
             countdown
-                .tick(input.context().cancellation())
+                .tick(&input.context().cancellation)
                 .map_err(|_| EndlessPassStopped)?;
         }
     }
@@ -264,7 +269,10 @@ impl CircuitPass for EndlessPass {
 #[test]
 fn circuit_passes_report_the_context_signal() {
     let fixture = circuit("X_ERROR(0.1) 0\nREPEAT 3 {\n    H 0\n    DEPOLARIZE1(0.1) 0\n}\n");
-    let context = CircuitPassContext::default().with_cancellation(cancelled());
+    let context = CircuitPassContext {
+        cancellation: cancelled(),
+        ..Default::default()
+    };
     let error = run_circuit_pass(&WithoutNoisePass, &fixture, &WithoutNoiseOptions, &context)
         .expect_err("a set signal stops the pass");
     assert!(
@@ -274,7 +282,10 @@ fn circuit_passes_report_the_context_signal() {
 
     let cancellation = Cancellation::new();
     let canceller = cancel_soon(&cancellation);
-    let context = CircuitPassContext::default().with_cancellation(cancellation);
+    let context = CircuitPassContext {
+        cancellation,
+        ..Default::default()
+    };
     let error = run_circuit_pass(&EndlessPass, &fixture, &(), &context)
         .expect_err("only the signal stops the endless pass");
     assert!(
@@ -297,8 +308,8 @@ fn surface_code_model(distance: u32) -> DetectorErrorModel {
     let generated = params.generate().expect("surface code circuit");
     circuit_to_detector_error_model(
         generated.circuit(),
-        ErrorAnalyzerOptions {
-            decompose_errors: true,
+        &ErrorAnalyzerOptions {
+            decomposition: Some(ErrorDecomposition::default()),
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -308,7 +319,10 @@ fn surface_code_model(distance: u32) -> DetectorErrorModel {
 #[test]
 fn logical_error_searches_are_cancellable() {
     let model = surface_code_model(5);
-    let limits = || LogicalErrorSearchLimits::default().with_cancellation(cancelled());
+    let limits = || LogicalErrorSearchLimits {
+        cancellation: cancelled(),
+        ..LogicalErrorSearchLimits::default()
+    };
     assert_cancelled(shortest_graphlike_undetectable_logical_error(
         &model,
         &GraphlikeSearchOptions {
@@ -334,7 +348,10 @@ fn logical_error_searches_are_cancellable() {
                 max_detection_event_set_size: 4,
                 max_edge_degree: 4,
                 symptom_growth: SymptomGrowth::Explore,
-                limits: LogicalErrorSearchLimits::default().with_cancellation(signal),
+                limits: LogicalErrorSearchLimits {
+                    cancellation: signal,
+                    ..LogicalErrorSearchLimits::default()
+                },
             },
         )
     });
@@ -347,19 +364,17 @@ fn sat_generation_over_an_astronomical_repeat_is_cancellable() {
         "repeat 1000000000000 {\n    error(0.1) D0 L0\n    shift_detectors 1\n}\n",
     )
     .expect("parse DEM fixture");
-    let unbounded = |signal| {
-        SatMaterializationLimits::default()
-            .with_max_expanded_instructions(u64::MAX)
-            .with_max_repeat_iterations(u64::MAX)
-            .with_max_error_mechanisms(usize::MAX)
-            .with_max_target_occurrences(usize::MAX)
-            .with_cancellation(signal)
+    let unbounded = |signal| SatMaterializationLimits {
+        max_expanded_instructions: u64::MAX,
+        max_repeat_iterations: u64::MAX,
+        max_error_mechanisms: usize::MAX,
+        max_target_occurrences: usize::MAX,
+        cancellation: signal,
+        ..SatMaterializationLimits::default()
     };
+    assert_cancelled_in_flight(|signal| shortest_error_sat_problem(&model, &unbounded(signal)));
     assert_cancelled_in_flight(|signal| {
-        shortest_error_sat_problem_with_limits(&model, unbounded(signal))
-    });
-    assert_cancelled_in_flight(|signal| {
-        likeliest_error_sat_problem_with_limits(&model, 100, unbounded(signal))
+        likeliest_error_sat_problem(&model, 100, &unbounded(signal))
     });
 }
 
@@ -391,8 +406,30 @@ fn wide_flow_regions_and_long_sat_clauses_honor_a_set_signal() {
     }
     dem_text.push('\n');
     let wide_dem = DetectorErrorModel::from_dem_str(&dem_text).expect("parse wide observable DEM");
-    assert_cancelled(shortest_error_sat_problem_with_limits(
+    assert_cancelled(shortest_error_sat_problem(
         &wide_dem,
-        SatMaterializationLimits::default().with_cancellation(cancelled()),
+        &SatMaterializationLimits {
+            cancellation: cancelled(),
+            ..SatMaterializationLimits::default()
+        },
+    ));
+}
+
+#[test]
+fn dense_detecting_region_lists_and_flow_measurement_solving_honor_a_set_signal() {
+    let fixture = circuit("REPEAT 100000 {\n    R 0\n    M 0\n    TICK\n    DETECTOR rec[-1]\n}\n");
+    let lists = DetectingRegionListOptions {
+        cancellation: cancelled(),
+        ..DetectingRegionListOptions::default()
+    };
+    assert_cancelled(all_detecting_region_targets(&fixture, &lists));
+    assert_cancelled(all_detecting_region_ticks(&fixture, &lists));
+    assert_cancelled(solve_for_flow_measurements(
+        &circuit("H 0\n"),
+        &flows(&["X0 -> Z0"]),
+        &FlowMeasurementOptions {
+            cancellation: cancelled(),
+            ..FlowMeasurementOptions::default()
+        },
     ));
 }

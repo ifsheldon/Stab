@@ -6,7 +6,8 @@
 )]
 
 use stab_analysis::{
-    ErrorAnalyzerOptions, circuit_to_detector_error_model, try_disjoint_to_independent_xyz_errors,
+    ErrorAnalyzerOptions, ErrorDecomposition, LoopFolding, circuit_to_detector_error_model,
+    try_disjoint_to_independent_xyz_errors,
 };
 use stab_model::{Circuit, Probability};
 
@@ -18,8 +19,8 @@ fn dem_analyzer_pauli_channel1_crosses_two_qubit_cliffords_like_stim() {
     .expect("circuit");
     let dem = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            approximate_disjoint_errors_threshold: Some(Probability::try_new(1.0).unwrap()),
+        &ErrorAnalyzerOptions {
+            approximate_disjoint_errors: Some(Probability::try_new(1.0).unwrap()),
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -40,8 +41,8 @@ fn dem_analyzer_pauli_channel1_crosses_controlled_pauli_gates_like_stim() {
     .expect("circuit");
     let dem = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            approximate_disjoint_errors_threshold: Some(Probability::try_new(1.0).unwrap()),
+        &ErrorAnalyzerOptions {
+            approximate_disjoint_errors: Some(Probability::try_new(1.0).unwrap()),
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -67,7 +68,7 @@ fn dem_analyzer_pauli_channel1_newton_edge_case_requires_approximate_like_pinned
     // Pinned Stim's Newton fallback fails to converge for this channel (the
     // vendor `dc = ab_i - ac` step), so analysis without the approximation
     // option rejects; a previous exact-Newton port accepted it.
-    let error = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+    let error = circuit_to_detector_error_model(&circuit, &ErrorAnalyzerOptions::default())
         .expect_err("pinned Stim requires approximate_disjoint_errors here")
         .to_string();
     assert!(
@@ -79,8 +80,8 @@ fn dem_analyzer_pauli_channel1_newton_edge_case_requires_approximate_like_pinned
     // so the X and Y symptoms sum into one class, byte-matching pinned Stim.
     let dem = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            approximate_disjoint_errors_threshold: Some(Probability::try_new(1.0).unwrap()),
+        &ErrorAnalyzerOptions {
+            approximate_disjoint_errors: Some(Probability::try_new(1.0).unwrap()),
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -109,14 +110,14 @@ fn pauli_channels_match_pinned_stim_combination_order_and_local_decomposition() 
         "RX 0\nPAULI_CHANNEL_1(0.13669, 0.05589, 0.14773) 0\nMX 0\nDETECTOR rec[-1]\n",
     )
     .expect("circuit");
-    let merged = circuit_to_detector_error_model(&mx_merge, ErrorAnalyzerOptions::default())
+    let merged = circuit_to_detector_error_model(&mx_merge, &ErrorAnalyzerOptions::default())
         .expect("analyze")
         .to_dem_string();
     assert_eq!(merged, "error(0.2036199999999999954436447069383576) D0\n");
 
     let decompose_options = ErrorAnalyzerOptions {
-        decompose_errors: true,
-        approximate_disjoint_errors_threshold: Some(Probability::try_new(1.0).unwrap()),
+        decomposition: Some(ErrorDecomposition::default()),
+        approximate_disjoint_errors: Some(Probability::try_new(1.0).unwrap()),
         ..ErrorAnalyzerOptions::default()
     };
     let pc1_bell = Circuit::from_stim_str(
@@ -124,7 +125,7 @@ fn pauli_channels_match_pinned_stim_combination_order_and_local_decomposition() 
     )
     .expect("circuit");
     assert_eq!(
-        circuit_to_detector_error_model(&pc1_bell, decompose_options.clone())
+        circuit_to_detector_error_model(&pc1_bell, &decompose_options)
             .expect("analyze")
             .to_dem_string(),
         "error(0.1776351926371489420297677952476079) D0\n\
@@ -139,7 +140,7 @@ fn pauli_channels_match_pinned_stim_combination_order_and_local_decomposition() 
     )
     .expect("circuit");
     assert_eq!(
-        circuit_to_detector_error_model(&pc2_bell, decompose_options)
+        circuit_to_detector_error_model(&pc2_bell, &decompose_options)
             .expect("analyze")
             .to_dem_string(),
         "error(0.06999999999999999278355033993648249) D0\n\
@@ -157,13 +158,13 @@ fn pauli_channel2_with_one_component_is_independent_without_approximation_like_p
     let threshold = |value| Some(Probability::try_new(value).expect("threshold"));
     let unfolded = ErrorAnalyzerOptions::default();
     let folded = ErrorAnalyzerOptions {
-        fold_loops: true,
+        loops: LoopFolding::Fold,
         ..ErrorAnalyzerOptions::default()
     };
     let decomposed_below_threshold = ErrorAnalyzerOptions {
-        fold_loops: true,
-        decompose_errors: true,
-        approximate_disjoint_errors_threshold: threshold(0.01),
+        loops: LoopFolding::Fold,
+        decomposition: Some(ErrorDecomposition::default()),
+        approximate_disjoint_errors: threshold(0.01),
         ..ErrorAnalyzerOptions::default()
     };
     let crossing = "R 0 1 2\n\
@@ -193,7 +194,7 @@ fn pauli_channel2_with_one_component_is_independent_without_approximation_like_p
         (
             crossing,
             ErrorAnalyzerOptions {
-                decompose_errors: true,
+                decomposition: Some(ErrorDecomposition::default()),
                 ..ErrorAnalyzerOptions::default()
             },
             "error(0.125) D1 ^ D0\nerror(0.125) D2 L0 ^ D1\n",
@@ -216,7 +217,7 @@ fn pauli_channel2_with_one_component_is_independent_without_approximation_like_p
         (zero, unfolded, "detector D0\n"),
     ] {
         let parsed = Circuit::from_stim_str(circuit).expect("circuit");
-        let dem = circuit_to_detector_error_model(&parsed, options.clone())
+        let dem = circuit_to_detector_error_model(&parsed, &options)
             .unwrap_or_else(|error| panic!("{circuit:?} with {options:?}: {error}"))
             .to_dem_string();
         assert_eq!(dem, expected, "{circuit:?} with {options:?}");

@@ -44,21 +44,21 @@ fn stim_negative_zero_target_preserves_boundary_semantics() {
     );
     assert!(conversion_error.to_string().contains("rec[-0]"));
 
-    let detector_model = circuit_to_detector_error_model(&exact, ErrorAnalyzerOptions::default())
+    let detector_model = circuit_to_detector_error_model(&exact, &ErrorAnalyzerOptions::default())
         .expect("Stim analyzer treats negative zero as an unused future record target");
     assert_eq!(detector_model.to_dem_string(), "detector D0\n");
 
     let observable = Circuit::from_stim_str("M 0\nOBSERVABLE_INCLUDE(2) rec[-0]\n")
         .expect("parse negative-zero observable target");
     let observable_model =
-        circuit_to_detector_error_model(&observable, ErrorAnalyzerOptions::default())
+        circuit_to_detector_error_model(&observable, &ErrorAnalyzerOptions::default())
             .expect("analyze negative-zero observable target");
     assert_eq!(observable_model.to_dem_string(), "logical_observable L2\n");
 
     let feedback = Circuit::from_stim_str("M 0\nCX rec[-0] 1\n")
         .expect("parse Stim feedback with text-only zero lookback");
     let feedback_model =
-        circuit_to_detector_error_model(&feedback, ErrorAnalyzerOptions::default())
+        circuit_to_detector_error_model(&feedback, &ErrorAnalyzerOptions::default())
             .expect("Stim analyzer treats negative-zero feedback as having no effect");
     assert_eq!(feedback_model.to_dem_string(), "");
     let sampling_error = SamplingCompiler::new()

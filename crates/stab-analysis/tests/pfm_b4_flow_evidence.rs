@@ -164,7 +164,7 @@ fn flow_checking_repeats_and_diagnostics_match_stim() {
 
 fn assert_flow_solve_empty() {
     assert_eq!(
-        solve_for_flow_measurements(&circuit(""), &[]).expect("empty solve"),
+        solve_for_flow_measurements(&circuit(""), &[], &Default::default()).expect("empty solve"),
         Vec::<Option<Vec<i32>>>::new()
     );
 }
@@ -180,7 +180,7 @@ fn assert_flow_solve_simple() {
         flow("Y1 -> Y1"),
     ];
     assert_eq!(
-        solve_for_flow_measurements(&circuit, &queries).expect("simple solve"),
+        solve_for_flow_measurements(&circuit, &queries, &Default::default()).expect("simple solve"),
         vec![Some(vec![0]), None, None, Some(vec![0]), None, Some(vec![]),]
     );
 }
@@ -205,7 +205,8 @@ fn assert_flow_solve_repetition_code() {
         flow("X0 -> Z0"),
     ];
     assert_eq!(
-        solve_for_flow_measurements(&circuit, &queries).expect("repetition-code solve"),
+        solve_for_flow_measurements(&circuit, &queries, &Default::default())
+            .expect("repetition-code solve"),
         vec![
             Some(vec![0]),
             Some(vec![1]),
@@ -219,7 +220,7 @@ fn assert_flow_solve_repetition_code() {
             None,
         ]
     );
-    let error = solve_for_flow_measurements(&circuit, &[flow("1 -> 1")])
+    let error = solve_for_flow_measurements(&circuit, &[flow("1 -> 1")], &Default::default())
         .expect_err("empty-Pauli query must be rejected");
     assert!(error.to_string().contains("non-empty Pauli"), "{error}");
 }
@@ -233,13 +234,15 @@ fn assert_python_measurement_solve() {
         flow("Z2 -> 1"),
     ];
     assert_eq!(
-        solve_for_flow_measurements(&measured_circuit, &queries).expect("measured-idle solve"),
+        solve_for_flow_measurements(&measured_circuit, &queries, &Default::default())
+            .expect("measured-idle solve"),
         vec![None, None, Some(vec![]), Some(vec![0])]
     );
     assert_eq!(
         solve_for_flow_measurements(
             &circuit("MXX 0 1\n"),
             &[flow("YY -> ZZ"), flow("YY -> YY"), flow("YZ -> ZY")],
+            &Default::default()
         )
         .expect("Python MXX batch solve"),
         vec![Some(vec![0]), Some(vec![]), Some(vec![0])]
@@ -263,7 +266,7 @@ fn assert_python_multitarget_solve() {
     ];
     for (circuit_text, queries, expected) in cases {
         assert_eq!(
-            solve_for_flow_measurements(&circuit(circuit_text), &queries)
+            solve_for_flow_measurements(&circuit(circuit_text), &queries, &Default::default())
                 .expect("multi-target solve"),
             expected,
             "{circuit_text}"
@@ -282,7 +285,7 @@ fn assert_python_fewer_measurements() {
             flow(&format!("{product} -> 1")),
         ];
         assert_eq!(
-            solve_for_flow_measurements(&circuit(&circuit_text), &queries)
+            solve_for_flow_measurements(&circuit(&circuit_text), &queries, &Default::default())
                 .expect("fewer-measurements solve"),
             vec![Some(expected.clone()), Some(expected)],
             "{circuit_text}"
@@ -293,11 +296,12 @@ fn assert_python_fewer_measurements() {
 fn assert_bounded_repeat_generation_and_checking() {
     let repeated = circuit("REPEAT 3 {\n    M 0\n}\n");
     let expanded = circuit("M 0\nM 0\nM 0\n");
-    let flows = circuit_flow_generators(&repeated).expect("bounded repeat generators");
+    let flows =
+        circuit_flow_generators(&repeated, &Default::default()).expect("bounded repeat generators");
 
     assert_eq!(
         flows,
-        circuit_flow_generators(&expanded).expect("expanded generators")
+        circuit_flow_generators(&expanded, &Default::default()).expect("expanded generators")
     );
     assert_eq!(
         check_unsigned_stabilizer_flows(&repeated, &flows, &UnsignedFlowCheckOptions::default()),
@@ -321,7 +325,7 @@ fn assert_flow_diagnostics() {
 }
 
 fn generator_strings(text: &str) -> Vec<String> {
-    circuit_flow_generators(&circuit(text))
+    circuit_flow_generators(&circuit(text), &Default::default())
         .expect("flow generators")
         .into_iter()
         .map(|flow| flow.to_string())

@@ -20,18 +20,18 @@ fn assert_generated_repetition_code_filters_and_regions() {
     let generated = params.generate().unwrap();
     let circuit = generated.circuit();
 
-    let all_targets = all_detecting_region_targets(circuit).unwrap();
+    let all_targets = all_detecting_region_targets(circuit, &Default::default()).unwrap();
     assert_eq!(all_targets.len(), 9);
     assert_eq!(
-        all_detecting_region_ticks(circuit).unwrap(),
+        all_detecting_region_ticks(circuit, &Default::default()).unwrap(),
         (0..9).map(tick).collect::<Vec<_>>()
     );
 
     let actual = circuit_detecting_regions_for_targets(
         circuit,
-        DetectingRegionTargetOptions {
-            targets: all_targets,
-            ticks: ticks(&[0, 1, 2, 6, 7, 8]),
+        &all_targets,
+        &ticks(&[0, 1, 2, 6, 7, 8]),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -66,8 +66,8 @@ fn assert_generated_rotated_surface_code_filters_and_regions() {
     let generated = params.generate().unwrap();
     let circuit = generated.circuit();
 
-    let all_targets = all_detecting_region_targets(circuit).unwrap();
-    let all_ticks = all_detecting_region_ticks(circuit).unwrap();
+    let all_targets = all_detecting_region_targets(circuit, &Default::default()).unwrap();
+    let all_ticks = all_detecting_region_ticks(circuit, &Default::default()).unwrap();
     assert_eq!(all_targets.len(), 25);
     assert_eq!(all_ticks, (0..=20).map(tick).collect::<Vec<_>>());
 
@@ -79,9 +79,9 @@ fn assert_generated_rotated_surface_code_filters_and_regions() {
     let selected_ticks = all_ticks.iter().copied().take(6).collect::<Vec<_>>();
     let actual = circuit_detecting_regions_for_targets(
         circuit,
-        DetectingRegionTargetOptions {
-            targets: selected_targets.clone(),
-            ticks: selected_ticks.clone(),
+        &selected_targets,
+        &selected_ticks,
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -165,8 +165,8 @@ fn assert_generated_unrotated_surface_code_filters_and_regions() {
     let generated = params.generate().unwrap();
     let circuit = generated.circuit();
 
-    let all_targets = all_detecting_region_targets(circuit).unwrap();
-    let all_ticks = all_detecting_region_ticks(circuit).unwrap();
+    let all_targets = all_detecting_region_targets(circuit, &Default::default()).unwrap();
+    let all_ticks = all_detecting_region_ticks(circuit, &Default::default()).unwrap();
     assert_eq!(all_targets.len(), 37);
     assert_eq!(all_ticks, (0..=20).map(tick).collect::<Vec<_>>());
 
@@ -178,9 +178,9 @@ fn assert_generated_unrotated_surface_code_filters_and_regions() {
     let selected_ticks = all_ticks.iter().copied().take(6).collect::<Vec<_>>();
     let actual = circuit_detecting_regions_for_targets(
         circuit,
-        DetectingRegionTargetOptions {
-            targets: selected_targets,
-            ticks: selected_ticks,
+        &selected_targets,
+        &selected_ticks,
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -350,8 +350,8 @@ fn assert_surface_code_regions(
     let generated = params.generate().unwrap();
     let circuit = generated.circuit();
 
-    let all_targets = all_detecting_region_targets(circuit).unwrap();
-    let all_ticks = all_detecting_region_ticks(circuit).unwrap();
+    let all_targets = all_detecting_region_targets(circuit, &Default::default()).unwrap();
+    let all_ticks = all_detecting_region_ticks(circuit, &Default::default()).unwrap();
     assert_eq!(all_targets.len(), expected_target_count);
     assert_eq!(all_ticks, (0..=20).map(tick).collect::<Vec<_>>());
 
@@ -361,9 +361,9 @@ fn assert_surface_code_regions(
         .collect::<Vec<_>>();
     let actual = circuit_detecting_regions_for_targets(
         circuit,
-        DetectingRegionTargetOptions {
-            targets: selected_targets,
-            ticks: all_ticks.iter().copied().take(6).collect(),
+        &selected_targets,
+        &all_ticks.iter().copied().take(6).collect::<Vec<_>>(),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),

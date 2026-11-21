@@ -63,7 +63,7 @@ fn run_experiment(partitions: &[u64]) -> ExperimentReport {
     .with_after_clifford_depolarization(probability(0.00625));
     let generated = params.generate().expect("generate repetition circuit");
     let circuit = generated.circuit();
-    let model = circuit_to_detector_error_model(circuit, ErrorAnalyzerOptions::default())
+    let model = circuit_to_detector_error_model(circuit, &ErrorAnalyzerOptions::default())
         .expect("lower detector-error model");
 
     let mut decoder = ExactMlDecoderSession::try_compile_model(&model).expect("compile decoder");

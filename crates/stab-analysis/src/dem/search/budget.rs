@@ -23,208 +23,40 @@ const DEFAULT_MAX_STORED_SEARCH_STATE_TERMS: usize = 5_000_000;
 /// Resource policy for graphlike and hypergraph logical-error search.
 ///
 /// The policy owns limits on expanded traversal and retained search data. Repeat nesting remains
-/// a fixed detector-error-model invariant, and SAT materialization has a separate policy. The
-/// cancellation signal is polled once per visited error mechanism and repeat iteration while the
-/// search graph is built, and once per examined search transition.
+/// a fixed detector-error-model invariant, and SAT materialization has a separate policy.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LogicalErrorSearchLimits {
-    max_repeat_unroll: u64,
-    max_repeat_iterations: u64,
-    max_expanded_error_mechanisms: u64,
-    max_error_target_occurrences_per_mechanism: usize,
-    max_total_error_target_occurrences: usize,
-    max_effective_detector_nodes: usize,
-    max_unique_graph_edges: usize,
-    max_stored_graph_terms: usize,
-    max_hyperedge_degree: usize,
-    max_hyperedge_incidences: usize,
-    max_search_states: usize,
-    max_search_transitions: u64,
-    max_search_state_terms: usize,
-    max_stored_search_state_terms: usize,
-    cancellation: Cancellation,
-}
-
-impl LogicalErrorSearchLimits {
-    /// Returns the cancellation signal polled while the graph is built and searched.
-    pub const fn cancellation(&self) -> &Cancellation {
-        &self.cancellation
-    }
-
-    /// Sets the cancellation signal polled while the graph is built and searched.
-    #[must_use]
-    pub fn with_cancellation(mut self, cancellation: Cancellation) -> Self {
-        self.cancellation = cancellation;
-        self
-    }
-
-    /// Returns the largest repeat count that search may expand directly.
-    pub const fn max_repeat_unroll(&self) -> u64 {
-        self.max_repeat_unroll
-    }
-
-    /// Returns the aggregate repeat-iteration budget across one folded traversal pass.
-    pub const fn max_repeat_iterations(&self) -> u64 {
-        self.max_repeat_iterations
-    }
-
-    /// Returns the nonzero-error visit budget for one graph-construction pass.
-    pub const fn max_expanded_error_mechanisms(&self) -> u64 {
-        self.max_expanded_error_mechanisms
-    }
-
-    /// Returns the target-occurrence limit for one nonzero error mechanism.
-    pub const fn max_error_target_occurrences_per_mechanism(&self) -> usize {
-        self.max_error_target_occurrences_per_mechanism
-    }
-
-    /// Returns the aggregate target-occurrence budget for one graph-construction pass.
-    pub const fn max_total_error_target_occurrences(&self) -> usize {
-        self.max_total_error_target_occurrences
-    }
-
-    /// Returns the largest number of detector nodes retained by the search graph.
-    pub const fn max_effective_detector_nodes(&self) -> usize {
-        self.max_effective_detector_nodes
-    }
-
-    /// Returns the largest number of unique edges retained by the search graph.
-    pub const fn max_unique_graph_edges(&self) -> usize {
-        self.max_unique_graph_edges
-    }
-
-    /// Returns the aggregate retained graph payload-term budget.
-    pub const fn max_stored_graph_terms(&self) -> usize {
-        self.max_stored_graph_terms
-    }
-
-    /// Returns the largest detector degree accepted for one hyperedge.
-    pub const fn max_hyperedge_degree(&self) -> usize {
-        self.max_hyperedge_degree
-    }
-
-    /// Returns the aggregate retained hyperedge-incidence budget.
-    pub const fn max_hyperedge_incidences(&self) -> usize {
-        self.max_hyperedge_incidences
-    }
-
-    /// Returns the largest number of distinct states retained by a search.
-    pub const fn max_search_states(&self) -> usize {
-        self.max_search_states
-    }
-
-    /// Returns the largest number of graph transitions a search may examine.
-    pub const fn max_search_transitions(&self) -> u64 {
-        self.max_search_transitions
-    }
-
-    /// Returns the detector-and-observable term limit for one search state.
-    pub const fn max_search_state_terms(&self) -> usize {
-        self.max_search_state_terms
-    }
-
-    /// Returns the aggregate retained search-state payload-term budget.
-    pub const fn max_stored_search_state_terms(&self) -> usize {
-        self.max_stored_search_state_terms
-    }
-
-    /// Sets the largest repeat count that search may expand directly.
-    #[must_use]
-    pub const fn with_max_repeat_unroll(mut self, limit: u64) -> Self {
-        self.max_repeat_unroll = limit;
-        self
-    }
-
-    /// Sets the aggregate repeat-iteration budget across one folded traversal pass.
-    #[must_use]
-    pub const fn with_max_repeat_iterations(mut self, limit: u64) -> Self {
-        self.max_repeat_iterations = limit;
-        self
-    }
-
-    /// Sets the nonzero-error visit budget for one graph-construction pass.
-    #[must_use]
-    pub const fn with_max_expanded_error_mechanisms(mut self, limit: u64) -> Self {
-        self.max_expanded_error_mechanisms = limit;
-        self
-    }
-
-    /// Sets the target-occurrence limit for one nonzero error mechanism.
-    #[must_use]
-    pub const fn with_max_error_target_occurrences_per_mechanism(mut self, limit: usize) -> Self {
-        self.max_error_target_occurrences_per_mechanism = limit;
-        self
-    }
-
-    /// Sets the aggregate target-occurrence budget for one graph-construction pass.
-    #[must_use]
-    pub const fn with_max_total_error_target_occurrences(mut self, limit: usize) -> Self {
-        self.max_total_error_target_occurrences = limit;
-        self
-    }
-
-    /// Sets the largest number of detector nodes retained by the search graph.
-    #[must_use]
-    pub const fn with_max_effective_detector_nodes(mut self, limit: usize) -> Self {
-        self.max_effective_detector_nodes = limit;
-        self
-    }
-
-    /// Sets the largest number of unique edges retained by the search graph.
-    #[must_use]
-    pub const fn with_max_unique_graph_edges(mut self, limit: usize) -> Self {
-        self.max_unique_graph_edges = limit;
-        self
-    }
-
-    /// Sets the aggregate retained graph payload-term budget.
-    #[must_use]
-    pub const fn with_max_stored_graph_terms(mut self, limit: usize) -> Self {
-        self.max_stored_graph_terms = limit;
-        self
-    }
-
-    /// Sets the largest detector degree accepted for one hyperedge.
-    #[must_use]
-    pub const fn with_max_hyperedge_degree(mut self, limit: usize) -> Self {
-        self.max_hyperedge_degree = limit;
-        self
-    }
-
-    /// Sets the aggregate retained hyperedge-incidence budget.
-    #[must_use]
-    pub const fn with_max_hyperedge_incidences(mut self, limit: usize) -> Self {
-        self.max_hyperedge_incidences = limit;
-        self
-    }
-
-    /// Sets the largest number of distinct states retained by a search.
-    #[must_use]
-    pub const fn with_max_search_states(mut self, limit: usize) -> Self {
-        self.max_search_states = limit;
-        self
-    }
-
-    /// Sets the largest number of graph transitions a search may examine.
-    #[must_use]
-    pub const fn with_max_search_transitions(mut self, limit: u64) -> Self {
-        self.max_search_transitions = limit;
-        self
-    }
-
-    /// Sets the detector-and-observable term limit for one search state.
-    #[must_use]
-    pub const fn with_max_search_state_terms(mut self, limit: usize) -> Self {
-        self.max_search_state_terms = limit;
-        self
-    }
-
-    /// Sets the aggregate retained search-state payload-term budget.
-    #[must_use]
-    pub const fn with_max_stored_search_state_terms(mut self, limit: usize) -> Self {
-        self.max_stored_search_state_terms = limit;
-        self
-    }
+    /// Largest repeat count that search may expand directly.
+    pub max_repeat_unroll: u64,
+    /// Aggregate repeat-iteration budget across one folded traversal pass.
+    pub max_repeat_iterations: u64,
+    /// Nonzero-error visit budget for one graph-construction pass.
+    pub max_expanded_error_mechanisms: u64,
+    /// Target-occurrence limit for one nonzero error mechanism.
+    pub max_error_target_occurrences_per_mechanism: usize,
+    /// Aggregate target-occurrence budget for one graph-construction pass.
+    pub max_total_error_target_occurrences: usize,
+    /// Largest number of detector nodes retained by the search graph.
+    pub max_effective_detector_nodes: usize,
+    /// Largest number of unique edges retained by the search graph.
+    pub max_unique_graph_edges: usize,
+    /// Aggregate retained graph payload-term budget.
+    pub max_stored_graph_terms: usize,
+    /// Largest detector degree accepted for one hyperedge.
+    pub max_hyperedge_degree: usize,
+    /// Aggregate retained hyperedge-incidence budget.
+    pub max_hyperedge_incidences: usize,
+    /// Largest number of distinct states retained by a search.
+    pub max_search_states: usize,
+    /// Largest number of graph transitions a search may examine.
+    pub max_search_transitions: u64,
+    /// Detector-and-observable term limit for one search state.
+    pub max_search_state_terms: usize,
+    /// Aggregate retained search-state payload-term budget.
+    pub max_stored_search_state_terms: usize,
+    /// Signal polled once per visited error mechanism and repeat iteration while the search
+    /// graph is built, and once per examined search transition.
+    pub cancellation: Cancellation,
 }
 
 impl Default for LogicalErrorSearchLimits {
@@ -291,7 +123,7 @@ impl GraphConstructionBudget {
                 format!("{} graph edge count overflowed", self.context),
             )
         })?;
-        let limit = self.limits.max_unique_graph_edges();
+        let limit = self.limits.max_unique_graph_edges;
         if edges > limit {
             return Err(ResourceLimitError::logical_error_search(
                 self.context,
@@ -351,7 +183,7 @@ impl GraphConstructionBudget {
                 format!("{} stored graph term count overflowed", self.context),
             )
         })?;
-        let limit = self.limits.max_stored_graph_terms();
+        let limit = self.limits.max_stored_graph_terms;
         if stored_terms > limit {
             return Err(ResourceLimitError::logical_error_search(
                 self.context,
@@ -404,7 +236,7 @@ impl SearchBudget {
     }
 
     pub(super) fn preflight_state_terms(&self, state_terms: usize) -> AnalysisResult<()> {
-        let limit = self.limits.max_search_state_terms();
+        let limit = self.limits.max_search_state_terms;
         if state_terms > limit {
             return Err(ResourceLimitError::logical_error_search(
                 self.context,
@@ -431,7 +263,7 @@ impl SearchBudget {
                 format!("{} search state count overflowed", self.context),
             )
         })?;
-        let state_limit = self.limits.max_search_states();
+        let state_limit = self.limits.max_search_states;
         if next > state_limit {
             return Err(ResourceLimitError::logical_error_search(
                 self.context,
@@ -460,7 +292,7 @@ impl SearchBudget {
                     format!("{} stored search-state term count overflowed", self.context),
                 )
             })?;
-        let stored_limit = self.limits.max_stored_search_state_terms();
+        let stored_limit = self.limits.max_stored_search_state_terms;
         if stored_state_terms > stored_limit {
             return Err(ResourceLimitError::logical_error_search(
                 self.context,
@@ -483,7 +315,7 @@ impl SearchBudget {
                 format!("{} search transition count overflowed", self.context),
             )
         })?;
-        let limit = self.limits.max_search_transitions();
+        let limit = self.limits.max_search_transitions;
         if next > limit {
             return Err(ResourceLimitError::logical_error_search(
                 self.context,
@@ -550,13 +382,15 @@ mod tests {
 
     #[test]
     fn graph_and_search_budgets_accept_exact_limits_and_reject_first_excess() {
-        let limits = LogicalErrorSearchLimits::default()
-            .with_max_unique_graph_edges(1)
-            .with_max_stored_graph_terms(3)
-            .with_max_search_states(1)
-            .with_max_search_transitions(1)
-            .with_max_search_state_terms(2)
-            .with_max_stored_search_state_terms(5);
+        let limits = LogicalErrorSearchLimits {
+            max_unique_graph_edges: 1,
+            max_stored_graph_terms: 3,
+            max_search_states: 1,
+            max_search_transitions: 1,
+            max_search_state_terms: 2,
+            max_stored_search_state_terms: 5,
+            ..LogicalErrorSearchLimits::default()
+        };
 
         let mut graph = GraphConstructionBudget::new("test graph", limits.clone());
         let exact_edge = graph
@@ -605,8 +439,13 @@ mod tests {
             2,
             1,
         );
-        let mut retained_terms =
-            SearchBudget::new("test search", &limits.clone().with_max_search_states(2));
+        let mut retained_terms = SearchBudget::new(
+            "test search",
+            &LogicalErrorSearchLimits {
+                max_search_states: 2,
+                ..limits.clone()
+            },
+        );
         retained_terms
             .admit_state(2, 1, true)
             .expect("exact retained-term limit is inclusive");

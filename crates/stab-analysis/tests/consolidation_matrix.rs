@@ -7,7 +7,10 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_analysis::{
+    DecompositionFailure, ErrorAnalyzerOptions, ErrorDecomposition, GaugeDetectors, LoopFolding,
+    RemnantEdges, circuit_to_detector_error_model,
+};
 use stab_model::{Circuit, Probability};
 
 const LOCAL_DECOMPOSITION_16_CIRCUIT: &str =
@@ -31,14 +34,18 @@ fn matrix_dir() -> std::path::PathBuf {
 
 fn options_for(name: &str, fold_loops: bool) -> ErrorAnalyzerOptions {
     let mut options = ErrorAnalyzerOptions {
-        fold_loops,
+        loops: if fold_loops {
+            LoopFolding::Fold
+        } else {
+            LoopFolding::Unroll
+        },
         ..ErrorAnalyzerOptions::default()
     };
     if name.starts_with("gauge_") {
-        options.allow_gauge_detectors = true;
+        options.gauge_detectors = GaugeDetectors::Allow;
     }
     if name.starts_with("heralded_") || name.starts_with("else_") {
-        options.approximate_disjoint_errors_threshold =
+        options.approximate_disjoint_errors =
             Some(Probability::try_new(1.0).expect("unit threshold"));
     }
     options
@@ -68,7 +75,7 @@ fn circuit_to_dem_selected_gate_surface_semantic_matrix_matches_stim() {
         for (mode, fold_loops) in [("nofold", false), ("fold", true)] {
             let expected = std::fs::read_to_string(dir.join(format!("{name}.{mode}.dem")))
                 .expect("matrix capture exists");
-            let actual = circuit_to_detector_error_model(&circuit, options_for(name, fold_loops))
+            let actual = circuit_to_detector_error_model(&circuit, &options_for(name, fold_loops))
                 .unwrap_or_else(|error| panic!("{name} ({mode}) analyzes: {error}"))
                 .to_dem_string();
             if actual != expected {
@@ -113,8 +120,8 @@ fn circuit_to_dem_error_decomposition_contract_matches_stim() {
         let circuit = Circuit::from_stim_str(circuit_text).expect("decomposition fixture parses");
         let actual = circuit_to_detector_error_model(
             &circuit,
-            ErrorAnalyzerOptions {
-                decompose_errors: true,
+            &ErrorAnalyzerOptions {
+                decomposition: Some(ErrorDecomposition::default()),
                 ..ErrorAnalyzerOptions::default()
             },
         )
@@ -127,9 +134,11 @@ fn circuit_to_dem_error_decomposition_contract_matches_stim() {
         Circuit::from_stim_str(REMNANT_DECOMPOSITION_CIRCUIT).expect("remnant fixture parses");
     let error = circuit_to_detector_error_model(
         &remnant_circuit,
-        ErrorAnalyzerOptions {
-            decompose_errors: true,
-            block_decomposition_from_introducing_remnant_edges: true,
+        &ErrorAnalyzerOptions {
+            decomposition: Some(ErrorDecomposition {
+                remnant_edges: RemnantEdges::Block,
+                ..Default::default()
+            }),
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -147,13 +156,15 @@ fn circuit_to_dem_local_decomposition_symptom_boundary_matches_stim() {
     let local_sixteen = Circuit::from_stim_str(LOCAL_DECOMPOSITION_16_CIRCUIT)
         .expect("sixteen-detector local decomposition fixture parses");
     let local_options = ErrorAnalyzerOptions {
-        fold_loops: true,
-        decompose_errors: true,
-        ignore_decomposition_failures: true,
+        loops: LoopFolding::Fold,
+        decomposition: Some(ErrorDecomposition {
+            on_failure: DecompositionFailure::Ignore,
+            ..Default::default()
+        }),
         ..ErrorAnalyzerOptions::default()
     };
     assert_eq!(
-        circuit_to_detector_error_model(&local_sixteen, local_options.clone())
+        circuit_to_detector_error_model(&local_sixteen, &local_options)
             .expect("sixteen-detector local decomposition succeeds")
             .to_dem_string(),
         LOCAL_DECOMPOSITION_16_EXPECTED
@@ -163,7 +174,7 @@ fn circuit_to_dem_local_decomposition_symptom_boundary_matches_stim() {
         "{LOCAL_DECOMPOSITION_16_CIRCUIT}DETECTOR rec[-1]\n"
     ))
     .expect("seventeen-detector local decomposition fixture parses");
-    let error = circuit_to_detector_error_model(&local_seventeen, local_options)
+    let error = circuit_to_detector_error_model(&local_seventeen, &local_options)
         .expect_err("seventeen detector symptoms exceed Stim's local mask")
         .to_string();
     assert!(error.contains("exceeded 16 detector symptoms"), "{error}");

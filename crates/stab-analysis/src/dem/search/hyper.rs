@@ -104,11 +104,13 @@ impl Eq for Graph {}
 impl Graph {
     #[cfg(test)]
     fn new(node_count: usize, num_observables: usize) -> Self {
-        let limits = LogicalErrorSearchLimits::default()
-            .with_max_unique_graph_edges(64)
-            .with_max_stored_graph_terms(2_048)
-            .with_max_hyperedge_degree(64)
-            .with_max_hyperedge_incidences(256);
+        let limits = LogicalErrorSearchLimits {
+            max_unique_graph_edges: 64,
+            max_stored_graph_terms: 2_048,
+            max_hyperedge_degree: 64,
+            max_hyperedge_incidences: 256,
+            ..LogicalErrorSearchLimits::default()
+        };
         Self::new_with_limits(node_count, num_observables, limits)
     }
 
@@ -263,7 +265,7 @@ impl Graph {
         targets: &[DemTarget],
         max_weight: usize,
     ) -> AnalysisResult<()> {
-        let cancellation = self.construction_budget.limits().cancellation().clone();
+        let cancellation = self.construction_budget.limits().cancellation.clone();
         let (detectors, observables) = toggled_dem_targets(targets, &cancellation)?;
         if detectors.is_empty() {
             if !observables.is_empty() {
@@ -274,7 +276,7 @@ impl Graph {
         if detectors.len() > max_weight {
             return Ok(());
         }
-        let degree_limit = self.construction_budget.limits().max_hyperedge_degree();
+        let degree_limit = self.construction_budget.limits().max_hyperedge_degree;
         if detectors.len() > degree_limit {
             return Err(ResourceLimitError::logical_error_search(
                 "hypergraph search",
@@ -298,7 +300,7 @@ impl Graph {
                     "hypergraph edge incidence count overflowed",
                 )
             })?;
-        let incidence_limit = self.construction_budget.limits().max_hyperedge_incidences();
+        let incidence_limit = self.construction_budget.limits().max_hyperedge_incidences;
         if projected_incidences > incidence_limit {
             return Err(ResourceLimitError::logical_error_search(
                 "hypergraph search",
@@ -361,7 +363,7 @@ impl Graph {
             &traversal,
             "hypergraph search",
             SearchGraphTargetPolicy::Hypergraph {
-                max_weight: max_weight.min(limits.max_hyperedge_degree()),
+                max_weight: max_weight.min(limits.max_hyperedge_degree),
             },
             limits,
         )?;
@@ -722,15 +724,24 @@ mod limit_policy_tests {
             DemTarget::relative_detector(0).expect("D0"),
             DemTarget::relative_detector(1).expect("D1"),
         ];
-        let degree_exact = LogicalErrorSearchLimits::default().with_max_hyperedge_degree(2);
+        let degree_exact = LogicalErrorSearchLimits {
+            max_hyperedge_degree: 2,
+            ..LogicalErrorSearchLimits::default()
+        };
         let mut exact_graph = Graph::new_with_limits(2, 0, degree_exact.clone());
         exact_graph
             .add_edge_from_dem_targets(&two_detector_edge, usize::MAX)
             .expect("the exact two-detector degree maximum is accepted");
         assert_eq!(exact_graph.edge_incidences, 2);
 
-        let mut degree_rejected =
-            Graph::new_with_limits(2, 0, degree_exact.with_max_hyperedge_degree(1));
+        let mut degree_rejected = Graph::new_with_limits(
+            2,
+            0,
+            LogicalErrorSearchLimits {
+                max_hyperedge_degree: 1,
+                ..degree_exact
+            },
+        );
         let error = degree_rejected
             .add_edge_from_dem_targets(&two_detector_edge, usize::MAX)
             .expect_err("the first detector above the degree policy should fail");
@@ -748,10 +759,12 @@ mod limit_policy_tests {
         );
         assert_eq!(degree_rejected.edge_incidences, 0);
 
-        let limits = LogicalErrorSearchLimits::default()
-            .with_max_hyperedge_degree(2)
-            .with_max_hyperedge_incidences(2)
-            .with_max_unique_graph_edges(2);
+        let limits = LogicalErrorSearchLimits {
+            max_hyperedge_degree: 2,
+            max_hyperedge_incidences: 2,
+            max_unique_graph_edges: 2,
+            ..LogicalErrorSearchLimits::default()
+        };
         let mut graph = Graph::new_with_limits(2, 2, limits);
         graph
             .add_edge_from_dem_targets(

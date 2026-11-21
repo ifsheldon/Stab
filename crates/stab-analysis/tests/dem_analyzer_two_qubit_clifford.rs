@@ -12,7 +12,7 @@ fn dem_analyzer_two_qubit_cliffords_propagate_pauli_errors_like_stim() {
         "../../../oracle/fixtures/inputs/analyze_errors_two_qubit_cliffords.stim"
     ))
     .expect("circuit");
-    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+    let dem = circuit_to_detector_error_model(&circuit, &ErrorAnalyzerOptions::default())
         .expect("analyze")
         .to_dem_string();
 

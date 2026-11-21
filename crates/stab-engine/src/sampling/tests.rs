@@ -510,8 +510,8 @@ fn sweep_records_are_width_checked_and_all_false_reuses_the_cached_sample() {
 fn active_feedback_crosses_inner_and_outer_repeat_boundaries() {
     let sweep_source = "R 0\nREPEAT 2 {\n    REPEAT 2 {\n        CX sweep[0] 0\n        M 0\n        R 0\n    }\n}\n";
     let sweep_folded = Circuit::from_stim_str(sweep_source).expect("parse nested sweep feedback");
-    let sweep_unrolled =
-        stab_analysis::flattened_circuit(&sweep_folded).expect("unroll nested sweep feedback");
+    let sweep_unrolled = stab_analysis::flattened_circuit(&sweep_folded, &Default::default())
+        .expect("unroll nested sweep feedback");
     for (sweep, expected) in [(false, vec![false; 4]), (true, vec![true; 4])] {
         let reference = |circuit: &Circuit| {
             let plan = SamplingCompiler::new()
@@ -533,8 +533,8 @@ fn active_feedback_crosses_inner_and_outer_repeat_boundaries() {
     let record_source = "X 0\nM 0\nREPEAT 2 {\n    REPEAT 2 {\n        R 1\n        CX rec[-1] 1\n        M 1\n    }\n}\n";
     let record_folded =
         Circuit::from_stim_str(record_source).expect("parse nested record feedback");
-    let record_unrolled =
-        stab_analysis::flattened_circuit(&record_folded).expect("unroll nested record feedback");
+    let record_unrolled = stab_analysis::flattened_circuit(&record_folded, &Default::default())
+        .expect("unroll nested record feedback");
     let expected = vec![vec![true; 5]];
     assert_eq!(samples(record_source, 1), expected);
     assert_eq!(

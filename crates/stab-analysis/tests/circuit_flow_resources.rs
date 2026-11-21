@@ -14,8 +14,9 @@ use flow_verdicts::flow_holds;
 
 #[test]
 fn circuit_flow_generators_admit_owned_rows_and_report_typed_limits() {
-    let flows = circuit_flow_generators(&circuit("REPEAT 4097 {\n    M 0\n}\n"))
-        .expect("flow generator beyond the former arbitrary row cap");
+    let flows =
+        circuit_flow_generators(&circuit("REPEAT 4097 {\n    M 0\n}\n"), &Default::default())
+            .expect("flow generator beyond the former arbitrary row cap");
     assert_eq!(flows.len(), 4098);
     let owned_records = flows
         .iter()
@@ -27,12 +28,16 @@ fn circuit_flow_generators_admit_owned_rows_and_report_typed_limits() {
 
     // Expanded solver work above the retired one-million cap completes.
     assert_eq!(
-        circuit_flow_generators(&circuit("M 0\nREPEAT 1000001 {\n    TICK\n}\n"))
-            .expect("uncapped flow-generator work"),
-        circuit_flow_generators(&circuit("M 0\n")).expect("single measurement flows")
+        circuit_flow_generators(
+            &circuit("M 0\nREPEAT 1000001 {\n    TICK\n}\n"),
+            &Default::default()
+        )
+        .expect("uncapped flow-generator work"),
+        circuit_flow_generators(&circuit("M 0\n"), &Default::default())
+            .expect("single measurement flows")
     );
 
-    let error = circuit_flow_generators(&circuit("M 1000000\n"))
+    let error = circuit_flow_generators(&circuit("M 1000000\n"), &Default::default())
         .expect_err("projected flow storage overflow");
     let resource = error
         .resource_limit_error()
@@ -53,7 +58,8 @@ fn circuit_flow_generators_admit_owned_rows_and_report_typed_limits() {
         ));
         nested = outer;
     }
-    let error = circuit_flow_generators(&nested).expect_err("flow-generator nesting boundary");
+    let error = circuit_flow_generators(&nested, &Default::default())
+        .expect_err("flow-generator nesting boundary");
     let resource = error
         .resource_limit_error()
         .expect("typed repeat-nesting error");
@@ -64,14 +70,15 @@ fn circuit_flow_generators_admit_owned_rows_and_report_typed_limits() {
 
     // Ignored-only and unitary flow rows are admitted in bytes like measurement-rich rows, so the
     // former 4096-qubit dense bound is gone and a projection above the budget is refused.
-    let admitted = circuit_flow_generators(&circuit("QUBIT_COORDS(0) 4096\n"))
+    let admitted = circuit_flow_generators(&circuit("QUBIT_COORDS(0) 4096\n"), &Default::default())
         .expect("ignored-only flows beyond the former dense bound");
     assert_eq!(admitted.len(), 8194);
-    let unitary = circuit_flow_generators(&circuit("H 4096\n")).expect("wide unitary flows");
+    let unitary = circuit_flow_generators(&circuit("H 4096\n"), &Default::default())
+        .expect("wide unitary flows");
     assert_eq!(unitary.len(), 8194);
 
     for text in ["QUBIT_COORDS(0) 100000\n", "H 100000\n"] {
-        let error = circuit_flow_generators(&circuit(text))
+        let error = circuit_flow_generators(&circuit(text), &Default::default())
             .expect_err("measurement-free flow storage above the budget");
         let resource = error
             .resource_limit_error()
@@ -88,9 +95,10 @@ fn circuit_flow_generators_admit_owned_rows_and_report_typed_limits() {
 #[test]
 fn flow_generation_skips_instructionless_repeats_without_expanding_their_counts() {
     let compact = circuit("M 0\nREPEAT 1000000000000 {\n    REPEAT 1000000000000 {\n    }\n}\n");
-    let expected = circuit_flow_generators(&circuit("M 0\n")).expect("single measurement flows");
+    let expected = circuit_flow_generators(&circuit("M 0\n"), &Default::default())
+        .expect("single measurement flows");
     assert_eq!(
-        circuit_flow_generators(&compact).expect("compact empty-repeat flows"),
+        circuit_flow_generators(&compact, &Default::default()).expect("compact empty-repeat flows"),
         expected
     );
 }
@@ -109,7 +117,8 @@ fn rejected_mpp_storage_is_admitted_before_product_allocation() {
 
     fn rejected_allocations(circuit: &Circuit) -> allocation_counter::AllocationInfo {
         allocation_counter::measure(|| {
-            let error = circuit_flow_generators(circuit).expect_err("projected MPP storage");
+            let error = circuit_flow_generators(circuit, &Default::default())
+                .expect_err("projected MPP storage");
             let resource = error
                 .resource_limit_error()
                 .expect("typed projected MPP storage error");

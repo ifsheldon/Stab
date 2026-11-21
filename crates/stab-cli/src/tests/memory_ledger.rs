@@ -222,7 +222,8 @@ fn held_plans_and_inlined_feedback_reduce_the_budget_of_later_stages() {
     let (fb_circuit, fb_parsed_bytes) =
         Circuit::from_stim_bytes_admitted(feedback_stim.as_bytes(), ParseLimits::default())
             .expect("parse feedback");
-    let inlined = stab_analysis::circuit_with_inlined_feedback(&fb_circuit).expect("inline");
+    let inlined = stab_analysis::circuit_with_inlined_feedback(&fb_circuit, &Default::default())
+        .expect("inline");
     let inlined_bytes = inlined.admitted_bytes();
     assert!(inlined_bytes > fb_parsed_bytes * 2);
     let m2d_plan_bytes = stab_engine::MeasurementToDetectionCompiler::new()

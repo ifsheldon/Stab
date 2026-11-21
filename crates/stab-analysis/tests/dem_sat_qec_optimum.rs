@@ -10,9 +10,9 @@
 //! first cross-checked against exhaustive enumeration on an instance small enough to enumerate.
 
 use stab_analysis::{
-    CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions, RepetitionCodeTask,
-    RoundCount, SurfaceCodeTask, circuit_to_detector_error_model, find_undetectable_logical_error,
-    likeliest_error_sat_problem, shortest_error_sat_problem,
+    CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions, ErrorDecomposition,
+    LoopFolding, RepetitionCodeTask, RoundCount, SurfaceCodeTask, circuit_to_detector_error_model,
+    find_undetectable_logical_error, likeliest_error_sat_problem, shortest_error_sat_problem,
     shortest_graphlike_undetectable_logical_error,
 };
 use stab_model::{Circuit, DetectorErrorModel, Probability};
@@ -65,9 +65,9 @@ fn rotated_surface_code(rounds: u64) -> Circuit {
 fn dem(circuit: &Circuit, decompose_errors: bool) -> DetectorErrorModel {
     circuit_to_detector_error_model(
         circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
-            decompose_errors,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
+            decomposition: decompose_errors.then_some(ErrorDecomposition::default()),
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -80,7 +80,7 @@ fn error_count(model: &DetectorErrorModel) -> usize {
 
 fn shortest_sat_optimum(model: &DetectorErrorModel) -> usize {
     sat_wcnf::optimum_by_branch_and_bound(
-        &shortest_error_sat_problem(model).expect("shortest-error WCNF"),
+        &shortest_error_sat_problem(model, &Default::default()).expect("shortest-error WCNF"),
     )
     .expect("a logical error exists")
 }
@@ -110,8 +110,9 @@ fn graphlike_error_count(model: &DetectorErrorModel) -> usize {
 fn branch_and_bound_wcnf_oracle_matches_exhaustive_enumeration() {
     let model = dem(&repetition_code(3, 1), false);
     for wcnf in [
-        shortest_error_sat_problem(&model).expect("shortest-error WCNF"),
-        likeliest_error_sat_problem(&model, 100).expect("likeliest-error WCNF"),
+        shortest_error_sat_problem(&model, &Default::default()).expect("shortest-error WCNF"),
+        likeliest_error_sat_problem(&model, 100, &Default::default())
+            .expect("likeliest-error WCNF"),
     ] {
         let exhaustive = sat_wcnf::optimum(&wcnf);
         // A positive optimum means the soft clauses really penalize the activated errors.

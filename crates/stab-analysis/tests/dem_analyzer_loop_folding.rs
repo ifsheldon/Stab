@@ -3,15 +3,18 @@
     reason = "compatibility tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_analysis::{ErrorAnalyzerOptions, ResourceKind, circuit_to_detector_error_model};
+use stab_analysis::{
+    ErrorAnalyzerOptions, ErrorDecomposition, LoopFolding, RemnantEdges, ResourceKind,
+    circuit_to_detector_error_model,
+};
 use stab_model::{Circuit, MemoryBudget, Probability};
 
 fn analyze_folding_loops(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
     circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -26,10 +29,16 @@ fn analyze_folding_and_decomposing_errors(
     let circuit = Circuit::from_stim_str(text).expect("circuit");
     circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
-            decompose_errors: true,
-            block_decomposition_from_introducing_remnant_edges: block_remnant_edges,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
+            decomposition: Some(ErrorDecomposition {
+                remnant_edges: if block_remnant_edges {
+                    RemnantEdges::Block
+                } else {
+                    RemnantEdges::Allow
+                },
+                ..Default::default()
+            }),
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -41,12 +50,10 @@ fn analyze_folding_with_decomposition_and_approximation(text: &str) -> Result<St
     let circuit = Circuit::from_stim_str(text).expect("circuit");
     circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
-            decompose_errors: true,
-            approximate_disjoint_errors_threshold: Some(
-                Probability::try_new(1.0).expect("probability"),
-            ),
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
+            decomposition: Some(ErrorDecomposition::default()),
+            approximate_disjoint_errors: Some(Probability::try_new(1.0).expect("probability")),
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -140,7 +147,7 @@ fn dem_analyzer_refuses_nested_repeat_output_beyond_the_memory_budget() {
     // retained output reaches the budget, then refuses with a typed error.
     let error = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
+        &ErrorAnalyzerOptions {
             memory_budget: MemoryBudget::from_bytes(64 * 1024),
             ..ErrorAnalyzerOptions::default()
         },
@@ -327,13 +334,13 @@ fn pf6_dem_analyzer_period127_observable_folds_minimum_compact_shape_like_upstre
 fn pf6_dem_analyzer_period127_observable_keeps_single_middle_repeat_unfolded() {
     let circuit =
         Circuit::from_stim_str(&period127_observable_circuit(338)).expect("period-127 circuit");
-    let expected = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+    let expected = circuit_to_detector_error_model(&circuit, &ErrorAnalyzerOptions::default())
         .expect("non-folded analysis")
         .to_dem_string();
     let actual = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -355,8 +362,8 @@ fn pf6_dem_analyzer_period127_observable_folds_adjacent_residue() {
         Circuit::from_stim_str(&period127_observable_circuit(466)).expect("period-127 circuit");
     let actual = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -376,8 +383,8 @@ fn pf6_dem_analyzer_period127_observable_folds_huge_adjacent_residue() {
 
     let actual = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -407,13 +414,13 @@ fn pf6_dem_analyzer_fallback_uses_bounded_unfolded_for_unsafe_tail_dependency() 
     )
     .expect("circuit");
 
-    let expected = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+    let expected = circuit_to_detector_error_model(&circuit, &ErrorAnalyzerOptions::default())
         .expect("non-folded analysis")
         .to_dem_string();
     let actual = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -448,13 +455,13 @@ fn pf6_dem_analyzer_fallback_preserves_delayed_rec_dependency() {
     )
     .expect("circuit");
 
-    let expected = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+    let expected = circuit_to_detector_error_model(&circuit, &ErrorAnalyzerOptions::default())
         .expect("non-folded analysis")
         .to_dem_string();
     let actual = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -483,11 +490,9 @@ REPEAT 2 {
     .expect("valid heralded folded circuit");
     let model = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
-            approximate_disjoint_errors_threshold: Some(
-                Probability::try_new(1.0).expect("valid threshold"),
-            ),
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
+            approximate_disjoint_errors: Some(Probability::try_new(1.0).expect("valid threshold")),
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -514,9 +519,9 @@ fn pf6_dem_analyzer_fallback_unrolls_beyond_the_retired_expansion_caps() {
         let circuit = Circuit::from_stim_str(&text).expect("valid unroll circuit");
         let dem = circuit_to_detector_error_model(
             &circuit,
-            ErrorAnalyzerOptions {
-                fold_loops: false,
-                approximate_disjoint_errors_threshold: Some(
+            &ErrorAnalyzerOptions {
+                loops: LoopFolding::Unroll,
+                approximate_disjoint_errors: Some(
                     Probability::try_new(1.0).expect("valid threshold"),
                 ),
                 ..ErrorAnalyzerOptions::default()
@@ -540,15 +545,15 @@ fn pf6_dem_analyzer_generic_prefixed_repeat_matches_unfolded() {
     )
     .expect("circuit");
 
-    let non_folded = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+    let non_folded = circuit_to_detector_error_model(&circuit, &ErrorAnalyzerOptions::default())
         .expect("non-folded analysis still succeeds")
         .to_dem_string();
     assert_eq!(non_folded, "error(0.125) D0 D1\n");
 
     let folded = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -599,8 +604,8 @@ fn pf6_dem_analyzer_no_recurrence_unrolls_within_the_memory_budget() {
 
     let error = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
             memory_budget: MemoryBudget::from_bytes(16 * 1024),
             ..ErrorAnalyzerOptions::default()
         },
@@ -617,12 +622,12 @@ fn pf6_dem_analyzer_no_recurrence_unrolls_within_the_memory_budget() {
         stab_analysis::ResourceKind::MaterializedBytes
     );
     assert_eq!(resource.limit(), 16 * 1024);
-    let unrolled = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+    let unrolled = circuit_to_detector_error_model(&circuit, &ErrorAnalyzerOptions::default())
         .expect("unroll the same circuit within the default budget");
     let folded = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -656,8 +661,8 @@ fn pf6_dem_analyzer_no_recurrence_delayed_dependency_unrolls_within_the_memory_b
 
     let error = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
             memory_budget: MemoryBudget::from_bytes(16 * 1024),
             ..ErrorAnalyzerOptions::default()
         },
@@ -674,12 +679,12 @@ fn pf6_dem_analyzer_no_recurrence_delayed_dependency_unrolls_within_the_memory_b
         stab_analysis::ResourceKind::MaterializedBytes
     );
     assert_eq!(resource.limit(), 16 * 1024);
-    let unrolled = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+    let unrolled = circuit_to_detector_error_model(&circuit, &ErrorAnalyzerOptions::default())
         .expect("unroll the same circuit within the default budget");
     let folded = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -704,8 +709,8 @@ fn pf6_dem_analyzer_folds_nested_measurement_only_repeats() {
 
     let actual = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -741,8 +746,8 @@ fn pf6_dem_analyzer_folds_measurement_only_instruction_volume() {
 
     let actual = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
             ..ErrorAnalyzerOptions::default()
         },
     )

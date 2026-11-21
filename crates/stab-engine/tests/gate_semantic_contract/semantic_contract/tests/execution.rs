@@ -378,13 +378,13 @@ fn gate_surface_contract_pair_measurement_inversion() {
         "direct pair inversion identities must produce no detection events"
     );
     assert!(
-        !circuit_flow_generators(&grouped_circuit)
+        !circuit_flow_generators(&grouped_circuit, &Default::default())
             .expect("generate grouped pair flows")
             .is_empty(),
         "grouped pair circuit must expose flow constraints"
     );
     assert!(
-        !circuit_to_detector_error_model(&grouped_circuit, ErrorAnalyzerOptions::default())
+        !circuit_to_detector_error_model(&grouped_circuit, &ErrorAnalyzerOptions::default())
             .expect("analyze grouped pair circuit")
             .to_string()
             .contains("error("),
@@ -435,7 +435,7 @@ fn gate_surface_contract_mpp_deterministic() {
             .all(|record| record.detectors.iter().all(|bit| !bit)),
         "direct four-body parity detectors must stay silent"
     );
-    let dem = circuit_to_detector_error_model(&four_body_circuit, ErrorAnalyzerOptions::default())
+    let dem = circuit_to_detector_error_model(&four_body_circuit, &ErrorAnalyzerOptions::default())
         .expect("analyze four-body MPP parity circuit")
         .to_string();
     assert!(
@@ -605,7 +605,7 @@ fn gate_surface_contract_annotations() {
     );
     let text = "X_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n";
     assert_all_semantic_surfaces_execute(text);
-    let dem = circuit_to_detector_error_model(&circuit(text), ErrorAnalyzerOptions::default())
+    let dem = circuit_to_detector_error_model(&circuit(text), &ErrorAnalyzerOptions::default())
         .expect("analyze vacuous detector declaration")
         .to_string();
     assert_eq!(dem, "error(0.25) D0\n");
@@ -629,7 +629,7 @@ fn gate_surface_contract_annotation_coordinates() {
     let text = "QUBIT_COORDS(1,2) 0\nTICK\nM 0\nDETECTOR(3) rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\nSHIFT_COORDS(4,5)\nDETECTOR(6) rec[-1]\n";
     assert_exact_reference_and_samples(text, &[false]);
     assert_all_semantic_surfaces_execute(text);
-    let dem = circuit_to_detector_error_model(&circuit(text), ErrorAnalyzerOptions::default())
+    let dem = circuit_to_detector_error_model(&circuit(text), &ErrorAnalyzerOptions::default())
         .expect("analyze annotation coordinates")
         .to_string();
     assert_eq!(
@@ -642,7 +642,7 @@ fn gate_surface_contract_annotation_coordinates() {
 fn gate_surface_contract_annotation_tags() {
     let text = "R[reset-tag] 0\nX_ERROR[error-tag](0.25) 0\nM[measure-tag] 0\nDETECTOR[detector-tag] rec[-1]\nOBSERVABLE_INCLUDE[observable-tag](0) rec[-1]\nSHIFT_COORDS[shift-tag](1)\n";
     assert_all_semantic_surfaces_execute(text);
-    let dem = circuit_to_detector_error_model(&circuit(text), ErrorAnalyzerOptions::default())
+    let dem = circuit_to_detector_error_model(&circuit(text), &ErrorAnalyzerOptions::default())
         .expect("analyze tagged annotations")
         .to_string();
     assert_eq!(
@@ -871,8 +871,8 @@ fn run_surface(text: &str, surface: GateSurface) -> TestResult<SurfaceFingerprin
         GateSurface::ErrorAnalyzer => Ok(SurfaceFingerprint::Analyzed(
             circuit_to_detector_error_model(
                 &circuit,
-                ErrorAnalyzerOptions {
-                    approximate_disjoint_errors_threshold: Some(
+                &ErrorAnalyzerOptions {
+                    approximate_disjoint_errors: Some(
                         Probability::try_new(1.0).expect("unit probability"),
                     ),
                     ..ErrorAnalyzerOptions::default()
@@ -882,6 +882,7 @@ fn run_surface(text: &str, surface: GateSurface) -> TestResult<SurfaceFingerprin
         )),
         GateSurface::FlowGenerator => Ok(SurfaceFingerprint::Flows(circuit_flow_generators(
             &circuit,
+            &Default::default(),
         )?)),
     }
 }
@@ -1045,19 +1046,17 @@ fn assert_circuit_semantics_equal(actual: &Circuit, expected: &Circuit, label: &
     // contract compares both circuits the way the pinned binary must be
     // driven; the requirement itself is pinned by the analyzer suites.
     let analyzer_options = ErrorAnalyzerOptions {
-        approximate_disjoint_errors_threshold: Some(
-            Probability::try_new(1.0).expect("unit threshold"),
-        ),
+        approximate_disjoint_errors: Some(Probability::try_new(1.0).expect("unit threshold")),
         ..ErrorAnalyzerOptions::default()
     };
     assert_eq!(
-        circuit_to_detector_error_model(actual, analyzer_options.clone()).expect("actual analysis"),
-        circuit_to_detector_error_model(expected, analyzer_options).expect("expected analysis"),
+        circuit_to_detector_error_model(actual, &analyzer_options).expect("actual analysis"),
+        circuit_to_detector_error_model(expected, &analyzer_options).expect("expected analysis"),
         "error analyzer: {label}"
     );
     assert_eq!(
-        circuit_flow_generators(actual).expect("actual flows"),
-        circuit_flow_generators(expected).expect("expected flows"),
+        circuit_flow_generators(actual, &Default::default()).expect("actual flows"),
+        circuit_flow_generators(expected, &Default::default()).expect("expected flows"),
         "flow generator: {label}"
     );
 }

@@ -56,7 +56,7 @@ fn gate_surface_contract_mpp_stochastic_at_lane_width() {
         ),
     );
     assert_eq!(
-        circuit_to_detector_error_model(&detection_circuit, ErrorAnalyzerOptions::default())
+        circuit_to_detector_error_model(&detection_circuit, &ErrorAnalyzerOptions::default())
             .expect("analyze stochastic MPP")
             .to_string(),
         "error(0.25) D0\n"
@@ -123,7 +123,7 @@ fn gate_surface_contract_mpad_stochastic_at_lane_width() {
         ),
     );
     assert_eq!(
-        circuit_to_detector_error_model(&detection_circuit, ErrorAnalyzerOptions::default())
+        circuit_to_detector_error_model(&detection_circuit, &ErrorAnalyzerOptions::default())
             .expect("analyze stochastic MPAD")
             .to_string(),
         "error(0.25) D0\n"
@@ -512,10 +512,8 @@ fn assert_depolarizing_gate_effect(
 fn noise_dem(circuit: &Circuit, label: &str) -> crate::DetectorErrorModel {
     circuit_to_detector_error_model(
         circuit,
-        ErrorAnalyzerOptions {
-            approximate_disjoint_errors_threshold: Some(
-                Probability::try_new(1.0).expect("unit probability"),
-            ),
+        &ErrorAnalyzerOptions {
+            approximate_disjoint_errors: Some(Probability::try_new(1.0).expect("unit probability")),
             ..ErrorAnalyzerOptions::default()
         },
     )

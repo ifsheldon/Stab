@@ -121,13 +121,13 @@ fn dem(input: &str) -> AnalysisResult<DetectorErrorModel> {
 fn shortest_error_wcnf_common_matches_stim() -> AnalysisResult<()> {
     for source in ["", "error(0.1) D0\n", "error(0.1)\n"] {
         assert_eq!(
-            shortest_error_sat_problem(&dem(source)?)?,
+            shortest_error_sat_problem(&dem(source)?, &Default::default())?,
             UNSAT,
             "{source}"
         );
     }
     assert_eq!(
-        shortest_error_sat_problem(&dem("error(0.1) L0\n")?)?,
+        shortest_error_sat_problem(&dem("error(0.1) L0\n")?, &Default::default())?,
         SINGLE_OBSERVABLE_SHORTEST
     );
 
@@ -141,23 +141,27 @@ fn shortest_error_wcnf_common_matches_stim() -> AnalysisResult<()> {
         "error(0.1) D1000001 L1000001\nerror(0.2) D1000001\n",
     ] {
         assert_eq!(
-            shortest_error_sat_problem(&dem(source)?)?,
+            shortest_error_sat_problem(&dem(source)?, &Default::default())?,
             TWO_ERROR_SHORTEST,
             "{source}"
         );
     }
     assert_eq!(
-        shortest_error_sat_problem(&dem(
-            "repeat 2 {\nerror(0.1) D0\nshift_detectors 1\n}\nerror(0.1) D0 L0\n"
-        )?)?,
+        shortest_error_sat_problem(
+            &dem("repeat 2 {\nerror(0.1) D0\nshift_detectors 1\n}\nerror(0.1) D0 L0\n")?,
+            &Default::default()
+        )?,
         "p wcnf 3 7 8\n1 -1 0\n1 -2 0\n1 -3 0\n8 -1 0\n8 -2 0\n8 -3 0\n8 3 0\n"
     );
     assert_eq!(
-        shortest_error_sat_problem(&dem("repeat 2 {\nerror(0.1) L0\n}\n")?)?,
+        shortest_error_sat_problem(&dem("repeat 2 {\nerror(0.1) L0\n}\n")?, &Default::default())?,
         FLAT_REPEAT_SHORTEST
     );
     assert_eq!(
-        shortest_error_sat_problem(&dem("repeat 2 {\nrepeat 2 {\nerror(0.1) L0\n}\n}\n")?)?,
+        shortest_error_sat_problem(
+            &dem("repeat 2 {\nrepeat 2 {\nerror(0.1) L0\n}\n}\n")?,
+            &Default::default()
+        )?,
         NESTED_REPEAT_SHORTEST
     );
     Ok(())
@@ -166,7 +170,7 @@ fn shortest_error_wcnf_common_matches_stim() -> AnalysisResult<()> {
 #[test]
 fn likeliest_error_wcnf_common_matches_stim() -> AnalysisResult<()> {
     assert_eq!(
-        likeliest_error_sat_problem(&DetectorErrorModel::new(), 10)?,
+        likeliest_error_sat_problem(&DetectorErrorModel::new(), 10, &Default::default())?,
         UNSAT
     );
     for (source, expected) in [
@@ -181,34 +185,46 @@ fn likeliest_error_wcnf_common_matches_stim() -> AnalysisResult<()> {
         ),
     ] {
         assert_eq!(
-            likeliest_error_sat_problem(&dem(source)?, 10)?,
+            likeliest_error_sat_problem(&dem(source)?, 10, &Default::default())?,
             expected,
             "{source}"
         );
     }
     assert_eq!(
-        likeliest_error_sat_problem(&dem("error(1) L0\n")?, 10)?,
+        likeliest_error_sat_problem(&dem("error(1) L0\n")?, 10, &Default::default())?,
         "p wcnf 1 2 21\n21 1 0\n21 1 0\n"
     );
     assert_eq!(
-        likeliest_error_sat_problem(&dem("error(0.1) D0 L0\nerror(0.49) D0\n")?, 1,)?,
+        likeliest_error_sat_problem(
+            &dem("error(0.1) D0 L0\nerror(0.49) D0\n")?,
+            1,
+            &Default::default()
+        )?,
         "p wcnf 3 8 9\n1 -1 0\n9 1 2 -3 0\n9 1 -2 3 0\n9 -1 2 3 0\n9 -1 -2 -3 0\n9 -3 0\n9 1 0\n"
     );
-    assert!(likeliest_error_sat_problem(&dem("error(0.1) L0\n")?, 0).is_err());
+    assert!(likeliest_error_sat_problem(&dem("error(0.1) L0\n")?, 0, &Default::default()).is_err());
 
     let sparse_source = "error(0.1) D1000001 L1000001\nerror(0.1) D1000001\n";
     assert_eq!(
-        likeliest_error_sat_problem(&dem(sparse_source)?, 10)?,
+        likeliest_error_sat_problem(&dem(sparse_source)?, 10, &Default::default())?,
         TWO_ERROR_LIKELIEST,
         "{sparse_source}"
     );
 
     assert_eq!(
-        likeliest_error_sat_problem(&dem("repeat 2 {\nerror(0.1) L0\n}\n")?, 10)?,
+        likeliest_error_sat_problem(
+            &dem("repeat 2 {\nerror(0.1) L0\n}\n")?,
+            10,
+            &Default::default()
+        )?,
         FLAT_REPEAT_LIKELIEST
     );
     assert_eq!(
-        likeliest_error_sat_problem(&dem("repeat 2 {\nrepeat 2 {\nerror(0.1) L0\n}\n}\n")?, 10,)?,
+        likeliest_error_sat_problem(
+            &dem("repeat 2 {\nrepeat 2 {\nerror(0.1) L0\n}\n}\n")?,
+            10,
+            &Default::default()
+        )?,
         NESTED_REPEAT_LIKELIEST
     );
 
@@ -221,6 +237,7 @@ fn likeliest_error_wcnf_avoids_stim_zero_probability_sparse_literal_bug() -> Ana
         likeliest_error_sat_problem(
             &dem("error(0) D9 L3\nerror(0.1) D0 L0\nerror(0.1) D0\n")?,
             10,
+            &Default::default()
         )?,
         "p wcnf 4 8 81\n10 -2 0\n81 2 3 -4 0\n81 2 -3 4 0\n81 -2 3 4 0\n81 -2 -3 -4 0\n10 -3 0\n81 -4 0\n81 2 0\n"
     );

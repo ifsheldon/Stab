@@ -32,7 +32,8 @@ fn circuit_instruction_tags(circuit: &Circuit) -> Vec<Option<&[u8]>> {
 #[test]
 fn flattened_circuit_preserves_opaque_instruction_tags() {
     let circuit = circuit_from_bytes(b"REPEAT[\xfc] 2 {\n    H[\xff] 0\n    S[\xfe] 0\n}\n");
-    let flattened = flattened_circuit(&circuit).expect("flatten tagged circuit");
+    let flattened =
+        flattened_circuit(&circuit, &Default::default()).expect("flatten tagged circuit");
 
     assert_eq!(
         flattened.to_stim_bytes(),
@@ -146,7 +147,8 @@ fn inverse_circuits_preserve_opaque_tags_in_reversed_models() {
     );
 
     let source = circuit_from_bytes(b"M[\xff](0.125) 0 1\nMX[\xfe](0.25) 2\n");
-    let inverse_qec = circuit_inverse_qec(&source).expect("QEC-invert tagged measurements");
+    let inverse_qec =
+        circuit_inverse_qec(&source, &Default::default()).expect("QEC-invert tagged measurements");
     assert_eq!(
         inverse_qec.to_stim_bytes(),
         b"MX[\xfe](0.25) 2\nM[\xff](0.125) 1 0\n"
@@ -168,7 +170,8 @@ fn feedback_inlining_preserves_opaque_tags_on_surviving_and_introduced_operation
           DETECTOR[\xfa] rec[-1] rec[-2]\n\
           OBSERVABLE_INCLUDE[\xf9](0) rec[-1]\n",
     );
-    let inlined = circuit_with_inlined_feedback(&circuit).expect("inline supported feedback");
+    let inlined = circuit_with_inlined_feedback(&circuit, &Default::default())
+        .expect("inline supported feedback");
 
     assert_eq!(
         inlined.to_stim_bytes(),

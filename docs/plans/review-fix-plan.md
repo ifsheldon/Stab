@@ -243,10 +243,10 @@ Larger redesigns the API review proposed and this batch did not do:
 - Done on 2026-11-21: one flow check returns a `FlowVerdict` per flow, and a refused budget, a cancellation, or an invalid circuit is an error instead of `false`.
 - Done on 2026-11-21: "no logical error found" is a `LogicalErrorSearch::NotFound` outcome, and each search takes one named options value.
 - Done on 2026-11-21: the gate-data getters return `Option`, and `GateDataUnavailable` is removed.
-- Collapse the roughly twenty `f` and `f_with_options` twins in analysis and the telescoping session constructors in the engine into one function per operation taking an options value.
+- Done on 2026-11-21 for analysis: one function per operation taking an options value. The telescoping session constructors in the engine are still open.
 - Write the engine's run progress, status, summary, and error types once as generic types instead of once per family.
 - Done on 2026-11-21: `CircuitInstruction::gate_arguments()` and `gate_targets()` are typed, infallible views, which removed about 120 impossible branches in analysis and the engine.
-- Replace `ErrorAnalyzerOptions`' five independent booleans with nested option types.
+- Done on 2026-11-21: `ErrorAnalyzerOptions` uses nested option types instead of five independent booleans.
 - Budget or remove the `Vec<Vec<bool>>` record codec family, which only CLI tests use outside `stab-records`.
 - Done on 2026-11-21: gate flow and decomposition metadata are typed tables in `stab-model`, checked against the vendored Stim gate data, and no product crate parses gate text at run time.
 - Done on 2026-11-21: `stab_model::advanced` went from 57 exports to 27, with dead items deleted and free wrappers turned into methods.

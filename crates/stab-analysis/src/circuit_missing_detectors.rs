@@ -11,7 +11,7 @@ use crate::folded_walk::walk_folded;
 use crate::instruction_shape;
 use crate::{
     AnalysisError, AnalysisOperation, AnalysisResult, FlowGeneratorOptions, ResourceKind,
-    ResourceLimitError, circuit_flow::flow_record_index, circuit_flow_generators_with_options,
+    ResourceLimitError, circuit_flow::flow_record_index, circuit_flow_generators,
 };
 
 mod final_repeat;
@@ -51,19 +51,19 @@ impl MissingDetectorOptions {
 /// feedback, heralded-record, annotation, and compact-repeat semantics.
 pub fn missing_detectors(
     circuit: &Circuit,
-    options: MissingDetectorOptions,
+    options: &MissingDetectorOptions,
 ) -> AnalysisResult<Circuit> {
     let qubit_count = circuit.simulated_qubit_count();
     if declaration_scan(circuit)?.instructions > FOLDED_FINAL_REPEAT_THRESHOLD
         && let Some(output) =
-            final_repeat::try_missing_detectors_folded_final_repeat(circuit, &options, qubit_count)?
+            final_repeat::try_missing_detectors_folded_final_repeat(circuit, options, qubit_count)?
     {
         return Ok(output);
     }
     if !contains_measurement_row_instruction(circuit) {
         return Ok(Circuit::new());
     }
-    missing_detectors_bounded(circuit, &options, qubit_count)
+    missing_detectors_bounded(circuit, options, qubit_count)
 }
 
 pub(super) fn contains_measurement_row_instruction(circuit: &Circuit) -> bool {
@@ -98,10 +98,7 @@ pub(super) fn missing_detectors_bounded(
     validate_missing_detector_flow_storage(qubit_count, measurement_count, options.memory_budget)?;
     let generator_circuit = circuit_with_known_input_resets(circuit, options, qubit_count)?;
     let invariants = collect_measurement_invariants(
-        circuit_flow_generators_with_options(
-            &generator_circuit,
-            &options.flow_generator_options(),
-        )?,
+        circuit_flow_generators(&generator_circuit, &options.flow_generator_options())?,
         measurement_count,
     )?;
     let declarations = collect_declared_rows(circuit, measurement_count)?;
@@ -122,9 +119,7 @@ pub(super) fn terminal_state_signature(
     validate_missing_detector_flow_storage(qubit_count, measurement_count, options.memory_budget)?;
     let generator_circuit = circuit_with_known_input_resets(circuit, options, qubit_count)?;
     let mut signature = Vec::new();
-    for flow in
-        circuit_flow_generators_with_options(&generator_circuit, &options.flow_generator_options())?
-    {
+    for flow in circuit_flow_generators(&generator_circuit, &options.flow_generator_options())? {
         if !flow.input().has_no_pauli_terms() || flow.output().has_no_pauli_terms() {
             continue;
         }

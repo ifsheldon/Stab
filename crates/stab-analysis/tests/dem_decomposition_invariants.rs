@@ -18,7 +18,8 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use stab_analysis::{
-    AnalysisError, AnalysisOperation, ErrorAnalyzerOptions, circuit_to_detector_error_model,
+    AnalysisError, AnalysisOperation, DecompositionFailure, ErrorAnalyzerOptions,
+    ErrorDecomposition, GaugeDetectors, LoopFolding, circuit_to_detector_error_model,
 };
 use stab_model::{Circuit, Probability};
 
@@ -48,16 +49,16 @@ fn matrix_circuits() -> Vec<(String, Circuit)> {
 }
 
 /// Mirrors the per-family options of `consolidation_matrix.rs`.
-fn base_options(name: &str, fold_loops: bool) -> ErrorAnalyzerOptions {
+fn base_options(name: &str, loops: LoopFolding) -> ErrorAnalyzerOptions {
     let mut options = ErrorAnalyzerOptions {
-        fold_loops,
+        loops,
         ..ErrorAnalyzerOptions::default()
     };
     if name.starts_with("gauge_") {
-        options.allow_gauge_detectors = true;
+        options.gauge_detectors = GaugeDetectors::Allow;
     }
     if name.starts_with("heralded_") || name.starts_with("else_") {
-        options.approximate_disjoint_errors_threshold =
+        options.approximate_disjoint_errors =
             Some(Probability::try_new(1.0).expect("unit threshold"));
     }
     options
@@ -77,14 +78,16 @@ fn decomposed_matrix_errors_preserve_symptoms_and_are_graphlike() {
     let mut strict_failures = Vec::new();
     let mut split_errors = 0_usize;
     for (name, circuit) in &circuits {
-        for fold_loops in [false, true] {
-            let context = format!("{name} (fold_loops={fold_loops})");
-            let base = base_options(name, fold_loops);
-            let analyze = |options| circuit_to_detector_error_model(circuit, options);
+        for loops in [LoopFolding::Unroll, LoopFolding::Fold] {
+            let context = format!("{name} (loops={loops:?})");
+            let base = base_options(name, loops);
+            let analyze = |options| circuit_to_detector_error_model(circuit, &options);
             let plain = analyze(base.clone()).unwrap_or_else(|error| panic!("{context}: {error}"));
             let lenient = analyze(ErrorAnalyzerOptions {
-                decompose_errors: true,
-                ignore_decomposition_failures: true,
+                decomposition: Some(ErrorDecomposition {
+                    on_failure: DecompositionFailure::Ignore,
+                    ..Default::default()
+                }),
                 ..base.clone()
             })
             .unwrap_or_else(|error| panic!("{context} lenient: {error}"));
@@ -115,7 +118,7 @@ fn decomposed_matrix_errors_preserve_symptoms_and_are_graphlike() {
             }
 
             match analyze(ErrorAnalyzerOptions {
-                decompose_errors: true,
+                decomposition: Some(ErrorDecomposition::default()),
                 ..base.clone()
             }) {
                 Ok(strict) => {
@@ -159,12 +162,12 @@ fn global_decomposition_merges_into_existing_classes_in_stim_order() {
         "R 0 1 2\nDEPOLARIZE2(0.1) 0 2\nCX 0 1\nE(0.2) X0 X1 X2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
     )
     .expect("circuit");
-    for fold_loops in [false, true] {
+    for loops in [LoopFolding::Unroll, LoopFolding::Fold] {
         let dem = circuit_to_detector_error_model(
             &circuit,
-            ErrorAnalyzerOptions {
-                fold_loops,
-                decompose_errors: true,
+            &ErrorAnalyzerOptions {
+                loops,
+                decomposition: Some(ErrorDecomposition::default()),
                 ..ErrorAnalyzerOptions::default()
             },
         )
@@ -176,7 +179,7 @@ fn global_decomposition_merges_into_existing_classes_in_stim_order() {
                 "error(0.2164510624248435488592434694510303) D0 D1 ^ D2\n",
                 "error(0.02741843737473917755331775936156191) D2\n",
             ),
-            "fold_loops={fold_loops}"
+            "loops={loops:?}"
         );
     }
 }
@@ -195,19 +198,19 @@ fn long_gauge_component(rounds: u64) -> Circuit {
 /// 64 bits wide, so every printed component XORs back to the undecomposed error.
 #[test]
 fn decomposition_of_components_past_32_terms_preserves_every_term() {
-    for fold_loops in [false, true] {
-        let context = format!("fold_loops={fold_loops}");
+    for loops in [LoopFolding::Unroll, LoopFolding::Fold] {
+        let context = format!("loops={loops:?}");
         let base = ErrorAnalyzerOptions {
-            fold_loops,
-            allow_gauge_detectors: true,
+            loops,
+            gauge_detectors: GaugeDetectors::Allow,
             ..ErrorAnalyzerOptions::default()
         };
         let circuit = long_gauge_component(34);
-        let plain = circuit_to_detector_error_model(&circuit, base.clone()).expect("plain");
+        let plain = circuit_to_detector_error_model(&circuit, &base).expect("plain");
         let decomposed = circuit_to_detector_error_model(
             &circuit,
-            ErrorAnalyzerOptions {
-                decompose_errors: true,
+            &ErrorAnalyzerOptions {
+                decomposition: Some(ErrorDecomposition::default()),
                 ..base.clone()
             },
         )
@@ -247,9 +250,11 @@ fn decomposition_of_components_past_32_terms_preserves_every_term() {
         // Past the 64-bit mask, Stab refuses exactly as pinned Stim does instead of guessing.
         let error = circuit_to_detector_error_model(
             &long_gauge_component(70),
-            ErrorAnalyzerOptions {
-                decompose_errors: true,
-                ignore_decomposition_failures: true,
+            &ErrorAnalyzerOptions {
+                decomposition: Some(ErrorDecomposition {
+                    on_failure: DecompositionFailure::Ignore,
+                    ..Default::default()
+                }),
                 ..base
             },
         )

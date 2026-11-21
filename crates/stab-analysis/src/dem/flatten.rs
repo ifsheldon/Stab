@@ -7,59 +7,27 @@ use crate::{AnalysisError, AnalysisOperation, AnalysisResult, ResourceKind, Reso
 
 const OPAQUE_TAG_STORAGE_MULTIPLIER: u64 = 4;
 
-/// Resource policy for materializing a detector error model's folded repeat structure.
+/// Options of [`crate::flattened_detector_error_model`].
 ///
-/// The memory budget bounds the conservative retained size of the flattened model, admitted
-/// before output is allocated. It does not constrain compact traversal or
+/// The options bound materialization only. They do not constrain compact traversal or
 /// [`DetectorErrorModel::iter_flattened_instructions`], whose callers may stop before consuming
 /// the represented model. Repeat counts, expanded instructions, and payload counts are not
-/// separately capped; repeat nesting remains a fixed parser and model safety invariant. The
-/// cancellation signal is polled once per visited item and repeat iteration while materializing.
+/// separately capped; repeat nesting remains a fixed parser and model safety invariant.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct DemFlattenLimits {
-    memory_budget: MemoryBudget,
-    cancellation: Cancellation,
+pub struct DemFlattenOptions {
+    /// Budget for the conservative retained size of the flattened model, admitted before output
+    /// is allocated.
+    pub memory_budget: MemoryBudget,
+    /// Signal polled once per visited item and repeat iteration while materializing.
+    pub cancellation: Cancellation,
 }
 
-impl DemFlattenLimits {
-    pub const fn new(memory_budget: MemoryBudget) -> Self {
-        Self {
-            memory_budget,
-            cancellation: Cancellation::never(),
-        }
-    }
-
-    /// Returns the budget for the materialized result.
-    pub const fn memory_budget(&self) -> MemoryBudget {
-        self.memory_budget
-    }
-
-    /// Returns the cancellation signal polled while the result is materialized.
-    pub const fn cancellation(&self) -> &Cancellation {
-        &self.cancellation
-    }
-
-    /// Sets the budget for the materialized result.
-    #[must_use]
-    pub const fn with_memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
-        self.memory_budget = memory_budget;
-        self
-    }
-
-    /// Sets the cancellation signal polled while the result is materialized.
-    #[must_use]
-    pub fn with_cancellation(mut self, cancellation: Cancellation) -> Self {
-        self.cancellation = cancellation;
-        self
-    }
-}
-
-pub(crate) fn validate_flattening_budget_with_limits(
+pub(crate) fn validate_flattening_budget(
     model: &DetectorErrorModel,
     context: &'static str,
-    limits: &DemFlattenLimits,
+    options: &DemFlattenOptions,
 ) -> AnalysisResult<DemFlatteningBudget> {
-    let mut budget = DemFlatteningBudget::new(limits.memory_budget());
+    let mut budget = DemFlatteningBudget::new(options.memory_budget);
     validate_flattening_budget_items(model, 1, 0, context, &mut budget)?;
     Ok(budget)
 }

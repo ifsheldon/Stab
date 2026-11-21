@@ -19,10 +19,10 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 | R1 | A verdict from the flow checks | M | Done on 2026-11-21, as a two-way verdict with errors for everything else. |
 | R2 | "No logical error found" as a search outcome, named search options | M | Done on 2026-11-21. |
 | R3 | `Option` from the gate-data getters | M | Done on 2026-11-21, with R9. |
-| R4 | One function per operation taking an options value | L | Do, after R1 and R2, and before any Python binding. |
+| R4 | One function per operation taking an options value | L | Analysis half done on 2026-11-21; the engine half is open. |
 | R5 | Engine run progress, status, summary, and error written once | M | Do, in the same pass as the engine half of R4. |
 | R6 | Typed gate-argument and target-group views in `stab-model` | L | Done on 2026-11-21. |
-| R7 | Nested option types for `ErrorAnalyzerOptions` | M | Do, in the same pass as R4 so call sites change once. |
+| R7 | Nested option types for `ErrorAnalyzerOptions` | M | Done on 2026-11-21. |
 | R8 | The `Vec<Vec<bool>>` record codec family | M | Remove from the public surface; keep as a test oracle. |
 | R9 | Typed gate flow and decomposition metadata | M to L | Done on 2026-11-21. |
 | R10 | Trim `stab_model::advanced` | S to M | Done on 2026-11-21. |
@@ -212,6 +212,13 @@ With R9 done, the parse disappears and `Option` is the whole truth; without R9 t
 
 ### R4. One function per operation taking an options value
 
+**Outcome for analysis, 2026-11-21.** Done: every `stab-analysis` operation is one function taking its options by reference, with public fields, no builders, and `memory_budget` and `cancellation` under those names.
+`solve_for_flow_measurements` gained a real budget and cancellation, and the dense detecting-region lists gained cancellation.
+Still without a byte budget or cancellation: `tableau_to_circuit` (needs a proven output bound), cancellation in `CodeCircuitParams::generate`, and a byte budget for SAT generation and logical-error search, which have cancellation and count caps.
+`CodeCircuitParams` keeps its budget inside the parameters.
+The engine half is not done yet.
+The rest of this section is the proposal as written before the work.
+
 **Today.** `stab-analysis` exports about twenty operations twice, as `f` and as `f_with_options`, `f_with_limits`, or `f_with_budget`, where the plain form is the other with defaults.
 The options follow four conventions: by value or by reference, public fields or private fields with `with_*` builders, a budget inside domain parameters, or a bare `MemoryBudget` with no cancellation.
 The engine has the same shape in its session constructors: `session`, `session_with_reference_mode`, `session_with_lane_width`, `session_with_budget`, `streaming_run`, `streaming_run_with_budget`, `session_with_limits`, `replay_session_with_limits`, and four free functions with `_with_limits` twins.
@@ -296,6 +303,9 @@ pub enum GateTargets<'a> {
 It removes the most code downstream of any model item, and R9 builds on it.
 
 ### R7. Nested option types for `ErrorAnalyzerOptions`
+
+**Outcome, 2026-11-21.** Done as proposed below, with the CLI mapping checked against pinned Stim on 81 runs, including the refinements given without `--decompose_errors`.
+The rest of this section is the proposal as written before the work.
 
 **Today.** Five independent booleans: `fold_loops`, `decompose_errors`, `allow_gauge_detectors`, `ignore_decomposition_failures`, and `block_decomposition_from_introducing_remnant_edges`.
 The last two mean nothing unless `decompose_errors` is set, and the type does not say so.

@@ -3,16 +3,16 @@
     reason = "decomposition fixtures are fixed test inputs"
 )]
 
-use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_analysis::{ErrorAnalyzerOptions, ErrorDecomposition, circuit_to_detector_error_model};
 use stab_model::Circuit;
 
 fn analyzed(circuit_text: &str, decompose: bool) -> Result<String, String> {
     let options = ErrorAnalyzerOptions {
-        decompose_errors: decompose,
+        decomposition: decompose.then_some(ErrorDecomposition::default()),
         ..ErrorAnalyzerOptions::default()
     };
     let circuit = Circuit::from_stim_str(circuit_text).expect("fixture circuit parses");
-    circuit_to_detector_error_model(&circuit, options)
+    circuit_to_detector_error_model(&circuit, &options)
         .map(|model| model.to_dem_string())
         .map_err(|error| error.to_string())
 }

@@ -3,15 +3,17 @@
     reason = "compatibility tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_analysis::{
+    ErrorAnalyzerOptions, GaugeDetectors, LoopFolding, circuit_to_detector_error_model,
+};
 use stab_model::{Circuit, DemInstructionKind, DemItem};
 
 fn analyze_allowing_gauge_detectors(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
     circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            allow_gauge_detectors: true,
+        &ErrorAnalyzerOptions {
+            gauge_detectors: GaugeDetectors::Allow,
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -21,7 +23,7 @@ fn analyze_allowing_gauge_detectors(text: &str) -> String {
 
 fn analyze_error(text: &str, options: ErrorAnalyzerOptions) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
-    circuit_to_detector_error_model(&circuit, options)
+    circuit_to_detector_error_model(&circuit, &options)
         .expect_err("analysis should reject gauge sensitivity")
         .to_string()
 }
@@ -38,7 +40,7 @@ fn dem_analyzer_rejects_gauge_observables_like_upstream() {
     for options in [
         ErrorAnalyzerOptions::default(),
         ErrorAnalyzerOptions {
-            allow_gauge_detectors: true,
+            gauge_detectors: GaugeDetectors::Allow,
             ..ErrorAnalyzerOptions::default()
         },
     ] {
@@ -246,8 +248,8 @@ fn dem_analyzer_noisy_multi_round_gauge_detectors_match_upstream_subset_semantic
     .expect("circuit");
     let dem = circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            allow_gauge_detectors: true,
+        &ErrorAnalyzerOptions {
+            gauge_detectors: GaugeDetectors::Allow,
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -303,9 +305,9 @@ fn analyze_folded_allowing_gauge_detectors(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
     circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            allow_gauge_detectors: true,
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            gauge_detectors: GaugeDetectors::Allow,
+            loops: LoopFolding::Fold,
             ..ErrorAnalyzerOptions::default()
         },
     )

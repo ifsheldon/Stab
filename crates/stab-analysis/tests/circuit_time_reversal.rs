@@ -10,10 +10,10 @@ use proptest::prelude::*;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
 use stab_algebra::Flow;
 use stab_analysis::{
-    CodeCircuitParams, CodeDistance, CodeTask, DetectingRegionTargetOptions, RoundCount,
-    SurfaceCodeTask, TimeReversedForFlowsOptions, all_detecting_region_targets,
-    all_detecting_region_ticks, circuit_detecting_regions_for_targets, circuit_flow_generators,
-    circuit_time_reversed_for_flows, circuit_time_reversed_for_flows_with_options,
+    CodeCircuitParams, CodeDistance, CodeTask, DetectingRegionOptions, RoundCount, SurfaceCodeTask,
+    TimeReversedForFlowsOptions, all_detecting_region_targets, all_detecting_region_ticks,
+    circuit_detecting_regions_for_targets, circuit_flow_generators,
+    circuit_time_reversed_for_flows,
 };
 use stab_model::{Circuit, CircuitTick, DemTarget};
 
@@ -36,13 +36,13 @@ fn time_reversal_preserves_generated_surface_code_regions() {
     let generated = params.generate().expect("generate surface code");
     let input = generated.circuit();
 
-    let targets = all_detecting_region_targets(input).expect("input targets");
-    let ticks = all_detecting_region_ticks(input).expect("input ticks");
+    let targets = all_detecting_region_targets(input, &Default::default()).expect("input targets");
+    let ticks = all_detecting_region_ticks(input, &Default::default()).expect("input ticks");
     let input_regions = circuit_detecting_regions_for_targets(
         input,
-        DetectingRegionTargetOptions {
-            targets: targets.clone(),
-            ticks: ticks.clone(),
+        &targets,
+        &ticks,
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -50,8 +50,8 @@ fn time_reversal_preserves_generated_surface_code_regions() {
     )
     .expect("input detecting regions");
 
-    let (inverse, flows) =
-        circuit_time_reversed_for_flows(input, &[]).expect("reverse generated surface code");
+    let (inverse, flows) = circuit_time_reversed_for_flows(input, &[], &Default::default())
+        .expect("reverse generated surface code");
     assert!(flows.is_empty());
     assert_eq!(inverse.count_ticks().expect("inverse ticks"), 14);
     assert_eq!(inverse.count_detectors().expect("inverse detectors"), 16);
@@ -62,9 +62,9 @@ fn time_reversal_preserves_generated_surface_code_regions() {
 
     let inverse_regions = circuit_detecting_regions_for_targets(
         &inverse,
-        DetectingRegionTargetOptions {
-            targets,
-            ticks: all_detecting_region_ticks(&inverse).expect("inverse ticks"),
+        &targets,
+        &all_detecting_region_ticks(&inverse, &Default::default()).expect("inverse ticks"),
+        &DetectingRegionOptions {
             ignore_anticommutation_errors: false,
             memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
@@ -119,7 +119,7 @@ fn time_reversal_rejects_measurement_feedback() {
         ",
     );
 
-    let error = circuit_time_reversed_for_flows(&input, &[flow("Z0 -> Z0")])
+    let error = circuit_time_reversed_for_flows(&input, &[flow("Z0 -> Z0")], &Default::default())
         .expect_err("feedback remains fail-closed")
         .to_string();
 
@@ -148,8 +148,8 @@ fn time_reversal_preserves_observable_pauli_semantics() {
         ",
     );
 
-    let (inverse, flows) =
-        circuit_time_reversed_for_flows(&input, &[]).expect("reverse observable Pauli packet");
+    let (inverse, flows) = circuit_time_reversed_for_flows(&input, &[], &Default::default())
+        .expect("reverse observable Pauli packet");
 
     assert_eq!(inverse, expected);
     assert!(flows.is_empty());
@@ -178,7 +178,8 @@ fn time_reversal_routes_mpad_flows_and_observables() {
     let expected_flows = ["1 -> rec[-2]", "1 -> rec[-1]", "Z -> X", "Y -> Z"].map(flow);
 
     let (inverse, output_flows) =
-        circuit_time_reversed_for_flows(&input, &input_flows).expect("reverse MPAD flow matrix");
+        circuit_time_reversed_for_flows(&input, &input_flows, &Default::default())
+            .expect("reverse MPAD flow matrix");
 
     assert_eq!(inverse, expected);
     assert_eq!(output_flows, expected_flows);
@@ -187,13 +188,13 @@ fn time_reversal_routes_mpad_flows_and_observables() {
 #[test]
 fn time_reversal_admits_measurement_rich_repeat_expansion_against_the_memory_budget() {
     let small = circuit("REPEAT 2 {\n    M 0\n}\n");
-    let (inverse, flows) =
-        circuit_time_reversed_for_flows(&small, &[]).expect("reverse bounded repeat");
+    let (inverse, flows) = circuit_time_reversed_for_flows(&small, &[], &Default::default())
+        .expect("reverse bounded repeat");
     assert_eq!(inverse, circuit("M 0 0\n"));
     assert!(flows.is_empty());
 
     let oversized = circuit("REPEAT 1000000000000 {\n    M 0\n}\n");
-    let error = circuit_time_reversed_for_flows(&oversized, &[])
+    let error = circuit_time_reversed_for_flows(&oversized, &[], &Default::default())
         .expect_err("measurement-rich expansion beyond the memory budget is refused");
     let resource = error
         .resource_limit_error()
@@ -218,7 +219,7 @@ fn time_reversal_skips_instructionless_nested_repeats() {
         ",
     );
 
-    let (inverse, flows) = circuit_time_reversed_for_flows(&input, &[])
+    let (inverse, flows) = circuit_time_reversed_for_flows(&input, &[], &Default::default())
         .expect("instruction-empty nested repeat must be skipped");
 
     assert_eq!(inverse, circuit("M 0\n"));
@@ -232,13 +233,14 @@ fn time_reversed_for_flows_matches_stim_heralded_record_reversal() {
         "HERALDED_PAULI_CHANNEL_1(0.1, 0.2, 0.3, 0.4) 0\n",
     ] {
         let input = circuit(circuit_text);
-        let (empty_inverse, empty_flows) = circuit_time_reversed_for_flows(&input, &[])
-            .expect("reverse heralded instruction without a record-bearing flow");
+        let (empty_inverse, empty_flows) =
+            circuit_time_reversed_for_flows(&input, &[], &Default::default())
+                .expect("reverse heralded instruction without a record-bearing flow");
         assert_eq!(empty_inverse, input, "{circuit_text}");
         assert!(empty_flows.is_empty(), "{circuit_text}");
 
         let (record_inverse, record_flows) =
-            circuit_time_reversed_for_flows(&input, &[flow("1 -> rec[-1]")])
+            circuit_time_reversed_for_flows(&input, &[flow("1 -> rec[-1]")], &Default::default())
                 .expect("reverse heralded instruction with a record-bearing flow");
         assert_eq!(record_inverse, input, "{circuit_text}");
         assert_eq!(record_flows, vec![flow("1 -> 1")], "{circuit_text}");
@@ -257,8 +259,8 @@ fn time_reversal_matches_sweep_control_target_order() {
         "YCZ 0 sweep[0]\n",
     ] {
         let input = circuit(text);
-        let (inverse, flows) =
-            circuit_time_reversed_for_flows(&input, &[]).expect("reverse gate-valid sweep control");
+        let (inverse, flows) = circuit_time_reversed_for_flows(&input, &[], &Default::default())
+            .expect("reverse gate-valid sweep control");
         assert_eq!(inverse, input, "{text}");
         assert!(flows.is_empty(), "{text}");
     }
@@ -273,7 +275,7 @@ fn time_reversal_matches_sweep_control_target_order() {
         "XCZ sweep[0] sweep[1]\n",
         "YCZ sweep[0] sweep[1]\n",
     ] {
-        let error = circuit_time_reversed_for_flows(&circuit(text), &[])
+        let error = circuit_time_reversed_for_flows(&circuit(text), &[], &Default::default())
             .expect_err("gate-invalid sweep target order is rejected")
             .to_string();
         assert!(error.contains("qubit-only side"), "{text}: {error}");
@@ -288,8 +290,9 @@ fn time_reversal_preserves_non_pair_target_order() {
         ("E(0.125) X0 Y1 Z2\n", "E(0.125) Z2 Y1 X0\n"),
         ("MXX 0 1 2 3\n", "MXX 2 3 0 1\n"),
     ] {
-        let (inverse, flows) = circuit_time_reversed_for_flows(&circuit(input_text), &[])
-            .expect("reverse targets using Stim's pair-aware rule");
+        let (inverse, flows) =
+            circuit_time_reversed_for_flows(&circuit(input_text), &[], &Default::default())
+                .expect("reverse targets using Stim's pair-aware rule");
         assert_eq!(inverse, circuit(expected_text), "{input_text}");
         assert!(flows.is_empty(), "{input_text}");
     }
@@ -300,7 +303,7 @@ fn time_reversal_rejects_inverted_result_synthesis() {
     for (gate, basis) in [("M", "Z"), ("MX", "X"), ("MY", "Y")] {
         let input = circuit(&format!("{gate} !0\n"));
         let input_flow = flow(&format!("{basis}0 -> rec[-1]"));
-        let error = circuit_time_reversed_for_flows(&input, &[input_flow])
+        let error = circuit_time_reversed_for_flows(&input, &[input_flow], &Default::default())
             .expect_err("Stim rejects the synthesized inverted reset")
             .to_string();
         assert!(
@@ -311,7 +314,7 @@ fn time_reversal_rejects_inverted_result_synthesis() {
 
     for gate in ["MR", "MRX", "MRY"] {
         let input = circuit(&format!("{gate}(0.125) !0\n"));
-        let error = circuit_time_reversed_for_flows(&input, &[])
+        let error = circuit_time_reversed_for_flows(&input, &[], &Default::default())
             .expect_err("Stim rejects inverted ejected reset noise")
             .to_string();
         assert!(
@@ -324,8 +327,9 @@ fn time_reversal_rejects_inverted_result_synthesis() {
 #[test]
 fn time_reversal_avoids_dense_storage_for_sparse_high_qubits() {
     let million_index = circuit("M 1000000\n");
-    let (unchanged, flows) = circuit_time_reversed_for_flows(&million_index, &[])
-        .expect("reverse a million-index circuit without dense tracker storage");
+    let (unchanged, flows) =
+        circuit_time_reversed_for_flows(&million_index, &[], &Default::default())
+            .expect("reverse a million-index circuit without dense tracker storage");
     assert_eq!(unchanged, million_index);
     assert!(flows.is_empty());
 }
@@ -335,8 +339,9 @@ fn time_reversal_validates_sparse_high_qubit_flows() {
     let input = circuit("M 4095\n");
     let input_flow = flow("Z4095 -> rec[-1]");
 
-    let (inverse, flows) = circuit_time_reversed_for_flows(&input, &[input_flow])
-        .expect("reverse and validate a sparse high-index flow");
+    let (inverse, flows) =
+        circuit_time_reversed_for_flows(&input, &[input_flow], &Default::default())
+            .expect("reverse and validate a sparse high-index flow");
 
     assert_eq!(inverse, circuit("R 4095\n"));
     assert_eq!(flows, vec![flow("1 -> Z4095")]);
@@ -347,16 +352,18 @@ fn time_reversal_validates_sparse_high_qubit_flows() {
 fn time_reversal_uses_sparse_validation_above_dense_tableau_width() {
     let input = circuit("H 1000000\n");
 
-    let (without_flows, empty) = circuit_time_reversed_for_flows(&input, &[])
+    let (without_flows, empty) = circuit_time_reversed_for_flows(&input, &[], &Default::default())
         .expect("empty-flow unitary reversal must not allocate a dense tableau");
     assert_eq!(without_flows, input);
     assert!(empty.is_empty());
 
     let idle_flow = flow("Z0 -> Z0");
-    let (with_flow, flows) =
-        circuit_time_reversed_for_flows(&input, std::slice::from_ref(&idle_flow)).expect(
-            "nonempty unitary validation must use the sparse checker above the tableau budget",
-        );
+    let (with_flow, flows) = circuit_time_reversed_for_flows(
+        &input,
+        std::slice::from_ref(&idle_flow),
+        &Default::default(),
+    )
+    .expect("nonempty unitary validation must use the sparse checker above the tableau budget");
     assert_eq!(with_flow, input);
     assert_eq!(flows, vec![idle_flow]);
 }
@@ -368,8 +375,12 @@ fn time_reversal_validates_flows_beyond_the_target_range() {
     let limit = stab_model::QubitId::MAX.get() + 1;
     let wide = flow(&format!("X{limit} -> X{limit}"));
     let input = circuit("H 0\n");
-    let (inverse, flows) = circuit_time_reversed_for_flows(&input, &[flow("X -> Z"), wide.clone()])
-        .expect("reverse a unitary circuit with a flow beyond the target range");
+    let (inverse, flows) = circuit_time_reversed_for_flows(
+        &input,
+        &[flow("X -> Z"), wide.clone()],
+        &Default::default(),
+    )
+    .expect("reverse a unitary circuit with a flow beyond the target range");
     assert_eq!(inverse, input);
     assert_eq!(flows, vec![flow("Z -> X"), wide]);
 }
@@ -379,9 +390,12 @@ fn time_reversal_uses_sparse_validation_at_the_tableau_boundary() {
     let input = circuit("H 512\n");
     let idle_flow = flow("Z0 -> Z0");
 
-    let (inverse, flows) =
-        circuit_time_reversed_for_flows(&input, std::slice::from_ref(&idle_flow))
-            .expect("reverse above the dense Tableau cap through sparse validation");
+    let (inverse, flows) = circuit_time_reversed_for_flows(
+        &input,
+        std::slice::from_ref(&idle_flow),
+        &Default::default(),
+    )
+    .expect("reverse above the dense Tableau cap through sparse validation");
 
     assert_eq!(inverse, input);
     assert_eq!(flows, vec![idle_flow]);
@@ -395,8 +409,9 @@ fn time_reversal_batches_output_flow_validation() {
         .take(1_024)
         .collect::<Vec<_>>();
 
-    let (inverse, output_flows) = circuit_time_reversed_for_flows(&input, &input_flows)
-        .expect("batch reverse and output-flow validation");
+    let (inverse, output_flows) =
+        circuit_time_reversed_for_flows(&input, &input_flows, &Default::default())
+            .expect("batch reverse and output-flow validation");
 
     assert_eq!(inverse, input);
     assert_eq!(output_flows.len(), input_flows.len());
@@ -412,7 +427,7 @@ fn time_reversal_rejects_absolute_relative_record_aliases() {
     let input = circuit("M 0\n");
     let aliased = flow("1 -> rec[-1] xor rec[0]");
 
-    let error = circuit_time_reversed_for_flows(&input, &[aliased])
+    let error = circuit_time_reversed_for_flows(&input, &[aliased], &Default::default())
         .expect_err("pinned Stim rejects distinct terms that alias one record")
         .to_string();
 
@@ -453,9 +468,10 @@ fn supported_time_reversal_is_semantically_involutive() {
             let input = Circuit::from_stim_str(&text).map_err(|error| {
                 TestCaseError::fail(format!("generated circuit did not parse: {error}\n{text}"))
             })?;
-            let input_flows = circuit_flow_generators(&input).map_err(|error| {
-                TestCaseError::fail(format!("generated flows failed: {error}\n{text}"))
-            })?;
+            let input_flows =
+                circuit_flow_generators(&input, &Default::default()).map_err(|error| {
+                    TestCaseError::fail(format!("generated flows failed: {error}\n{text}"))
+                })?;
             let options = TimeReversedForFlowsOptions {
                 dont_turn_measurements_into_resets: true,
                 memory_budget: stab_model::MemoryBudget::DEFAULT,
@@ -463,10 +479,9 @@ fn supported_time_reversal_is_semantically_involutive() {
             };
 
             let (inverse, inverse_flows) =
-                circuit_time_reversed_for_flows_with_options(&input, &input_flows, options.clone())
-                    .map_err(|error| {
-                        TestCaseError::fail(format!("first reversal failed: {error}\n{text}"))
-                    })?;
+                circuit_time_reversed_for_flows(&input, &input_flows, &options).map_err(
+                    |error| TestCaseError::fail(format!("first reversal failed: {error}\n{text}")),
+                )?;
             prop_assert!(
                 flow_holds(&inverse, &inverse_flows)
                     .into_iter()
@@ -478,10 +493,9 @@ fn supported_time_reversal_is_semantically_involutive() {
             );
 
             let (round_trip, round_trip_flows) =
-                circuit_time_reversed_for_flows_with_options(&inverse, &inverse_flows, options)
-                    .map_err(|error| {
-                        TestCaseError::fail(format!("second reversal failed: {error}\n{text}"))
-                    })?;
+                circuit_time_reversed_for_flows(&inverse, &inverse_flows, &options).map_err(
+                    |error| TestCaseError::fail(format!("second reversal failed: {error}\n{text}")),
+                )?;
             prop_assert_eq!(&round_trip, &input, "round-trip circuit mismatch\n{}", text);
             prop_assert!(
                 flow_holds(&round_trip, &round_trip_flows)

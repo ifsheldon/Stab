@@ -6,8 +6,8 @@
 use std::hint::black_box;
 
 use stab_analysis::{
-    AnalysisOperation, CircuitFlattenLimits, ResourceKind, flattened_circuit,
-    flattened_circuit_operations_with_limits, flattened_circuit_with_limits,
+    AnalysisOperation, CircuitFlattenOptions, ResourceKind, flattened_circuit,
+    flattened_circuit_operations,
 };
 use stab_model::{
     Circuit, CircuitItem, MemoryBudget, RepeatBlock, RepeatCount, RepeatNestingLimit, Target,
@@ -17,35 +17,18 @@ fn circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("parse circuit")
 }
 
-fn budget(bytes: u64) -> CircuitFlattenLimits {
-    CircuitFlattenLimits::default().with_memory_budget(MemoryBudget::from_bytes(bytes))
+fn budget(bytes: u64) -> CircuitFlattenOptions {
+    CircuitFlattenOptions {
+        memory_budget: MemoryBudget::from_bytes(bytes),
+        ..CircuitFlattenOptions::default()
+    }
 }
 
 #[test]
 fn default_budget_refuses_compact_expansion_beyond_the_budget() {
-    assert_eq!(
-        CircuitFlattenLimits::default().memory_budget(),
-        MemoryBudget::DEFAULT
-    );
-    let default_input = circuit(
-        "
-        SHIFT_COORDS(5, 0)
-        QUBIT_COORDS(1, 2, 3) 0
-        REPEAT 2 {
-            M 0
-            DETECTOR(0, 0) rec[-1]
-            SHIFT_COORDS(0, 1)
-        }
-    ",
-    );
-    assert_eq!(
-        flattened_circuit_with_limits(&default_input, CircuitFlattenLimits::default())
-            .expect("explicit default flatten"),
-        flattened_circuit(&default_input).expect("existing default flatten")
-    );
-
     let hostile = circuit("REPEAT 1000000000000 {\nH 0\n}\n");
-    let error = flattened_circuit(&hostile).expect_err("a compact repeat beyond the budget");
+    let error = flattened_circuit(&hostile, &Default::default())
+        .expect_err("a compact repeat beyond the budget");
     let resource = error.resource_limit_error().expect("typed budget refusal");
     assert_eq!(resource.code(), "resource-limit-exceeded");
     assert_eq!(resource.operation(), AnalysisOperation::CircuitFlatten);
@@ -59,9 +42,9 @@ fn default_budget_refuses_compact_expansion_beyond_the_budget() {
 fn materialized_bytes_admit_the_exact_budget_and_reject_the_first_excess_before_allocation() {
     let one = circuit("H 0\n");
     let exact_bytes = (std::mem::size_of::<CircuitItem>() + std::mem::size_of::<Target>()) as u64;
-    flattened_circuit_with_limits(&one, budget(exact_bytes))
+    flattened_circuit(&one, &budget(exact_bytes))
         .expect("the exact conservative byte boundary should materialize");
-    let error = flattened_circuit_with_limits(&one, budget(exact_bytes - 1))
+    let error = flattened_circuit(&one, &budget(exact_bytes - 1))
         .expect_err("the first byte below the conservative requirement must reject");
     let resource = error
         .resource_limit_error()
@@ -80,7 +63,7 @@ fn materialized_bytes_admit_the_exact_budget_and_reject_the_first_excess_before_
     let large = circuit(&large_text);
     let rejection_allocations = |input: &Circuit| {
         allocation_counter::measure(|| {
-            let error = flattened_circuit_with_limits(input, budget(exact_bytes))
+            let error = flattened_circuit(input, &budget(exact_bytes))
                 .expect_err("the budget must reject before output materialization");
             drop(black_box(error));
         })
@@ -109,7 +92,7 @@ fn operation_count_overflow_fails_before_materialization() {
     ",
     );
 
-    let error = flattened_circuit_with_limits(&overflowing, budget(u64::MAX))
+    let error = flattened_circuit(&overflowing, &budget(u64::MAX))
         .expect_err("operation count arithmetic should overflow before materialization");
 
     assert_eq!(
@@ -134,7 +117,7 @@ fn retained_payload_count_overflow_fails_before_materialization() {
             None,
         ));
 
-        let error = flattened_circuit_with_limits(&overflowing, budget(u64::MAX))
+        let error = flattened_circuit(&overflowing, &budget(u64::MAX))
             .expect_err("retained payload arithmetic should overflow before materialization");
         assert!(
             error.to_string().contains(expected),
@@ -154,8 +137,8 @@ fn caller_raised_limit_cannot_exceed_platform_materialization_capacity() {
     let limits = budget(u64::MAX);
 
     for result in [
-        flattened_circuit_with_limits(&enormous, limits.clone()).map(|_| ()),
-        flattened_circuit_operations_with_limits(&enormous, limits).map(|_| ()),
+        flattened_circuit(&enormous, &limits).map(|_| ()),
+        flattened_circuit_operations(&enormous, &limits).map(|_| ()),
     ] {
         let error = result.expect_err("platform vector capacity must reject before allocation");
         let resource = error
@@ -186,27 +169,27 @@ fn programmatic_repeat_depth_is_admitted_before_recursive_flattening() {
 
     let exact = nested(RepeatNestingLimit::HARD_MAX);
     assert_eq!(
-        flattened_circuit_with_limits(&exact, CircuitFlattenLimits::default())
+        flattened_circuit(&exact, &CircuitFlattenOptions::default())
             .expect("the fixed recursive envelope is accepted")
             .to_stim_string(),
         "H 0\n"
     );
     assert_eq!(
-        flattened_circuit_operations_with_limits(&exact, CircuitFlattenLimits::default())
+        flattened_circuit_operations(&exact, &CircuitFlattenOptions::default())
             .expect("the operation-vector adapter uses the same admission")
             .len(),
         1
     );
 
     for result in [
-        flattened_circuit_with_limits(
+        flattened_circuit(
             &nested(RepeatNestingLimit::HARD_MAX + 1),
-            CircuitFlattenLimits::default(),
+            &CircuitFlattenOptions::default(),
         )
         .map(|_| ()),
-        flattened_circuit_operations_with_limits(
+        flattened_circuit_operations(
             &nested(RepeatNestingLimit::HARD_MAX + 1),
-            CircuitFlattenLimits::default(),
+            &CircuitFlattenOptions::default(),
         )
         .map(|_| ()),
     ] {

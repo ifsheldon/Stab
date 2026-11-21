@@ -21,14 +21,14 @@ fn pf4_dem_analyzer_repeat_resource_policy_is_source_owned() {
         ",
     )
     .unwrap();
-    let dem = circuit_to_detector_error_model(&allowed, ErrorAnalyzerOptions::default()).unwrap();
+    let dem = circuit_to_detector_error_model(&allowed, &ErrorAnalyzerOptions::default()).unwrap();
     assert_eq!(dem.to_dem_string(), "error(0.125) D0 D1\nerror(0.125) D1\n");
 
     let above_retired_per_block_cap =
         Circuit::from_stim_str("REPEAT 100001 {\n    TICK\n}\n").unwrap();
     let empty = circuit_to_detector_error_model(
         &above_retired_per_block_cap,
-        ErrorAnalyzerOptions::default(),
+        &ErrorAnalyzerOptions::default(),
     )
     .expect("aggregate work below the limit remains admitted");
     assert!(empty.is_empty());
@@ -38,7 +38,7 @@ fn pf4_dem_analyzer_repeat_resource_policy_is_source_owned() {
     assert!(
         circuit_to_detector_error_model(
             &above_retired_aggregate_cap,
-            ErrorAnalyzerOptions::default()
+            &ErrorAnalyzerOptions::default()
         )
         .expect("aggregate repeat work is not capped")
         .is_empty()
@@ -57,7 +57,7 @@ fn pf4_dem_analyzer_repeat_resource_policy_is_source_owned() {
     .unwrap();
     let error = circuit_to_detector_error_model(
         &nested,
-        ErrorAnalyzerOptions {
+        &ErrorAnalyzerOptions {
             memory_budget: stab_model::MemoryBudget::from_bytes(64 * 1024),
             ..ErrorAnalyzerOptions::default()
         },

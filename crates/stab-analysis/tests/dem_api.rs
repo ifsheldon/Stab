@@ -4,8 +4,8 @@
 )]
 
 use stab_analysis::{
-    CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions, RoundCount, SurfaceCodeTask,
-    circuit_to_detector_error_model,
+    CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions, ErrorDecomposition,
+    LoopFolding, RemnantEdges, RoundCount, SurfaceCodeTask, circuit_to_detector_error_model,
 };
 use stab_model::{CircuitDetectorId, DemItem, Probability};
 
@@ -24,12 +24,14 @@ fn pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit() {
         .detector_coordinates()
         .expect("all circuit detector coordinates");
     let options = ErrorAnalyzerOptions {
-        fold_loops: true,
-        decompose_errors: true,
-        block_decomposition_from_introducing_remnant_edges: true,
+        loops: LoopFolding::Fold,
+        decomposition: Some(ErrorDecomposition {
+            remnant_edges: RemnantEdges::Block,
+            ..Default::default()
+        }),
         ..ErrorAnalyzerOptions::default()
     };
-    let dem = circuit_to_detector_error_model(circuit, options)
+    let dem = circuit_to_detector_error_model(circuit, &options)
         .expect("analyze generated surface-code circuit");
     assert!(
         dem.items()

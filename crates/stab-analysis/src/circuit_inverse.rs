@@ -198,21 +198,16 @@ fn rebuild_reversed<'a>(
 }
 
 /// Returns the tracker-driven QEC inverse of a circuit.
-pub fn circuit_inverse_qec(circuit: &Circuit) -> AnalysisResult<Circuit> {
-    circuit_inverse_qec_with_options(circuit, InverseQecOptions::default())
-}
-
-/// Returns the tracker-driven QEC inverse with explicit measurement handling.
-pub fn circuit_inverse_qec_with_options(
+pub fn circuit_inverse_qec(
     circuit: &Circuit,
-    options: InverseQecOptions,
+    options: &InverseQecOptions,
 ) -> AnalysisResult<Circuit> {
     let reverse_options = TimeReversedForFlowsOptions {
         dont_turn_measurements_into_resets: options.keep_measurements,
         memory_budget: options.memory_budget,
-        cancellation: options.cancellation,
+        cancellation: options.cancellation.clone(),
     };
-    let (inverse, _) = circuit_time_reversed_for_flows_with_options(circuit, &[], reverse_options)?;
+    let (inverse, _) = circuit_time_reversed_for_flows(circuit, &[], &reverse_options)?;
     Ok(inverse)
 }
 
@@ -229,19 +224,7 @@ pub fn circuit_inverse_qec_with_options(
 pub fn circuit_time_reversed_for_flows(
     circuit: &Circuit,
     flows: &[Flow],
-) -> AnalysisResult<(Circuit, Vec<Flow>)> {
-    circuit_time_reversed_for_flows_with_options(
-        circuit,
-        flows,
-        TimeReversedForFlowsOptions::default(),
-    )
-}
-
-/// Returns tracker-driven time reversal for flows with explicit options.
-pub fn circuit_time_reversed_for_flows_with_options(
-    circuit: &Circuit,
-    flows: &[Flow],
-    options: TimeReversedForFlowsOptions,
+    options: &TimeReversedForFlowsOptions,
 ) -> AnalysisResult<(Circuit, Vec<Flow>)> {
     time_reversed_for_flows_using(circuit, flows, options, FlowValidation::cheaper_algorithm)
 }
@@ -251,11 +234,11 @@ pub fn circuit_time_reversed_for_flows_with_options(
 pub(crate) fn time_reversed_for_flows_using(
     circuit: &Circuit,
     flows: &[Flow],
-    options: TimeReversedForFlowsOptions,
+    options: &TimeReversedForFlowsOptions,
     select: fn(&Circuit, &[Flow]) -> FlowCheckAlgorithm,
 ) -> AnalysisResult<(Circuit, Vec<Flow>)> {
     if reverse_flow::requires_general_reversal(circuit, flows) {
-        return reverse_flow::reverse_flows(circuit, flows, options);
+        return reverse_flow::reverse_flows(circuit, flows, options.clone());
     }
     for (index, flow) in flows.iter().enumerate() {
         reject_non_unitary_flow_terms(index, flow)?;
@@ -272,10 +255,10 @@ pub(crate) fn time_reversed_for_flows_using(
     if flows.is_empty() {
         return Ok((inverse, Vec::new()));
     }
-    let validation = FlowValidation::build(select(circuit, flows), circuit, &options)?;
+    let validation = FlowValidation::build(select(circuit, flows), circuit, options)?;
     for (index, (flow, satisfied)) in flows
         .iter()
-        .zip(validation.check_all(circuit, flows, &options)?)
+        .zip(validation.check_all(circuit, flows, options)?)
         .enumerate()
     {
         if !satisfied {
@@ -529,9 +512,7 @@ impl FlowValidation {
             cancellation: reversal.cancellation.clone(),
             ..crate::CircuitToTableauOptions::default()
         };
-        Ok(Self::Tableau(crate::circuit_to_tableau_with_options(
-            circuit, &options,
-        )?))
+        Ok(Self::Tableau(crate::circuit_to_tableau(circuit, &options)?))
     }
 
     fn check_all(

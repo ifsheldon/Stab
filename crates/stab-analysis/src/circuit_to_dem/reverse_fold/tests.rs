@@ -5,7 +5,7 @@
 
 use stab_model::{Circuit, MemoryBudget};
 
-use crate::ErrorAnalyzerOptions;
+use crate::{ErrorAnalyzerOptions, LoopFolding};
 
 use super::try_analyze;
 
@@ -18,25 +18,25 @@ fn no_recurrence_loop(iterations: u64) -> Circuit {
 
 #[test]
 fn analyzer_output_is_admitted_against_the_memory_budget_for_folded_and_unrolled_loops() {
-    for fold_loops in [false, true] {
+    for loops in [LoopFolding::Unroll, LoopFolding::Fold] {
         let options = |bytes| ErrorAnalyzerOptions {
-            fold_loops,
+            loops,
             memory_budget: MemoryBudget::from_bytes(bytes),
             ..ErrorAnalyzerOptions::default()
         };
         let circuit = no_recurrence_loop(200);
         // Find the smallest budget that admits the produced model.
         let (mut low, mut high) = (0_u64, 1 << 20);
-        assert!(try_analyze(&circuit, options(high)).is_ok());
+        assert!(try_analyze(&circuit, &options(high)).is_ok());
         while low < high {
             let middle = low + (high - low) / 2;
-            if try_analyze(&circuit, options(middle)).is_ok() {
+            if try_analyze(&circuit, &options(middle)).is_ok() {
                 high = middle;
             } else {
                 low = middle + 1;
             }
         }
-        let error = try_analyze(&circuit, options(low - 1))
+        let error = try_analyze(&circuit, &options(low - 1))
             .expect_err("one byte below the exact budget is refused");
         let resource = error.resource_limit_error().expect("typed budget refusal");
         assert_eq!(
@@ -51,7 +51,7 @@ fn analyzer_output_is_admitted_against_the_memory_budget_for_folded_and_unrolled
     // Unrolled analysis above the retired one-million expanded-instruction cap completes.
     let dem = try_analyze(
         &no_recurrence_loop(400_000),
-        ErrorAnalyzerOptions::default(),
+        &ErrorAnalyzerOptions::default(),
     )
     .expect("expanded work is not capped");
     assert_eq!(dem.count_detectors(), Ok(400_002));
@@ -69,7 +69,7 @@ fn error_accumulator_admits_live_classes_before_flushing_to_dem() {
     stim.push_str("M 0\nDETECTOR rec[-1]\n");
     let circuit = Circuit::from_stim_str(&stim).expect("valid circuit syntax");
 
-    let semantic = try_analyze(&circuit, ErrorAnalyzerOptions::default())
+    let semantic = try_analyze(&circuit, &ErrorAnalyzerOptions::default())
         .expect_err("default budget reaches start-of-circuit anti-Hermitian MPP");
     assert!(
         semantic.to_string().contains("anti-Hermitian"),
@@ -79,7 +79,7 @@ fn error_accumulator_admits_live_classes_before_flushing_to_dem() {
     let tight = MemoryBudget::from_bytes(4096);
     let refused = try_analyze(
         &circuit,
-        ErrorAnalyzerOptions {
+        &ErrorAnalyzerOptions {
             memory_budget: tight,
             ..ErrorAnalyzerOptions::default()
         },
@@ -119,15 +119,15 @@ fn analyzer_repeat_nesting_boundary_is_exact_with_and_without_folding() {
         .stack_size(2 * 1024 * 1024)
         .spawn(|| {
             let max_depth = stab_model::RepeatNestingLimit::HARD_MAX;
-            for fold_loops in [false, true] {
+            for loops in [LoopFolding::Unroll, LoopFolding::Fold] {
                 let options = ErrorAnalyzerOptions {
-                    fold_loops,
+                    loops,
                     ..ErrorAnalyzerOptions::default()
                 };
-                let model = try_analyze(&nested(max_depth), options.clone())
+                let model = try_analyze(&nested(max_depth), &options)
                     .expect("the full nesting envelope is analyzed");
-                assert_eq!(model.count_errors(), Ok(1), "fold_loops={fold_loops}");
-                let error = try_analyze(&nested(max_depth + 1), options)
+                assert_eq!(model.count_errors(), Ok(1), "loops={loops:?}");
+                let error = try_analyze(&nested(max_depth + 1), &options)
                     .expect_err("one level beyond the envelope");
                 let resource = error
                     .resource_limit_error()
@@ -175,7 +175,7 @@ fn tracker_growth_is_refused_against_the_bytes_the_analyzer_already_holds() {
     let one_set_growth = 2 * DETECTORS as u64 * size_of::<stab_model::DemTarget>() as u64;
     // The analysis needs 1_393_842 bytes with 88-byte DEM items, so every budget is refused.
     for budget in [950_000, 1_150_000, 1_350_000] {
-        let error = try_analyze(&circuit, options(budget)).expect_err("the fan-out does not fit");
+        let error = try_analyze(&circuit, &options(budget)).expect_err("the fan-out does not fit");
         let resource = error.resource_limit_error().expect("typed budget refusal");
         assert_eq!(resource.limit(), budget);
         assert!(
@@ -201,27 +201,28 @@ fn fold_search_that_does_not_fit_falls_back_to_unrolling() {
         text.push_str("DETECTOR rec[-1]\n");
     }
     let circuit = Circuit::from_stim_str(&text).expect("valid fold-budget circuit");
-    let options = |fold_loops, bytes| ErrorAnalyzerOptions {
-        fold_loops,
+    let options = |loops, bytes| ErrorAnalyzerOptions {
+        loops,
         memory_budget: MemoryBudget::from_bytes(bytes),
         ..ErrorAnalyzerOptions::default()
     };
     // The smallest budget the unfolded run admits.
     let (mut low, mut high) = (0_u64, 1 << 24);
-    let unfolded = try_analyze(&circuit, options(false, high)).expect("unfolded analysis");
+    let unfolded =
+        try_analyze(&circuit, &options(LoopFolding::Unroll, high)).expect("unfolded analysis");
     while low < high {
         let middle = low + (high - low) / 2;
-        if try_analyze(&circuit, options(false, middle)).is_ok() {
+        if try_analyze(&circuit, &options(LoopFolding::Unroll, middle)).is_ok() {
             high = middle;
         } else {
             low = middle + 1;
         }
     }
 
-    let folded = try_analyze(&circuit, options(true, low))
+    let folded = try_analyze(&circuit, &options(LoopFolding::Fold, low))
         .expect("the fold search gives up and unrolls within the unfolded budget");
     assert_eq!(folded, unfolded);
-    let error = try_analyze(&circuit, options(true, low - 1))
+    let error = try_analyze(&circuit, &options(LoopFolding::Fold, low - 1))
         .expect_err("a genuine shortage still resurfaces from the unrolled run");
     assert_eq!(
         error.resource_limit_error().map(|error| error.limit()),
@@ -239,23 +240,23 @@ fn folded_analysis_reports_the_unrolled_first_error_when_the_hare_fails() {
         "REPEAT 10 {\n    RX 0\n    M 0\n    DETECTOR rec[-1]\n    PAULI_CHANNEL_2(0.1, 0.1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) 0 1\n}\n",
     )
     .expect("valid precedence circuit");
-    let error = |fold_loops| {
+    let error = |loops| {
         try_analyze(
             &circuit,
-            ErrorAnalyzerOptions {
-                fold_loops,
+            &ErrorAnalyzerOptions {
+                loops,
                 ..ErrorAnalyzerOptions::default()
             },
         )
         .expect_err("the channel needs approximate_disjoint_errors")
         .to_string()
     };
-    let folded = error(true);
+    let folded = error(LoopFolding::Fold);
     assert!(
         folded.contains("PAULI_CHANNEL_2 requires approximate_disjoint_errors"),
         "{folded}"
     );
-    assert_eq!(folded, error(false));
+    assert_eq!(folded, error(LoopFolding::Unroll));
 }
 
 /// Pinned Stim saturates its tick count, so more than `2^64` ticks is not an error. Expected
@@ -268,8 +269,8 @@ fn folded_analysis_accepts_more_ticks_than_fit_in_u64() {
     .expect("valid tick circuit");
     let model = try_analyze(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
             ..ErrorAnalyzerOptions::default()
         },
     )

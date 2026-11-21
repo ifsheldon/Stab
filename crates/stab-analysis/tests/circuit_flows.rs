@@ -24,7 +24,8 @@ fn flow_generation_ignores_coordinate_overflow_irrelevant_to_semantics() {
         }
     ",
     );
-    let flows = circuit_flow_generators(&circuit).expect("generate flows without flattening");
+    let flows = circuit_flow_generators(&circuit, &Default::default())
+        .expect("generate flows without flattening");
     assert_eq!(
         flows.iter().map(ToString::to_string).collect::<Vec<_>>(),
         vec!["1 -> rec[0] xor rec[1]", "1 -> Z xor rec[1]", "Z -> rec[1]",]
@@ -562,7 +563,8 @@ fn solve_for_flow_measurements_treats_sweep_controlled_paulis_as_noops() {
     ] {
         let text = format!("M 0\n{suffix}\n");
         assert_eq!(
-            solve_for_flow_measurements(&circuit(&text), &queries).expect(&text),
+            solve_for_flow_measurements(&circuit(&text), &queries, &Default::default())
+                .expect(&text),
             expected.clone(),
             "{suffix}"
         );

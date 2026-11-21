@@ -66,7 +66,7 @@ fn without_detectors(flat: &str, keep: impl Fn(usize) -> bool) -> (String, usize
 
 fn suggestions(text: &str, context: &str) -> Circuit {
     let circuit = Circuit::from_stim_str(text).expect("stripped circuit parses");
-    missing_detectors(&circuit, KNOWN_INPUT)
+    missing_detectors(&circuit, &KNOWN_INPUT)
         .unwrap_or_else(|error| panic!("{context}: missing_detectors failed: {error}"))
 }
 
@@ -99,7 +99,7 @@ fn completed_and_closed(text: &str, context: &str) -> (Circuit, usize) {
 fn analyzer_options(name: &str) -> ErrorAnalyzerOptions {
     let mut options = ErrorAnalyzerOptions::default();
     if name.starts_with("heralded_") || name.starts_with("else_") {
-        options.approximate_disjoint_errors_threshold =
+        options.approximate_disjoint_errors =
             Some(Probability::try_new(1.0).expect("unit threshold"));
     }
     options
@@ -119,7 +119,7 @@ fn missing_detector_suggestions_close_and_are_deterministic() {
         let slow = name.starts_with("surface_code_") && name.contains("_d5_");
         !generated || (noise_variant_kept && !slow)
     }) {
-        let flat = flattened_circuit(circuit)
+        let flat = flattened_circuit(circuit, &Default::default())
             .expect("matrix circuit flattens")
             .to_stim_string();
         let originally_complete = suggestions(&flat, name).to_stim_string().is_empty();
@@ -149,7 +149,7 @@ fn missing_detector_suggestions_close_and_are_deterministic() {
         }
         total_restored += restored;
         if !gauge {
-            circuit_to_detector_error_model(&completed, analyzer_options(name))
+            circuit_to_detector_error_model(&completed, &analyzer_options(name))
                 .unwrap_or_else(|error| panic!("{context}: completed circuit rejected: {error}"));
         }
 
@@ -158,7 +158,7 @@ fn missing_detector_suggestions_close_and_are_deterministic() {
         let (bare, _) = without_detectors(&flat, |_| false);
         let context = format!("{name} (full strip)");
         let (completed, _) = completed_and_closed(&bare, &context);
-        circuit_to_detector_error_model(&completed, analyzer_options(name))
+        circuit_to_detector_error_model(&completed, &analyzer_options(name))
             .unwrap_or_else(|error| panic!("{context}: suggested detectors rejected: {error}"));
     }
     assert!(

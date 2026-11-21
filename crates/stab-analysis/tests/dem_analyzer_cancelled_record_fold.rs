@@ -10,15 +10,15 @@
 //!
 //! Expected outputs are `stim analyze_errors --fold_loops` captures from pinned Stim v1.16.0.
 
-use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_analysis::{ErrorAnalyzerOptions, LoopFolding, circuit_to_detector_error_model};
 use stab_model::Circuit;
 
 fn analyze_folding_loops(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
     circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
             ..ErrorAnalyzerOptions::default()
         },
     )

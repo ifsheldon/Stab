@@ -4,8 +4,8 @@
 )]
 
 use stab_analysis::{
-    AnalysisOperation, CircuitPassContext, CircuitPassLimits, CircuitPassResources,
-    CircuitPassStage, ResourceKind, run_circuit_pass,
+    AnalysisOperation, CircuitPassContext, CircuitPassResources, CircuitPassStage, ResourceKind,
+    run_circuit_pass,
 };
 use stab_model::{Circuit, MemoryBudget, Probability};
 use stab_reference_noise_pass::{
@@ -143,14 +143,16 @@ fn common_admission_rejects_expanded_output_after_admitting_input() {
     let input_bytes = CircuitPassResources::try_new(1, 1, 0, 0, 0)
         .expect("representable input resources")
         .projected_payload_bytes();
-    let limits =
-        CircuitPassLimits::default().with_memory_budget(MemoryBudget::from_bytes(input_bytes));
+    let limits = CircuitPassContext {
+        memory_budget: MemoryBudget::from_bytes(input_bytes),
+        ..Default::default()
+    };
 
     let error = run_circuit_pass(
         &XErrorAfterSingleQubitUnitariesPass,
         &source,
         &options,
-        &CircuitPassContext::new(limits),
+        &limits,
     )
     .expect_err("one admitted input item becomes two output items");
 
@@ -171,9 +173,10 @@ fn opaque_tag_output_projection_rejects_before_pass_allocation() {
     let options = XErrorAfterSingleQubitUnitariesOptions::new(probability(0.1));
     let input_resources =
         CircuitPassResources::try_new(1, 1, 0, 1, 0).expect("representable input resources");
-    let limits = CircuitPassLimits::default().with_memory_budget(MemoryBudget::from_bytes(
-        input_resources.projected_payload_bytes(),
-    ));
+    let limits = CircuitPassContext {
+        memory_budget: MemoryBudget::from_bytes(input_resources.projected_payload_bytes()),
+        ..Default::default()
+    };
 
     let mut result = None;
     let allocations = allocation_counter::measure(|| {
@@ -181,7 +184,7 @@ fn opaque_tag_output_projection_rejects_before_pass_allocation() {
             &XErrorAfterSingleQubitUnitariesPass,
             &source,
             &options,
-            &CircuitPassContext::new(limits),
+            &limits,
         ));
     });
     assert_eq!(allocations.count_total, 0, "{allocations:?}");

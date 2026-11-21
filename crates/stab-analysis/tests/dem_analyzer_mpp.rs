@@ -9,14 +9,14 @@ use stab_model::Circuit;
 
 fn analyze(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
-    circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+    circuit_to_detector_error_model(&circuit, &ErrorAnalyzerOptions::default())
         .expect("analyze")
         .to_dem_string()
 }
 
 fn analyze_error(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
-    circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+    circuit_to_detector_error_model(&circuit, &ErrorAnalyzerOptions::default())
         .expect_err("analyze should fail")
         .to_string()
 }
@@ -83,7 +83,7 @@ fn dem_analyzer_mpp_ordering_rejects_non_deterministic_upstream_subset() {
         ",
     ] {
         let parsed = Circuit::from_stim_str(circuit).expect("circuit");
-        let error = circuit_to_detector_error_model(&parsed, ErrorAnalyzerOptions::default())
+        let error = circuit_to_detector_error_model(&parsed, &ErrorAnalyzerOptions::default())
             .unwrap_err()
             .to_string();
         assert!(error.contains("non-deterministic detectors"));

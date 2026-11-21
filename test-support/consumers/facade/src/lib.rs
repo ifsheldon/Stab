@@ -36,7 +36,8 @@ impl MeasurementSink for CountingSink {
 
 pub fn exercise_facade_namespaces() -> Result<(usize, usize, usize, usize), Box<dyn Error>> {
     let circuit = Circuit::from_stim_str("M 0 1\nDETECTOR rec[-1]\n")?;
-    let unchanged = stab_core::analysis::circuit_with_inlined_feedback(&circuit)?;
+    let unchanged =
+        stab_core::analysis::circuit_with_inlined_feedback(&circuit, &Default::default())?;
     if unchanged != circuit {
         return Err(std::io::Error::other("feedback-free circuit changed").into());
     }

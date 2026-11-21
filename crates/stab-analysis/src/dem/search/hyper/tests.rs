@@ -232,7 +232,10 @@ fn hyper_algo_rejects_excessive_search_states() {
         text.push_str(&format!("error(0.1) D0 L{observable}\n"));
     }
     let model = DetectorErrorModel::from_dem_str(&text).expect("valid search model");
-    let limits = LogicalErrorSearchLimits::default().with_max_search_states(64);
+    let limits = LogicalErrorSearchLimits {
+        max_search_states: 64,
+        ..LogicalErrorSearchLimits::default()
+    };
     let options = HypergraphSearchOptions {
         max_detection_event_set_size: 3,
         max_edge_degree: 3,

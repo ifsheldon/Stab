@@ -10,11 +10,11 @@ use std::collections::BTreeSet;
 
 use stab_analysis::{
     AnalysisResult, CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions,
-    GraphlikeSearchOptions, HypergraphSearchOptions, LogicalErrorSearch, LogicalErrorSearchKind,
-    LogicalErrorSearchLimits, NoLogicalErrorReport, RepetitionCodeTask, RoundCount,
-    SurfaceCodeTask, SymptomGrowth, UngraphlikeErrors, circuit_to_detector_error_model,
-    find_undetectable_logical_error, likeliest_error_sat_problem, shortest_error_sat_problem,
-    shortest_graphlike_undetectable_logical_error,
+    ErrorDecomposition, GraphlikeSearchOptions, HypergraphSearchOptions, LogicalErrorSearch,
+    LogicalErrorSearchKind, LogicalErrorSearchLimits, LoopFolding, NoLogicalErrorReport,
+    RepetitionCodeTask, RoundCount, SurfaceCodeTask, SymptomGrowth, UngraphlikeErrors,
+    circuit_to_detector_error_model, find_undetectable_logical_error, likeliest_error_sat_problem,
+    shortest_error_sat_problem, shortest_graphlike_undetectable_logical_error,
 };
 use stab_model::{
     Circuit, DemInstructionKind, DemItem, DemTarget, DemTargetKind, DetectorErrorModel, Probability,
@@ -53,7 +53,7 @@ fn pf4_dem_search_and_sat_repeat_resource_policy_is_source_owned() {
             .to_dem_string(),
         expected
     );
-    let sat_problem = shortest_error_sat_problem(&allowed).unwrap();
+    let sat_problem = shortest_error_sat_problem(&allowed, &Default::default()).unwrap();
     assert_eq!(
         sat_problem
             .lines()
@@ -331,13 +331,13 @@ fn assert_search_and_sat_match_compact(
         return;
     }
     assert_eq!(
-        sat_wcnf::optimum(&shortest_error_sat_problem(model).unwrap()),
-        sat_wcnf::optimum(&shortest_error_sat_problem(compact).unwrap()),
+        sat_wcnf::optimum(&shortest_error_sat_problem(model, &Default::default()).unwrap()),
+        sat_wcnf::optimum(&shortest_error_sat_problem(compact, &Default::default()).unwrap()),
         "{name}: shortest-error WCNF optimum"
     );
     assert_eq!(
-        sat_wcnf::optimum(&likeliest_error_sat_problem(model, 10).unwrap()),
-        sat_wcnf::optimum(&likeliest_error_sat_problem(compact, 10).unwrap()),
+        sat_wcnf::optimum(&likeliest_error_sat_problem(model, 10, &Default::default()).unwrap()),
+        sat_wcnf::optimum(&likeliest_error_sat_problem(compact, 10, &Default::default()).unwrap()),
         "{name}: likeliest-error WCNF optimum"
     );
 }
@@ -462,7 +462,8 @@ fn upstream_not_found_cases() -> [(&'static str, ReportFacts, String); 3] {
 fn wcnf_shortest_large_detector_only_is_unsat() {
     let model = dem("repeat 100001 {\n    error(0.1) D0\n    shift_detectors 1\n}\n");
     assert_eq!(
-        shortest_error_sat_problem(&model).expect("trivial detector-only WCNF"),
+        shortest_error_sat_problem(&model, &Default::default())
+            .expect("trivial detector-only WCNF"),
         "p wcnf 1 2 3\n3 -1 0\n3 1 0\n"
     );
 }
@@ -823,15 +824,15 @@ fn pf6_hypergraph_search_many_observables_preserves_high_observable_id() {
 // The generated QEC models are loop-folded so search must expand shifted repeat blocks.
 fn generated_rotated_surface_code_dem() -> AnalysisResult<DetectorErrorModel> {
     generated_rotated_surface_code_dem_with_options(ErrorAnalyzerOptions {
-        fold_loops: true,
-        decompose_errors: true,
+        loops: LoopFolding::Fold,
+        decomposition: Some(ErrorDecomposition::default()),
         ..ErrorAnalyzerOptions::default()
     })
 }
 
 fn generated_rotated_surface_code_ungraphlike_dem() -> AnalysisResult<DetectorErrorModel> {
     generated_rotated_surface_code_dem_with_options(ErrorAnalyzerOptions {
-        fold_loops: true,
+        loops: LoopFolding::Fold,
         ..ErrorAnalyzerOptions::default()
     })
 }
@@ -850,7 +851,7 @@ fn generated_rotated_surface_code_dem_with_options(
     .with_after_reset_flip_probability(probability)
     .with_before_round_data_depolarization(probability);
     let generated = params.generate()?;
-    circuit_to_detector_error_model(generated.circuit(), options)
+    circuit_to_detector_error_model(generated.circuit(), &options)
 }
 
 fn generated_repetition_code_dem() -> AnalysisResult<DetectorErrorModel> {
@@ -863,9 +864,9 @@ fn generated_repetition_code_dem() -> AnalysisResult<DetectorErrorModel> {
     let generated = params.generate()?;
     circuit_to_detector_error_model(
         generated.circuit(),
-        ErrorAnalyzerOptions {
-            fold_loops: true,
-            decompose_errors: true,
+        &ErrorAnalyzerOptions {
+            loops: LoopFolding::Fold,
+            decomposition: Some(ErrorDecomposition::default()),
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -885,8 +886,8 @@ fn many_observables_dem() -> AnalysisResult<DetectorErrorModel> {
     ))?;
     circuit_to_detector_error_model(
         &circuit,
-        ErrorAnalyzerOptions {
-            decompose_errors: true,
+        &ErrorAnalyzerOptions {
+            decomposition: Some(ErrorDecomposition::default()),
             ..ErrorAnalyzerOptions::default()
         },
     )
