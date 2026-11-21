@@ -33,7 +33,7 @@ pub use dem::{
     DemDetectorId, DemErrorMechanismTraversalLimits, DemErrorMechanismView,
     DemErrorMechanismVisitError, DemErrorMechanismVisitor, DemErrorTarget, DemErrorTargetIter,
     DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemInstructionView, DemItem,
-    DemObservableId, DemRepeatBlock, DemTarget, DemTargetKind, DetectorErrorModel,
+    DemRepeatBlock, DemTarget, DemTargetKind, DetectorErrorModel,
 };
 pub use diagnostics::{
     ByteSpan, DiagnosticSeverity, ParseError, ParseErrorCode, ParseErrorContext,
@@ -61,10 +61,10 @@ pub mod advanced {
     use std::fmt::Display;
 
     use super::{
-        ByteSpan, Circuit, CircuitInstruction, DemDetectorId, DemInstruction, DemObservableId,
-        DemRepeatBlock, DemTarget, DetectorErrorModel, Gate, GateDecomposition,
-        MeasureRecordOffset, ModelDialect, ModelResult, ParseError, ParseErrorCode,
-        ParseErrorContext, Probability, RepeatBlock, RepeatCount, Target,
+        ByteSpan, Circuit, CircuitInstruction, DemDetectorId, DemInstruction, DemRepeatBlock,
+        DemTarget, DetectorErrorModel, Gate, GateDecomposition, MeasureRecordOffset, ModelDialect,
+        ModelResult, ObservableId, ParseError, ParseErrorCode, ParseErrorContext, Probability,
+        RepeatBlock, RepeatCount, Target,
     };
     pub use crate::cancellation::CancellationCountdown;
     pub use crate::circuit::{FoldedCircuitEvent, FoldedVisitError, visit_folded_circuit};
@@ -208,7 +208,7 @@ pub mod advanced {
 
     /// Constructs a DEM `logical_observable` instruction while preserving opaque tag bytes.
     pub fn dem_logical_observable_instruction_with_tag_bytes(
-        observable: DemObservableId,
+        observable: ObservableId,
         tag: Option<&[u8]>,
     ) -> DemInstruction {
         DemInstruction::logical_observable_with_tag_bytes(observable, tag)

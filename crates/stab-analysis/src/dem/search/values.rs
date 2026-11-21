@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use stab_model::{DemDetectorId, DemObservableId, DemTarget};
+use stab_model::{DemDetectorId, DemTarget, ObservableId};
 
 use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisResult};
@@ -22,7 +22,7 @@ impl SearchGraphKind {
 
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(super) struct ObservableMask {
-    pub(super) observables: BTreeSet<DemObservableId>,
+    pub(super) observables: BTreeSet<ObservableId>,
 }
 
 impl ObservableMask {
@@ -30,7 +30,7 @@ impl ObservableMask {
         Self::default()
     }
 
-    pub(super) fn toggle(&mut self, observable: DemObservableId) {
+    pub(super) fn toggle(&mut self, observable: ObservableId) {
         if !self.observables.insert(observable) {
             self.observables.remove(&observable);
         }
@@ -60,11 +60,13 @@ impl ObservableMask {
         self.observables.is_empty()
     }
 
-    pub(super) fn push_targets(&self, targets: &mut Vec<DemTarget>) -> AnalysisResult<()> {
-        for observable in &self.observables {
-            targets.push(DemTarget::logical_observable(observable.get())?);
-        }
-        Ok(())
+    pub(super) fn push_targets(&self, targets: &mut Vec<DemTarget>) {
+        targets.extend(
+            self.observables
+                .iter()
+                .copied()
+                .map(DemTarget::from_observable),
+        );
     }
 }
 

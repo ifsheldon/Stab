@@ -42,7 +42,6 @@ stab_model::DemFlattenedInstructionIter
 stab_model::DemInstruction
 stab_model::DemInstructionKind
 stab_model::DemItem
-stab_model::DemObservableId
 stab_model::DemRepeatBlock
 stab_model::DemRepeatCount
 stab_records::DemSampleBatchView

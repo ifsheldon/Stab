@@ -2,10 +2,10 @@ use super::super::instruction::{
     DemPayload, error_probability, validate_coordinates, validate_error_targets,
 };
 use super::super::{
-    DemArgVec, DemDetectorId, DemInstruction, DemInstructionKind, DemObservableId, DemTag,
-    DemTarget, DemTargetVec,
+    DemArgVec, DemDetectorId, DemInstruction, DemInstructionKind, DemTag, DemTarget, DemTargetVec,
 };
 use super::{MAX_DEM_TEXT_INTEGER, MAX_STIM_NUMBER_TOKEN_BYTES};
+use crate::ObservableId;
 // Kept out of line: inlined into the parse loop it measurably slows every line.
 #[inline(never)]
 pub(super) fn parse_canonical_instruction(line: &str) -> Option<DemInstruction> {
@@ -135,7 +135,7 @@ fn parse_canonical_payload(
             Some(DemPayload::detector(args, detector))
         }
         DemInstructionKind::LogicalObservable => {
-            DemObservableId::try_new(parse_prefixed_id(raw_targets, b'L')?)
+            ObservableId::try_new(parse_prefixed_id(raw_targets, b'L')?)
                 .ok()
                 .map(DemPayload::logical_observable)
         }

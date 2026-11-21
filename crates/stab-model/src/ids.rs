@@ -25,16 +25,49 @@ impl QubitId {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct ObservableId(u64);
+/// A logical observable id, shared by circuit `OBSERVABLE_INCLUDE` arguments and DEM `L` targets.
+///
+/// The domain is `0..=u32::MAX`, the range the DEM file format accepts, so every id a circuit
+/// holds is one a detector error model can represent.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ObservableId(u32);
 
 impl ObservableId {
-    pub fn new(value: u64) -> Self {
+    /// The largest observable id.
+    pub const MAX: Self = Self(u32::MAX);
+
+    /// Builds an id, refusing values above [`Self::MAX`].
+    pub fn try_new(value: u64) -> ModelResult<Self> {
+        u32::try_from(value)
+            .map(Self)
+            .map_err(|_| ModelError::invalid_domain_value("observable id", value))
+    }
+
+    pub const fn get(self) -> u32 {
+        self.0
+    }
+
+    pub(crate) const fn from_u32(value: u32) -> Self {
         Self(value)
     }
 
-    pub fn get(self) -> u64 {
-        self.0
+    /// Converts a gate argument to an id when it is an integral value in the id domain.
+    pub(crate) fn from_gate_arg(arg: f64) -> Option<Self> {
+        if !arg.is_finite() || arg < 0.0 || arg.fract() != 0.0 || arg > f64::from(u32::MAX) {
+            return None;
+        }
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "the finite, integral, nonnegative, and at-most-u32::MAX checks make this exact"
+        )]
+        Some(Self(arg as u32))
+    }
+}
+
+impl From<u32> for ObservableId {
+    fn from(value: u32) -> Self {
+        Self(value)
     }
 }
 

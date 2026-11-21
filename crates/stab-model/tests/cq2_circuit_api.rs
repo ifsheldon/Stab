@@ -6,7 +6,7 @@
 
 use stab_model::{
     Circuit, CircuitDetectorId, CircuitInstruction, CircuitItem, Gate, ModelError, ObservableId,
-    Probability, QubitId, RepeatBlock, RepeatCount, Target, ValidationError,
+    ParseErrorCode, Probability, QubitId, RepeatBlock, RepeatCount, Target, ValidationError,
 };
 
 #[test]
@@ -75,24 +75,24 @@ fn cq2_circuit_api_instruction_value_contract_matches_stim() {
             .get(),
         17
     );
-    let largest_observable = instruction("OBSERVABLE_INCLUDE(18446744073709549568) rec[-1]\n");
+    let largest_observable = instruction("OBSERVABLE_INCLUDE(4294967295) rec[-1]\n");
     assert_eq!(
         largest_observable
             .observable_id_argument()
-            .expect("typed largest observable")
-            .expect("largest observable id")
-            .get(),
-        18_446_744_073_709_549_568
+            .expect("typed largest observable"),
+        Some(ObservableId::MAX)
     );
-    let overflowing_observable = instruction("OBSERVABLE_INCLUDE(18446744073709551616) rec[-1]\n");
+    // Ids above the detector error model's `L` range are refused at parse time, not later.
+    let overflowing_observable =
+        Circuit::from_stim_str("M 0\nOBSERVABLE_INCLUDE(4294967296) rec[-1]\n")
+            .expect_err("2^32 is outside the ObservableId domain");
+    let parse_error = overflowing_observable
+        .parse_error()
+        .expect("out-of-domain observable id is a parse error");
+    assert_eq!(parse_error.code(), ParseErrorCode::InvalidArgument);
     assert_eq!(
-        overflowing_observable
-            .observable_id_argument()
-            .expect_err("2^64 is outside the ObservableId domain"),
-        ModelError::from(ValidationError::InvalidArgument {
-            gate: "OBSERVABLE_INCLUDE",
-            argument: "18446744073709552000".to_string(),
-        })
+        overflowing_observable.to_string(),
+        "failed to parse line 2: gate OBSERVABLE_INCLUDE received invalid argument 4294967296"
     );
 
     let channel = instruction("PAULI_CHANNEL_1(0.1, 0.2, 0.3) 0\n");
@@ -190,8 +190,19 @@ fn cq2_circuit_api_typed_ids_enforce_value_boundaries() {
         ))
     );
 
-    let observable = ObservableId::new(u64::MAX);
-    assert_eq!(observable.get(), u64::MAX);
+    assert_eq!(
+        ObservableId::try_new(u64::from(u32::MAX)),
+        Ok(ObservableId::MAX)
+    );
+    assert_eq!(
+        ObservableId::try_new(u64::from(u32::MAX) + 1),
+        Err(ModelError::Validation(
+            ValidationError::InvalidDomainValue {
+                kind: "observable id",
+                value: "4294967296".to_string(),
+            }
+        ))
+    );
 
     let detector = CircuitDetectorId::new(u64::MAX);
     assert_eq!(detector.get(), u64::MAX);

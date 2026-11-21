@@ -9,8 +9,8 @@ use stab_model::advanced::{
     FoldedDemTraversal, FoldedDemVisitor, shifted_detector, shifted_targets,
 };
 use stab_model::{
-    Cancellation, DemDetectorId, DemInstruction, DemInstructionView, DemObservableId,
-    DemRepeatBlock, DemTarget, DemTargetKind, DetectorErrorModel,
+    Cancellation, DemDetectorId, DemInstruction, DemInstructionView, DemRepeatBlock, DemTarget,
+    DemTargetKind, DetectorErrorModel, ObservableId,
 };
 
 mod instance;
@@ -30,7 +30,7 @@ struct FlattenedError {
 #[derive(Clone, Debug)]
 struct SatTargetIndex {
     detector_to_slot: BTreeMap<DemDetectorId, usize>,
-    observable_to_slot: BTreeMap<DemObservableId, usize>,
+    observable_to_slot: BTreeMap<ObservableId, usize>,
 }
 
 impl SatTargetIndex {
@@ -82,7 +82,7 @@ impl SatTargetIndex {
             })
     }
 
-    fn observable_slot(&self, observable: DemObservableId) -> AnalysisResult<usize> {
+    fn observable_slot(&self, observable: ObservableId) -> AnalysisResult<usize> {
         self.observable_to_slot
             .get(&observable)
             .copied()

@@ -649,9 +649,13 @@ fn sparse_rev_frame_tracker_shifted_copy_matches_record_and_detector_offsets() {
         .xor_item(DemTarget::relative_detector(2987).unwrap());
     assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
 
-    actual.observable_effects.insert(9, detector_set(286));
+    actual
+        .observable_effects
+        .insert(ObservableId::from(9), detector_set(286));
     assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
-    expected.observable_effects.insert(9, detector_set(2986));
+    expected
+        .observable_effects
+        .insert(ObservableId::from(9), detector_set(2986));
     assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
 
     actual.gauge_errors.push(detector_set(285));

@@ -9,14 +9,14 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use stab_model::{
-    DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemObservableId, DemRepeatBlock,
-    DemRepeatCount, DemTarget, DetectorErrorModel, Probability,
+    DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DemRepeatCount,
+    DemTarget, DetectorErrorModel, ObservableId, Probability,
 };
 
 #[test]
 fn cq2_dem_target_value_and_parse_contract_matches_stim() {
     let detector = DemDetectorId::try_new(5).expect("D5");
-    let observable = DemObservableId::try_new(6).expect("L6");
+    let observable = ObservableId::try_new(6).expect("L6");
     assert_eq!(detector.get(), 5);
     assert_eq!(observable.get(), 6);
     assert_eq!(
@@ -62,8 +62,8 @@ fn cq2_dem_target_value_and_parse_contract_matches_stim() {
 
     assert!(DemDetectorId::try_new((1_u64 << 62) - 1).is_ok());
     assert!(DemDetectorId::try_new(1_u64 << 62).is_err());
-    assert!(DemObservableId::try_new(u64::from(u32::MAX)).is_ok());
-    assert!(DemObservableId::try_new(u64::from(u32::MAX) + 1).is_err());
+    assert!(ObservableId::try_new(u64::from(u32::MAX)).is_ok());
+    assert!(ObservableId::try_new(u64::from(u32::MAX) + 1).is_err());
     for rejected in [
         "",
         "5",
@@ -99,7 +99,7 @@ fn cq2_dem_instruction_value_validation_and_print_contract_matches_stim() {
     )
     .expect("detector instruction");
     let logical = DemInstruction::logical_observable(
-        DemObservableId::try_new(4).expect("L4"),
+        ObservableId::try_new(4).expect("L4"),
         Some("obs".to_string()),
     );
     let shift = DemInstruction::shift_detectors(vec![3.5], 7, Some("shift".to_string()))

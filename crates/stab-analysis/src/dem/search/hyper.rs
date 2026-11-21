@@ -446,7 +446,7 @@ impl SearchState {
         }
         self.observables
             .symmetric_difference(&next.observables)
-            .push_targets(&mut targets)?;
+            .push_targets(&mut targets);
         out.push_instruction(DemInstruction::error(
             Probability::try_new(1.0)?,
             targets,

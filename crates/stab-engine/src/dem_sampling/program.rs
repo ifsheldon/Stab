@@ -275,7 +275,10 @@ fn compile_instruction(
                 detectors.push(shifted);
             }
             DemTargetKind::LogicalObservable(observable) => {
-                observables.push(usize_from_u64(observable.get(), "observable index")?);
+                observables.push(usize_from_u64(
+                    u64::from(observable.get()),
+                    "observable index",
+                )?);
             }
             DemTargetKind::Separator => {}
         }

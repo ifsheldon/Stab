@@ -958,19 +958,11 @@ fn probability_from_validated_arg(gate: &'static str, arg: f64) -> ModelResult<P
 }
 
 fn observable_id_from_validated_arg(gate: &'static str, arg: f64) -> ModelResult<ObservableId> {
-    const U64_EXCLUSIVE_UPPER_BOUND: f64 = f64::from_bits(0x43f0_0000_0000_0000);
-
-    if !arg.is_finite() || arg < 0.0 || arg.fract() != 0.0 || arg >= U64_EXCLUSIVE_UPPER_BOUND {
-        return Err(ValidationError::InvalidArgument {
+    ObservableId::from_gate_arg(arg).ok_or_else(|| {
+        ValidationError::InvalidArgument {
             gate,
             argument: arg.to_string(),
         }
-        .into());
-    }
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "the finite, integral, nonnegative, and exclusive 2^64 checks prove this cast exact"
-    )]
-    Ok(ObservableId::new(arg as u64))
+        .into()
+    })
 }

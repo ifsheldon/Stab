@@ -742,7 +742,7 @@ fn instruction_typed_argument_accessors_preserve_stim_domains() {
         "X_ERROR(0.125) 0\n",
         "PAULI_CHANNEL_1(0.1, 0.2, 0.3) 1\n",
         "OBSERVABLE_INCLUDE(7) rec[-1]\n",
-        "OBSERVABLE_INCLUDE(4294967296) rec[-2]\n",
+        "OBSERVABLE_INCLUDE(4294967295) rec[-2]\n",
         "DETECTOR(2, 3.5) rec[-1]\n",
         "H 2\n",
     ))
@@ -773,11 +773,11 @@ fn instruction_typed_argument_accessors_preserve_stim_domains() {
     );
     assert_eq!(
         observable.observable_id_argument().unwrap(),
-        Some(ObservableId::new(7))
+        Some(ObservableId::from(7))
     );
     assert_eq!(
         large_observable.observable_id_argument().unwrap(),
-        Some(ObservableId::new(4_294_967_296))
+        Some(ObservableId::MAX)
     );
     assert_eq!(detector.coordinate_arguments(), Some(&[2.0, 3.5][..]));
     assert_eq!(h.probability_argument().unwrap(), None);

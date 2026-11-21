@@ -335,7 +335,9 @@ fn collect_semantic_instruction(
                         ));
                     }
                     DemTargetKind::LogicalObservable(observable) => {
-                        targets.push(SemanticTarget::LogicalObservable(observable.get()));
+                        targets.push(SemanticTarget::LogicalObservable(u64::from(
+                            observable.get(),
+                        )));
                     }
                     DemTargetKind::Separator => {}
                 }
@@ -367,7 +369,7 @@ fn collect_semantic_instruction(
                 let Some(observable) = target.observable() else {
                     panic!("logical observable declaration should have observable targets");
                 };
-                result.logical_observables.push(observable.get());
+                result.logical_observables.push(u64::from(observable.get()));
             }
         }
         DemInstructionKind::ShiftDetectors => {

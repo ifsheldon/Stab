@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display, Formatter, NumBuffer};
 use std::str::FromStr;
 
 use super::parser::parse_unsigned_dem_text_value;
-use crate::{ModelError, ModelResult};
+use crate::{ModelError, ModelResult, ObservableId};
 
 /// Largest relative detector id a DEM target can name.
 pub(super) const MAX_DEM_DETECTOR_ID: u64 = (1_u64 << 62) - 1;
@@ -39,25 +39,6 @@ impl DemDetectorId {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct DemObservableId(u32);
-
-impl DemObservableId {
-    pub fn try_new(value: u64) -> ModelResult<Self> {
-        let value = u32::try_from(value).map_err(|_| {
-            ModelError::invalid_detector_error_model(format!(
-                "observable id {value} exceeds {}",
-                u32::MAX
-            ))
-        })?;
-        Ok(Self(value))
-    }
-
-    pub const fn get(self) -> u64 {
-        self.0 as u64
-    }
-}
-
 /// One target of a DEM instruction: a relative detector, a logical observable, or the `^`
 /// separator between the components of a decomposed error.
 ///
@@ -73,7 +54,7 @@ const _: () = assert!(size_of::<DemTarget>() == 8);
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum DemTargetKind {
     RelativeDetector(DemDetectorId),
-    LogicalObservable(DemObservableId),
+    LogicalObservable(ObservableId),
     Separator,
 }
 
@@ -86,7 +67,13 @@ impl DemTarget {
     }
 
     pub fn logical_observable(id: u64) -> ModelResult<Self> {
-        DemObservableId::try_new(id).map(Self::from_observable)
+        let observable = u32::try_from(id).map_err(|_| {
+            ModelError::invalid_detector_error_model(format!(
+                "observable id {id} exceeds {}",
+                ObservableId::MAX.get()
+            ))
+        })?;
+        Ok(Self::from_observable(ObservableId::from(observable)))
     }
 
     pub const fn separator() -> Self {
@@ -97,15 +84,15 @@ impl DemTarget {
         Self(detector.0)
     }
 
-    pub const fn from_observable(observable: DemObservableId) -> Self {
-        Self(OBSERVABLE_BITS | observable.0 as u64)
+    pub const fn from_observable(observable: ObservableId) -> Self {
+        Self(OBSERVABLE_BITS | observable.get() as u64)
     }
 
     pub const fn kind(self) -> DemTargetKind {
         match self.0 >> KIND_SHIFT {
             0 => DemTargetKind::RelativeDetector(DemDetectorId(self.0)),
             OBSERVABLE_KIND => {
-                DemTargetKind::LogicalObservable(DemObservableId(self.observable_bits()))
+                DemTargetKind::LogicalObservable(ObservableId::from_u32(self.observable_bits()))
             }
             _ => DemTargetKind::Separator,
         }
@@ -119,9 +106,9 @@ impl DemTarget {
         }
     }
 
-    pub const fn observable(self) -> Option<DemObservableId> {
+    pub const fn observable(self) -> Option<ObservableId> {
         if self.is_observable() {
-            Some(DemObservableId(self.observable_bits()))
+            Some(ObservableId::from_u32(self.observable_bits()))
         } else {
             None
         }
@@ -168,7 +155,7 @@ impl DemTarget {
     pub(super) fn text_parts(self, digits: &mut NumBuffer<u64>) -> (&'static str, &str) {
         match self.kind() {
             DemTargetKind::RelativeDetector(id) => ("D", id.get().format_into(digits)),
-            DemTargetKind::LogicalObservable(id) => ("L", id.get().format_into(digits)),
+            DemTargetKind::LogicalObservable(id) => ("L", u64::from(id.get()).format_into(digits)),
             DemTargetKind::Separator => ("^", ""),
         }
     }
@@ -214,13 +201,13 @@ impl DetectorTarget {
 pub(super) struct ObservableTarget(DemTarget);
 
 impl ObservableTarget {
-    pub(super) const fn new(observable: DemObservableId) -> Self {
+    pub(super) const fn new(observable: ObservableId) -> Self {
         Self(DemTarget::from_observable(observable))
     }
 
-    pub(super) const fn id(self) -> DemObservableId {
+    pub(super) const fn id(self) -> ObservableId {
         // Only `new` builds this target, so its low bits hold the observable id.
-        DemObservableId(self.0.observable_bits())
+        ObservableId::from_u32(self.0.observable_bits())
     }
 
     pub(super) const fn as_target(&self) -> &DemTarget {
@@ -234,8 +221,8 @@ impl From<DemDetectorId> for DemTarget {
     }
 }
 
-impl From<DemObservableId> for DemTarget {
-    fn from(observable: DemObservableId) -> Self {
+impl From<ObservableId> for DemTarget {
+    fn from(observable: ObservableId) -> Self {
         Self::from_observable(observable)
     }
 }

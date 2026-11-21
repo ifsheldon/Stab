@@ -649,7 +649,7 @@ fn summarize_observable_count(items: &[FoldedDemItem<'_>]) -> u64 {
             FoldedDemItem::Instruction(instruction) => {
                 for target in instruction.targets() {
                     if let Some(observable) = target.observable() {
-                        count = count.max(observable.get().saturating_add(1));
+                        count = count.max(u64::from(observable.get()) + 1);
                     }
                 }
             }

@@ -6,8 +6,8 @@ use stab_algebra::{
 };
 use stab_model::advanced::FoldedCircuitEvent;
 use stab_model::{
-    Cancellation, Circuit, CircuitItem, DemTarget, GateCategory, MemoryBudget, ParseLimits,
-    QubitId, Target,
+    Cancellation, Circuit, CircuitItem, DemTarget, GateCategory, MemoryBudget, ObservableId,
+    ParseLimits, QubitId, Target,
 };
 
 use super::check_algorithm::{FlowCheckAlgorithm, FlowCheckCost};
@@ -645,7 +645,8 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
                     tracker.toggle_record_target_absolute(record_index, tracked_target)?;
                 }
                 for observable in flow.observables() {
-                    tracker.toggle_observable_effect(observable, tracked_target)?;
+                    tracker
+                        .toggle_observable_effect(ObservableId::from(observable), tracked_target)?;
                 }
                 tracker.check_live_budget()?;
                 preliminary.push(None);
@@ -738,7 +739,7 @@ fn flow_labels(
             if let FoldedCircuitEvent::Instruction { instruction, .. } = event
                 && let Some(observable) = instruction.observable_id_argument()?
             {
-                included.insert(observable.get());
+                included.insert(u64::from(observable.get()));
             }
             Ok(())
         },

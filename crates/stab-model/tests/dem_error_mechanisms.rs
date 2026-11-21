@@ -9,8 +9,8 @@ use std::ops::ControlFlow;
 
 use stab_model::{
     DemDetectorId, DemErrorMechanismTraversalLimits, DemErrorMechanismView,
-    DemErrorMechanismVisitError, DemErrorMechanismVisitor, DemErrorTarget, DemObservableId,
-    DetectorErrorModel,
+    DemErrorMechanismVisitError, DemErrorMechanismVisitor, DemErrorTarget, DetectorErrorModel,
+    ObservableId,
 };
 
 #[derive(Default)]
@@ -87,7 +87,7 @@ fn detector(id: u64) -> DemErrorTarget {
 }
 
 fn observable(id: u64) -> DemErrorTarget {
-    DemErrorTarget::Observable(DemObservableId::try_new(id).expect("observable id"))
+    DemErrorTarget::Observable(ObservableId::try_new(id).expect("observable id"))
 }
 
 #[test]

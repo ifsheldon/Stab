@@ -7,9 +7,8 @@ use std::collections::BTreeMap;
 use std::ops::Bound;
 
 use stab_model::{
-    DemDetectorId, DemInstruction, DemInstructionKind, DemInstructionView, DemItem,
-    DemObservableId, DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, ModelResult,
-    Probability,
+    DemDetectorId, DemInstruction, DemInstructionKind, DemInstructionView, DemItem, DemRepeatBlock,
+    DemRepeatCount, DemTarget, DetectorErrorModel, ModelResult, ObservableId, Probability,
 };
 
 #[test]
@@ -131,7 +130,7 @@ fn pf1_dem_basic_programmatic_constructors_push_and_clone() {
         Some("loop".to_string()),
     ));
     dem.push_instruction(DemInstruction::logical_observable(
-        DemObservableId::try_new(4).expect("L4"),
+        ObservableId::try_new(4).expect("L4"),
         Some("obs".to_string()),
     ));
 
@@ -893,7 +892,7 @@ fn dem_instruction_view_carries_each_kind_s_data_without_fallible_follow_up() {
                 detector: detector(3),
             },
             DemInstructionView::LogicalObservable {
-                observable: DemObservableId::try_new(7).expect("valid observable"),
+                observable: ObservableId::try_new(7).expect("valid observable"),
             },
             DemInstructionView::Detector {
                 coordinates: &[0.0, 0.0],

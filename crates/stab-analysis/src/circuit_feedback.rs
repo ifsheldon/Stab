@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, DemTargetKind, FoldedCircuitSummary,
-    FoldedWalkError, Gate, GateCategory, GateKind, MeasureRecordOffset, MemoryBudget, ParseLimits,
-    Pauli, QubitId, RepeatBlock, RepeatCount, Target,
+    FoldedWalkError, Gate, GateCategory, GateKind, MeasureRecordOffset, MemoryBudget, ObservableId,
+    ParseLimits, Pauli, QubitId, RepeatBlock, RepeatCount, Target,
     advanced::{
         CircuitBuilder, ClassicalControl, ControlledPauliTargetPair, FoldedCircuitEvent,
         classify_controlled_pauli_target_pair,
@@ -104,7 +104,7 @@ pub fn circuit_with_inlined_feedback_with_limits(
 struct WithoutFeedbackHelper {
     reversed_output: Vec<CircuitItem>,
     tracker: SparseReverseFrameTracker,
-    observable_changes: BTreeMap<u64, BTreeSet<MeasureRecordOffset>>,
+    observable_changes: BTreeMap<ObservableId, BTreeSet<MeasureRecordOffset>>,
     detector_changes: BTreeMap<u64, BTreeSet<usize>>,
 }
 
@@ -233,7 +233,7 @@ impl WithoutFeedbackHelper {
                 }
                 DemTargetKind::LogicalObservable(observable) => {
                     toggle_value(
-                        self.observable_changes.entry(observable.get()).or_default(),
+                        self.observable_changes.entry(observable).or_default(),
                         record,
                     );
                 }
@@ -256,7 +256,7 @@ impl WithoutFeedbackHelper {
             }
             let instruction = stab_model::advanced::circuit_instruction_with_tag_bytes(
                 GateKind::OBSERVABLE_INCLUDE.gate(),
-                vec![observable as f64],
+                vec![f64::from(observable.get())],
                 records
                     .into_iter()
                     .map(Target::measurement_record)

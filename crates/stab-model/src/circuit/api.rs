@@ -170,7 +170,7 @@ impl Circuit {
             if instruction.gate() == Gate::OBSERVABLE_INCLUDE {
                 instruction
                     .observable_id_argument()
-                    .map(|id| id.map(|id| id.get().saturating_add(1)))
+                    .map(|id| id.map(|id| u64::from(id.get()) + 1))
             } else {
                 Ok(None)
             }

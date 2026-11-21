@@ -20,7 +20,7 @@ pub use error_mechanisms::{
     DemErrorMechanismVisitor, DemErrorTarget, DemErrorTargetIter,
 };
 pub use instruction::{DemInstruction, DemInstructionKind, DemInstructionView};
-pub use target::{DemDetectorId, DemObservableId, DemTarget, DemTargetKind};
+pub use target::{DemDetectorId, DemTarget, DemTargetKind};
 
 /// Advanced borrowed boundary for traversing compact DEM structure.
 ///

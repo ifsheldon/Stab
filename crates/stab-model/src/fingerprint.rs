@@ -205,7 +205,7 @@ impl StructuralEncoder {
                 self.hasher.update([1, b0, b1, b2, b3, b4, b5, b6, b7]);
             }
             DemTargetKind::LogicalObservable(id) => {
-                let [b0, b1, b2, b3, b4, b5, b6, b7] = id.get().to_be_bytes();
+                let [b0, b1, b2, b3, b4, b5, b6, b7] = u64::from(id.get()).to_be_bytes();
                 self.hasher.update([2, b0, b1, b2, b3, b4, b5, b6, b7]);
             }
             DemTargetKind::Separator => self.byte(3),

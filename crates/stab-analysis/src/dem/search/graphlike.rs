@@ -411,7 +411,7 @@ impl SearchState {
         }
         self.observables
             .symmetric_difference(&next.observables)
-            .push_targets(&mut targets)?;
+            .push_targets(&mut targets);
         out.push_instruction(DemInstruction::error(
             Probability::try_new(1.0)?,
             targets,
@@ -475,7 +475,7 @@ fn toggle_detector(targets: &mut BTreeSet<DemDetectorId>, detector: Option<DemDe
 mod tests {
     use std::collections::hash_map::DefaultHasher;
 
-    use stab_model::DemObservableId;
+    use stab_model::ObservableId;
 
     use super::*;
 
@@ -487,7 +487,7 @@ mod tests {
         let mut observables = BTreeSet::new();
         for index in 0..64 {
             if bits & (1 << index) != 0 {
-                observables.insert(DemObservableId::try_new(index).unwrap());
+                observables.insert(ObservableId::try_new(index).unwrap());
             }
         }
         ObservableMask { observables }

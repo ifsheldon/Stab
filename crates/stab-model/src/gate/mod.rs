@@ -273,7 +273,9 @@ impl ArgRule {
                     }
                     .into());
                 };
-                if !arg.is_finite() || arg < 0.0 || arg.fract() != 0.0 {
+                // The only unsigned-integer argument is an observable id, so admit exactly the
+                // ids a detector error model can hold.
+                if crate::ObservableId::from_gate_arg(arg).is_none() {
                     return Err(ValidationError::InvalidArgument {
                         gate,
                         argument: arg.to_string(),

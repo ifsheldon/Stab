@@ -5,11 +5,11 @@ use super::tag::DemTag;
 use super::target::{DetectorTarget, ObservableTarget};
 use super::traversal::shifted_coordinates;
 use super::{
-    DemArgVec, DemDetectorId, DemObservableId, DemTarget, DemTargetVec, normalize_tag,
-    write_indent, write_indent_io, write_optional_tag, write_optional_tag_io,
+    DemArgVec, DemDetectorId, DemTarget, DemTargetVec, normalize_tag, write_indent,
+    write_indent_io, write_optional_tag, write_optional_tag_io,
 };
 use crate::circuit::printing::DemFloatCache;
-use crate::{ModelError, ModelResult, Probability};
+use crate::{ModelError, ModelResult, ObservableId, Probability};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DemInstructionKind {
@@ -59,7 +59,7 @@ pub enum DemInstructionView<'a> {
         detector: DemDetectorId,
     },
     /// `logical_observable L<observable>`.
-    LogicalObservable { observable: DemObservableId },
+    LogicalObservable { observable: ObservableId },
     /// `shift_detectors(coordinate_shift) detector_shift`.
     ShiftDetectors {
         coordinate_shift: &'a [f64],
@@ -121,7 +121,7 @@ impl DemPayload {
         }
     }
 
-    pub(super) fn logical_observable(observable: DemObservableId) -> Self {
+    pub(super) fn logical_observable(observable: ObservableId) -> Self {
         Self::LogicalObservable {
             observable: ObservableTarget::new(observable),
         }
@@ -245,7 +245,7 @@ impl DemInstruction {
         Self::detector_with_tag(coordinates, detector, normalize_tag(tag))
     }
 
-    pub fn logical_observable(observable: DemObservableId, tag: Option<String>) -> Self {
+    pub fn logical_observable(observable: ObservableId, tag: Option<String>) -> Self {
         Self::from_validated_parts(
             DemPayload::logical_observable(observable),
             normalize_tag(tag),
@@ -282,7 +282,7 @@ impl DemInstruction {
     }
 
     pub(crate) fn logical_observable_with_tag_bytes(
-        observable: DemObservableId,
+        observable: ObservableId,
         tag: Option<&[u8]>,
     ) -> Self {
         Self::from_validated_parts(

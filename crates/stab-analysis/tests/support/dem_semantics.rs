@@ -88,7 +88,7 @@ impl ResolvedDem {
                                     Symptom::Detector(*offset + detector.get())
                                 }
                                 DemTargetKind::LogicalObservable(observable) => {
-                                    Symptom::Observable(observable.get())
+                                    Symptom::Observable(u64::from(observable.get()))
                                 }
                                 DemTargetKind::Separator => {
                                     components.push(BTreeSet::new());
@@ -125,7 +125,8 @@ impl ResolvedDem {
                             let Some(observable) = target.observable() else {
                                 panic!("observable declaration target {target:?}");
                             };
-                            self.declared_observables.insert(observable.get());
+                            self.declared_observables
+                                .insert(u64::from(observable.get()));
                         }
                     }
                     DemInstructionKind::ShiftDetectors => {

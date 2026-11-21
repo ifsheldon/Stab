@@ -816,7 +816,9 @@ impl CanonicalSearchTargets {
             );
             match target.kind() {
                 DemTargetKind::RelativeDetector(detector) => detectors.push(detector.get()),
-                DemTargetKind::LogicalObservable(observable) => observables.push(observable.get()),
+                DemTargetKind::LogicalObservable(observable) => {
+                    observables.push(u64::from(observable.get()));
+                }
                 DemTargetKind::Separator => {}
             }
         }
@@ -840,7 +842,7 @@ impl CanonicalSearchTargets {
                     toggle_parity(&mut detectors, detector.get());
                 }
                 DemTargetKind::LogicalObservable(observable) => {
-                    toggle_parity(&mut observables, observable.get());
+                    toggle_parity(&mut observables, u64::from(observable.get()));
                 }
                 DemTargetKind::Separator => {}
             }

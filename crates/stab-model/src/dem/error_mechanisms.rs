@@ -6,10 +6,10 @@ use super::traversal::{
     shifted_detector,
 };
 use super::{
-    DemDetectorId, DemInstruction, DemInstructionView, DemObservableId, DemRepeatBlock, DemTarget,
-    DemTargetKind, DetectorErrorModel,
+    DemDetectorId, DemInstruction, DemInstructionView, DemRepeatBlock, DemTarget, DemTargetKind,
+    DetectorErrorModel,
 };
-use crate::{ModelError, ModelResult, Probability};
+use crate::{ModelError, ModelResult, ObservableId, Probability};
 
 /// Caller-owned limits for semantic DEM error-mechanism traversal.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -39,7 +39,7 @@ impl DemErrorMechanismTraversalLimits {
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum DemErrorTarget {
     Detector(DemDetectorId),
-    Observable(DemObservableId),
+    Observable(ObservableId),
     Separator,
 }
 

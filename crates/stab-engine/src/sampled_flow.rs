@@ -757,32 +757,12 @@ fn observable_is_selected(
     instruction: &CircuitInstruction,
     selected_observables: &BTreeSet<u32>,
 ) -> SampledFlowResult<bool> {
-    let observable = instruction.args().first().ok_or_else(|| {
+    let observable = instruction.observable_id_argument()?.ok_or_else(|| {
         SampledFlowError::invalid_flow(
             "OBSERVABLE_INCLUDE missing observable index during sampled flow checking",
         )
     })?;
-    let observable = checked_observable_arg_to_u32(*observable)?;
-    Ok(selected_observables.contains(&observable))
-}
-
-fn checked_observable_arg_to_u32(observable: f64) -> SampledFlowResult<u32> {
-    if !observable.is_finite()
-        || observable < 0.0
-        || observable > f64::from(u32::MAX)
-        || observable.fract() != 0.0
-    {
-        return Err(SampledFlowError::invalid_flow(
-            "OBSERVABLE_INCLUDE has invalid observable index during sampled flow checking",
-        ));
-    }
-    #[expect(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "observable was validated as a non-negative integer within u32 range"
-    )]
-    let observable = observable as u32;
-    Ok(observable)
+    Ok(selected_observables.contains(&observable.get()))
 }
 
 fn sampled_flow_measurement_target(

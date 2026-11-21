@@ -970,7 +970,7 @@ fn validate_targets(
                 }
             }
             DemTargetKind::LogicalObservable(observable) => {
-                if observable.get() >= observable_count {
+                if u64::from(observable.get()) >= observable_count {
                     return Err(AnalysisRequestError::ObservableOutOfRange {
                         observable,
                         observable_count,

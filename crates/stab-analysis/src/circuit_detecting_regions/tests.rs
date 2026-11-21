@@ -556,7 +556,7 @@ fn detecting_regions_target_shape_keeps_heralded_noise_plain_qubit_scoped() {
 
 #[test]
 fn detecting_regions_target_api_admits_dense_helpers_against_the_memory_budget() {
-    let high_observable = Circuit::from_stim_str("OBSERVABLE_INCLUDE(4294967296) Z0\n").unwrap();
+    let high_observable = Circuit::from_stim_str("OBSERVABLE_INCLUDE(4294967295) Z0\n").unwrap();
     let error = all_detecting_region_targets(&high_observable).unwrap_err();
     let AnalysisError::ResourceLimit(resource) = error else {
         panic!("expected typed target-helper rejection, got {error}");

@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use stab_algebra::PauliBasis;
 use stab_model::advanced::CancellationCountdown;
 use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, DemTarget, GateKind, MemoryBudget, Pauli, QubitId,
-    Target, TargetKind,
+    Cancellation, Circuit, CircuitInstruction, DemTarget, GateKind, MemoryBudget, ObservableId,
+    Pauli, QubitId, Target, TargetKind,
 };
 
 mod budget;
@@ -67,7 +67,7 @@ pub(crate) struct SparseReverseFrameTracker {
     rec_bits: TargetSets<usize>,
     measurement_count: usize,
     detector_count: u64,
-    observable_effects: TargetSets<u64>,
+    observable_effects: TargetSets<ObservableId>,
     anticommutation_policy: AnticommutationPolicy,
     error_analysis_mode: bool,
     eliminate_detector_gauges: bool,
@@ -278,15 +278,14 @@ impl SparseReverseFrameTracker {
 
     pub(crate) fn toggle_observable_effect(
         &mut self,
-        observable: u32,
+        observable: ObservableId,
         target: DemTarget,
     ) -> AnalysisResult<()> {
-        let key = u64::from(observable);
-        let existing = self.observable_effects.get(&key);
+        let existing = self.observable_effects.get(&observable);
         self.scratch
             .admit_growth(&self.meter, xor_item_growth_bytes(existing))?;
         let before = set_entry_bytes(existing);
-        let set = self.observable_effects.entry(key).or_default();
+        let set = self.observable_effects.entry(observable).or_default();
         set.xor_item(target);
         let after = set_entry_bytes(Some(set));
         self.meter.adjust(before, after);
@@ -688,14 +687,14 @@ impl SparseReverseFrameTracker {
             )
         })?;
         let mut sensitivity = self.scratch.take_operand();
-        let effects = self.observable_effects.get(&observable.get());
+        let effects = self.observable_effects.get(&observable);
         self.scratch.admit_growth(
             &self.meter,
             buffer_growth_bytes(sensitivity.capacity(), effects.map_or(1, TargetXorSet::len)),
         )?;
         match effects {
             Some(effects) => sensitivity.extend_from_slice(effects.as_slice()),
-            None => sensitivity.push(DemTarget::logical_observable(observable.get())?),
+            None => sensitivity.push(DemTarget::from_observable(observable)),
         }
         let held = budget::buffer_bytes(sensitivity.capacity());
         let included = self.holding(held, |tracker| {

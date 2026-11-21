@@ -120,3 +120,16 @@ fn dem_analyzer_omits_only_vacuous_detector_and_observable_declarations_like_ups
         assert_eq!(analyze(circuit), expected);
     }
 }
+
+#[test]
+fn dem_analyzer_keeps_the_largest_observable_id_exact() {
+    // Pinned Stim also emits a spurious `logical_observable L2147483647` for these circuits.
+    assert_eq!(
+        analyze("X_ERROR(0.125) 0\nM 0\nOBSERVABLE_INCLUDE(4294967295) rec[-1]\n"),
+        "error(0.125) L4294967295\n"
+    );
+    assert_eq!(
+        analyze("M 0\nOBSERVABLE_INCLUDE(4294967295) rec[-1]\n"),
+        "logical_observable L4294967295\n"
+    );
+}

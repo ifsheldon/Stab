@@ -5,7 +5,7 @@
     reason = "logical-search tests use direct assertions for compact diagnostics"
 )]
 
-use stab_model::DemObservableId;
+use stab_model::ObservableId;
 
 use super::*;
 
@@ -21,7 +21,7 @@ fn obs_mask(bits: u64) -> ObservableMask {
     let mut observables = BTreeSet::new();
     for index in 0..64 {
         if bits & (1 << index) != 0 {
-            observables.insert(DemObservableId::try_new(index).unwrap());
+            observables.insert(ObservableId::try_new(index).unwrap());
         }
     }
     ObservableMask { observables }

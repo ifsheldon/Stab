@@ -203,7 +203,7 @@ impl DemErrorMechanismVisitor for EffectCollector {
                 DemErrorTarget::Observable(observable) => {
                     if observable.get() != 0 {
                         return Err(OracleError::ObservableOutOfRange {
-                            observable: observable.get(),
+                            observable: u64::from(observable.get()),
                         });
                     }
                     mask ^= 1_usize << self.detector_count;

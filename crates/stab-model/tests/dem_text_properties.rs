@@ -688,7 +688,7 @@ fn build_text_tagged(items: &[GenDem]) -> Option<DetectorErrorModel> {
             GenDem::Observable {
                 tag, observable, ..
             } => model.push_instruction(stab_model::DemInstruction::logical_observable(
-                stab_model::DemObservableId::try_new(u64::from(*observable)).expect("valid id"),
+                stab_model::ObservableId::try_new(u64::from(*observable)).expect("valid id"),
                 text_tag(tag)?,
             )),
             GenDem::Shift {

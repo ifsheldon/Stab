@@ -5,7 +5,7 @@ use std::fmt::{Display, Formatter};
 
 use stab_algebra::Flow;
 use stab_model::{
-    CircuitTick, DemDetectorId, DemObservableId, DemTarget, GateKind, Probability, QubitId,
+    CircuitTick, DemDetectorId, DemTarget, GateKind, ObservableId, Probability, QubitId,
 };
 
 /// Detectors or observables whose value a collapse in the circuit randomizes.
@@ -333,7 +333,7 @@ pub enum AnalysisRequestError {
         detector_count: u64,
     },
     ObservableOutOfRange {
-        observable: DemObservableId,
+        observable: ObservableId,
         observable_count: u64,
     },
     /// A detecting-region filter named a target that is neither a detector nor an observable.

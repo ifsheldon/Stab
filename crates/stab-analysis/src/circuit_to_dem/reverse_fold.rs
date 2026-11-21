@@ -1,6 +1,6 @@
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, DemDetectorId, DemInstruction, DemItem,
-    DemObservableId, DemTarget, DetectorErrorModel, GateKind, Pauli, Probability,
+    Circuit, CircuitInstruction, CircuitItem, DemDetectorId, DemInstruction, DemItem, DemTarget,
+    DetectorErrorModel, GateKind, Pauli, Probability,
 };
 
 use super::{
@@ -250,7 +250,7 @@ impl<'c> ReverseFoldAnalyzer<'c> {
                 })?;
                 self.push_output_instruction(
                     stab_model::advanced::dem_logical_observable_instruction_with_tag_bytes(
-                        DemObservableId::try_new(observable.get())?,
+                        observable,
                         instruction.tag_bytes(),
                     ),
                 )?;

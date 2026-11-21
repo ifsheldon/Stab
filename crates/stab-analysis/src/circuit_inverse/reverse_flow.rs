@@ -501,7 +501,7 @@ impl ReverseFlowEngine {
                 "OBSERVABLE_INCLUDE is missing an observable id",
             )
         })?;
-        let target = DemTarget::logical_observable(observable.get())?;
+        let target = DemTarget::from_observable(observable);
         let pauli_targets = instruction
             .targets()
             .iter()
@@ -651,7 +651,7 @@ impl ReverseFlowEngine {
             .copied()
             .filter(|target| match target.kind() {
                 DemTargetKind::LogicalObservable(observable) => {
-                    observable.get() < self.observable_count
+                    u64::from(observable.get()) < self.observable_count
                 }
                 DemTargetKind::RelativeDetector(_) => !active_targets.contains(target),
                 DemTargetKind::Separator => false,
@@ -689,7 +689,7 @@ impl ReverseFlowEngine {
                 DemTargetKind::LogicalObservable(observable) => {
                     self.append_instruction(
                         GateKind::OBSERVABLE_INCLUDE.gate(),
-                        vec![observable.get() as f64],
+                        vec![f64::from(observable.get())],
                         record_targets,
                         tag.as_deref(),
                     )?;

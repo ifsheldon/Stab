@@ -4,7 +4,7 @@ use stab_algebra::Flow;
 use stab_model::advanced::FoldedCircuitEvent;
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, GateKind, MeasureRecordOffset,
-    MemoryBudget, ParseLimits, QubitId, Target,
+    MemoryBudget, ObservableId, ParseLimits, QubitId, Target,
 };
 
 use crate::folded_walk::walk_folded;
@@ -147,7 +147,7 @@ fn collect_declared_rows(
 ) -> AnalysisResult<DeclaredRows> {
     let mut measurement_offset = 0usize;
     let mut detector_rows = Vec::new();
-    let mut logical_rows = BTreeMap::<u64, MeasurementRow>::new();
+    let mut logical_rows = BTreeMap::<ObservableId, MeasurementRow>::new();
     let mut ignored_logical_rows = BTreeSet::new();
 
     for instruction in circuit.iter_flattened_instructions() {
@@ -170,15 +170,12 @@ fn collect_declared_rows(
                 &mut ignored_logical_rows,
             )?),
             GateKind::OBSERVABLE_INCLUDE => {
-                let observable = instruction
-                    .observable_id_argument()?
-                    .ok_or_else(|| {
-                        AnalysisError::internal(
-                            AnalysisOperation::MissingDetectorDiscovery,
-                            "OBSERVABLE_INCLUDE is missing an observable id argument",
-                        )
-                    })?
-                    .get();
+                let observable = instruction.observable_id_argument()?.ok_or_else(|| {
+                    AnalysisError::internal(
+                        AnalysisOperation::MissingDetectorDiscovery,
+                        "OBSERVABLE_INCLUDE is missing an observable id argument",
+                    )
+                })?;
                 let delta = row_from_record_targets(
                     instruction,
                     measurement_offset,
@@ -385,7 +382,7 @@ fn row_from_record_targets(
     instruction: &CircuitInstruction,
     measurement_offset: usize,
     allow_pauli: bool,
-    ignored_logical_rows: &mut BTreeSet<u64>,
+    ignored_logical_rows: &mut BTreeSet<ObservableId>,
 ) -> AnalysisResult<MeasurementRow> {
     let mut row = MeasurementRow::default();
     for target in instruction.targets() {
@@ -396,7 +393,7 @@ fn row_from_record_targets(
             row.toggle(absolute_record_index(offset, measurement_offset)?);
         } else if allow_pauli && target.is_pauli_target() {
             if let Some(observable) = instruction.observable_id_argument()? {
-                ignored_logical_rows.insert(observable.get());
+                ignored_logical_rows.insert(observable);
             }
         } else {
             return Err(AnalysisError::unsupported(

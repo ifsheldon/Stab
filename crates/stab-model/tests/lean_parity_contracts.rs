@@ -11,9 +11,9 @@ use std::str::FromStr;
 
 use stab_model::{
     Circuit, CircuitDetectorId, CircuitInstruction, CircuitItem, DemDetectorId, DemInstruction,
-    DemInstructionKind, DemItem, DemObservableId, DemRepeatBlock, DemRepeatCount, DemTarget,
-    DetectorErrorModel, Gate, MeasureRecordOffset, Pauli, Probability, QubitId, RepeatBlock,
-    RepeatCount, Target,
+    DemInstructionKind, DemItem, DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel,
+    Gate, MeasureRecordOffset, ModelError, ObservableId, Pauli, Probability, QubitId, RepeatBlock,
+    RepeatCount, Target, ValidationError,
 };
 
 #[test]
@@ -191,30 +191,33 @@ fn circuit_mutation_and_value_lifecycle_preserves_semantics() {
     assert!(repeated_in_place.repeated(u64::MAX).is_err());
 
     let rec = record(-1);
-    let largest_observable_id = 18_446_744_073_709_549_568_u64;
     let observable = CircuitInstruction::new(
         Gate::from_name("OBSERVABLE_INCLUDE").expect("observable gate"),
-        vec![f64::from_bits(0x43ef_ffff_ffff_ffff)],
+        vec![f64::from(u32::MAX)],
         vec![rec],
         None,
     )
-    .expect("largest exactly represented observable id");
+    .expect("largest observable id");
     assert_eq!(
         observable
             .observable_id_argument()
-            .expect("valid observable argument")
-            .expect("observable id")
-            .get(),
-        largest_observable_id
+            .expect("valid observable argument"),
+        Some(ObservableId::MAX)
     );
-    let overflowing_observable = CircuitInstruction::new(
-        Gate::from_name("OBSERVABLE_INCLUDE").expect("observable gate"),
-        vec![f64::from_bits(0x43f0_0000_0000_0000)],
-        vec![rec],
-        None,
-    )
-    .expect("integer-shaped observable argument");
-    assert!(overflowing_observable.observable_id_argument().is_err());
+    // The constructor refuses an id no detector error model can hold, so the typed accessor
+    // never meets one.
+    assert_eq!(
+        CircuitInstruction::new(
+            Gate::from_name("OBSERVABLE_INCLUDE").expect("observable gate"),
+            vec![f64::from(u32::MAX) + 1.0],
+            vec![rec],
+            None,
+        ),
+        Err(ModelError::from(ValidationError::InvalidArgument {
+            gate: "OBSERVABLE_INCLUDE",
+            argument: "4294967296".to_string(),
+        }))
+    );
 
     let before_failure = circuit.clone();
     assert!(circuit.append_from_stim_text("UNKNOWN 0\n").is_err());
@@ -483,7 +486,7 @@ fn dem_counts_coordinates_and_value_lifecycle_preserves_semantics() {
         assert_eq!(target.to_string(), text);
     }
     assert!(DemDetectorId::try_new(1_u64 << 62).is_err());
-    assert!(DemObservableId::try_new(u64::from(u32::MAX) + 1).is_err());
+    assert!(ObservableId::try_new(u64::from(u32::MAX) + 1).is_err());
     for malformed in ["", "5", "d5", "D-1", "L4294967296"] {
         assert!(DemTarget::from_str(malformed).is_err(), "{malformed:?}");
     }
