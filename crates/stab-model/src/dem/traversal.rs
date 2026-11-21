@@ -16,7 +16,7 @@ use super::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DemTarget,
     DetectorErrorModel, MAX_DEM_REPEAT_NESTING,
 };
-use crate::{ModelError, ModelResult};
+use crate::{ModelError, ModelResult, ResourceLimitError};
 
 mod visit;
 
@@ -143,9 +143,12 @@ impl<'a> FoldedDemTraversal<'a> {
     pub fn validate_repeat_depth(&self, context: &'static str) -> ModelResult<()> {
         let depth = self.root.summary().max_repeat_depth();
         if depth > MAX_DEM_REPEAT_NESTING {
-            return Err(ModelError::invalid_detector_error_model(format!(
-                "DEM {context} repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}, got {depth}"
-            )));
+            return Err(ResourceLimitError::dem_traversal_repeat_nesting(
+                context,
+                depth as u64,
+                MAX_DEM_REPEAT_NESTING as u64,
+            )
+            .into());
         }
         Ok(())
     }
@@ -550,8 +553,8 @@ pub trait FoldedDemVisitor {
         actual: u64,
         limit: u64,
     ) -> Self::Error {
-        ModelError::invalid_detector_error_model(format!(
-            "DEM {context} traversal currently supports at most {limit} expanded repeat iterations, got at least {actual}"
+        ModelError::from(ResourceLimitError::dem_traversal_repeat_expansion(
+            context, actual, limit,
         ))
         .into()
     }
@@ -849,7 +852,7 @@ pub(super) fn add_coordinate_shift_mul(
     if shift.len() < delta.len() {
         shift
             .try_reserve(delta.len() - shift.len())
-            .map_err(|_| detector_summary_error("coordinate shift allocation failed"))?;
+            .map_err(|_| ModelError::dem_allocation_failed("coordinate shift allocation failed"))?;
         shift.resize(delta.len(), 0.0);
     }
     for (index, value) in delta.iter().enumerate() {

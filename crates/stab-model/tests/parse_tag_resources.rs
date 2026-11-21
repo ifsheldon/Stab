@@ -82,8 +82,16 @@ fn opaque_tags_restored_from_bytes_are_charged_before_they_are_built() {
     assert_eq!(resource.resource(), ResourceKind::RetainedBytes);
     assert_eq!(resource.source_line(), Some(2), "{resource}");
     let second_tag = 2 + 4_096 + 4 + 2;
-    assert_eq!(resource.span().byte_start(), second_tag, "{resource}");
-    assert_eq!(resource.span().byte_length(), 4_096, "{resource}");
+    assert_eq!(
+        resource.span().map(stab_model::ByteSpan::byte_start),
+        Some(second_tag),
+        "{resource}"
+    );
+    assert_eq!(
+        resource.span().map(stab_model::ByteSpan::byte_length),
+        Some(4_096),
+        "{resource}"
+    );
 }
 
 #[test]
@@ -141,8 +149,16 @@ fn opaque_dem_tags_restored_from_bytes_are_charged_before_they_are_built() {
     assert_eq!(resource.resource(), ResourceKind::RetainedBytes);
     assert_eq!(resource.source_line(), Some(2), "{resource}");
     let second_tag = "error[".len() + 4_096 + "](0.125) D0\n".len() + "error[".len();
-    assert_eq!(resource.span().byte_start(), second_tag, "{resource}");
-    assert_eq!(resource.span().byte_length(), 4_096, "{resource}");
+    assert_eq!(
+        resource.span().map(stab_model::ByteSpan::byte_start),
+        Some(second_tag),
+        "{resource}"
+    );
+    assert_eq!(
+        resource.span().map(stab_model::ByteSpan::byte_length),
+        Some(4_096),
+        "{resource}"
+    );
 }
 
 /// Restores the tags of `outer_tag { inner_tag }` and returns the model's admitted bytes with the

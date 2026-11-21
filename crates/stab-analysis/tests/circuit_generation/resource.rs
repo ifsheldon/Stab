@@ -138,7 +138,14 @@ fn assert_generation_boundary(task: CodeTask, accepted_distance: u32, rejected_d
         FIXED_BYTES + rejected_qubits * BYTES_PER_QUBIT
     );
     assert_eq!(resource.limit(), BUDGET.bytes());
-    assert!(resource.is_memory_budget());
+    let exceeded = error
+        .memory_budget_exceeded()
+        .expect("the generation refusal is a memory-budget refusal");
+    assert_eq!(exceeded.budget(), BUDGET);
+    assert_eq!(
+        exceeded.required().value(),
+        FIXED_BYTES + rejected_qubits * BYTES_PER_QUBIT
+    );
     assert_eq!(
         error.to_string(),
         format!(

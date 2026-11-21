@@ -3,7 +3,6 @@
 mod batches;
 mod diagnostics;
 mod encoder;
-mod estimate;
 mod index;
 mod record_stream;
 mod result_formats;
@@ -17,11 +16,8 @@ pub use batches::{
     ObservablePredictionBatch, ObservablePredictionBatchViewMut, PackedShotBatch,
     PackedShotBatchView, RecordBatchView, RecordLayout,
 };
-pub use diagnostics::{
-    ByteSpan, DiagnosticSeverity, FormatError, FormatErrorCode, FormatErrorContext,
-};
+pub use diagnostics::{FormatError, FormatErrorCode, FormatErrorContext};
 pub use encoder::{RecordBatchPart, RecordEncoder, RecordPart, RecordWriteError};
-pub use estimate::EncodedSizeEstimate;
 pub use index::{BitIndex, ShotIndex};
 pub use record_stream::{
     HitsDuplicates, RecordFraming, RecordStreamReadError, RecordStreamReader, RecordStreamStorage,
@@ -36,6 +32,7 @@ pub use sinks::{
     DemSampleCodecSink, DemSampleEncodedRecords, DemSampleSink, DetectionCodecSink, DetectionSink,
     MeasurementCodecSink, MeasurementSink,
 };
+pub use stab_foundation::{ByteSpan, DiagnosticSeverity, Estimate};
 pub use widths::{
     CorrectionWidth, DetectorWidth, MeasurementWidth, ObservableWidth, SampledErrorWidth,
 };

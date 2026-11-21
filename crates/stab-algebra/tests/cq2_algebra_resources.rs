@@ -9,8 +9,8 @@ use std::str::FromStr as _;
 use rand::rngs::StdRng;
 use rand::{Rng as _, SeedableRng as _};
 use stab_algebra::{
-    AlgebraMemoryBudget, CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow,
-    PauliBasis, PauliIterationBases, PauliPhase, PauliSign, PauliString, PauliStringIterator,
+    CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow, MemoryBudget, PauliBasis,
+    PauliIterationBases, PauliPhase, PauliSign, PauliString, PauliStringIterator, ResourceAmount,
     SignIteration, SingleQubitClifford, StabilizerError, StabilizerResource, StabilizerResult,
     StabilizerTableauOptions, Tableau, TableauIterator,
 };
@@ -30,18 +30,18 @@ fn algebra_byte_admission_refuses_before_allocation_or_rng_use() {
 fn refused_bytes<T: std::fmt::Debug>(
     result: StabilizerResult<T>,
     resource: StabilizerResource,
-    budget: AlgebraMemoryBudget,
-) -> u128 {
+    budget: MemoryBudget,
+) -> ResourceAmount {
     match result {
         Err(StabilizerError::MemoryBudgetExceeded {
             resource: actual,
-            requested_bytes,
-            budget_bytes,
+            exceeded,
         }) => {
             assert_eq!(actual, resource);
-            assert_eq!(budget_bytes, budget.bytes());
-            assert!(requested_bytes > u128::from(budget_bytes));
-            requested_bytes
+            assert_eq!(exceeded.budget(), budget);
+            let requested = exceeded.required();
+            assert!(requested.is_lower_bound() || requested.value() > budget.bytes());
+            requested
         }
         other => panic!("expected a {resource} budget refusal, got {other:?}"),
     }
@@ -51,28 +51,29 @@ fn refused_bytes<T: std::fmt::Debug>(
 /// admitted at exactly its requirement, returning that requirement.
 fn assert_exact_boundary<T: std::fmt::Debug>(
     resource: StabilizerResource,
-    mut request: impl FnMut(AlgebraMemoryBudget) -> StabilizerResult<T>,
+    mut request: impl FnMut(MemoryBudget) -> StabilizerResult<T>,
 ) -> u64 {
     let required = refused_bytes(
-        request(AlgebraMemoryBudget::from_bytes(0)),
+        request(MemoryBudget::from_bytes(0)),
         resource,
-        AlgebraMemoryBudget::from_bytes(0),
+        MemoryBudget::from_bytes(0),
     );
-    let required = u64::try_from(required).expect("test requirement fits u64");
-    let short = AlgebraMemoryBudget::from_bytes(required - 1);
+    assert!(!required.is_lower_bound(), "test requirement fits u64");
+    let required = required.value();
+    let short = MemoryBudget::from_bytes(required - 1);
     let mut refusal = None;
     let allocations = allocation_counter::measure(|| refusal = Some(request(short)));
     assert_eq!(
         refused_bytes(refusal.expect("refusal ran"), resource, short),
-        u128::from(required)
+        ResourceAmount::exact(required)
     );
     assert_eq!(allocations.count_total, 0, "{allocations:?}");
-    request(AlgebraMemoryBudget::from_bytes(required)).expect("the exact budget is admitted");
+    request(MemoryBudget::from_bytes(required)).expect("the exact budget is admitted");
     required
 }
 
 fn pauli_widths_are_admitted_in_bytes() {
-    let default = AlgebraMemoryBudget::DEFAULT;
+    let default = MemoryBudget::DEFAULT;
     // The 65,536-qubit regressions and one past the former 1,048,576-qubit count cap.
     assert_eq!(
         PauliString::identity(65_536).map(|pauli| pauli.len()),
@@ -133,7 +134,7 @@ fn tableau_admission_is_exact_and_precedes_allocation() {
     // 2n packed rows of two 16-word planes plus a 32-word sign plane.
     assert_eq!(required, 2_000 * 2 * 16 * 8 + 32 * 8);
 
-    let default = AlgebraMemoryBudget::DEFAULT;
+    let default = MemoryBudget::DEFAULT;
     refused_bytes(
         Tableau::identity(usize::MAX / 4),
         StabilizerResource::Tableau,
@@ -158,12 +159,13 @@ fn random_tableau_admission_is_exact_and_precedes_rng_use() {
     let mut rng = StdRng::seed_from_u64(0x5eed);
     let mut expected_rng = StdRng::seed_from_u64(0x5eed);
     let required = refused_bytes(
-        Tableau::random_with_budget(width, AlgebraMemoryBudget::from_bytes(0), &mut rng),
+        Tableau::random_with_budget(width, MemoryBudget::from_bytes(0), &mut rng),
         StabilizerResource::RandomTableau,
-        AlgebraMemoryBudget::from_bytes(0),
+        MemoryBudget::from_bytes(0),
     );
-    let required = u64::try_from(required).expect("random requirement fits u64");
-    let short = AlgebraMemoryBudget::from_bytes(required - 1);
+    assert!(!required.is_lower_bound(), "random requirement fits u64");
+    let required = required.value();
+    let short = MemoryBudget::from_bytes(required - 1);
     let mut refusal = None;
     let allocations = allocation_counter::measure(|| {
         refusal = Some(Tableau::random_with_budget(width, short, &mut rng))
@@ -175,9 +177,8 @@ fn random_tableau_admission_is_exact_and_precedes_rng_use() {
     );
     assert_eq!(allocations.count_total, 0, "{allocations:?}");
     assert_eq!(rng.next_u64(), expected_rng.next_u64());
-    let tableau =
-        Tableau::random_with_budget(width, AlgebraMemoryBudget::from_bytes(required), &mut rng)
-            .expect("the exact budget is admitted");
+    let tableau = Tableau::random_with_budget(width, MemoryBudget::from_bytes(required), &mut rng)
+        .expect("the exact budget is admitted");
     assert_eq!(tableau.len(), width);
     // The sampling matrices stay within a small multiple of the output's packed rows.
     let output = 2_000 * 2 * 16 * 8 + 32 * 8;
@@ -219,10 +220,10 @@ fn stabilizer_solver_admission_is_exact_and_precedes_allocation() {
                 allow_underconstrained: true,
                 ..StabilizerTableauOptions::default()
             },
-            AlgebraMemoryBudget::DEFAULT,
+            MemoryBudget::DEFAULT,
         ),
         StabilizerResource::StabilizerSolve,
-        AlgebraMemoryBudget::DEFAULT,
+        MemoryBudget::DEFAULT,
     );
 }
 
@@ -251,14 +252,14 @@ fn packed_plane_bytes(planes: u64, bits: u64) -> u64 {
 fn assert_collected_boundary<T: std::fmt::Debug>(
     resource: StabilizerResource,
     required: u64,
-    mut request: impl FnMut(AlgebraMemoryBudget) -> StabilizerResult<T>,
+    mut request: impl FnMut(MemoryBudget) -> StabilizerResult<T>,
 ) {
-    let short = AlgebraMemoryBudget::from_bytes(required - 1);
+    let short = MemoryBudget::from_bytes(required - 1);
     assert_eq!(
         refused_bytes(request(short), resource, short),
-        u128::from(required)
+        ResourceAmount::exact(required)
     );
-    request(AlgebraMemoryBudget::from_bytes(required)).expect("the exact budget is admitted");
+    request(MemoryBudget::from_bytes(required)).expect("the exact budget is admitted");
 }
 
 fn caller_budgets_govern_requested_string_widths() {

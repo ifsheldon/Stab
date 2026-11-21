@@ -1,12 +1,14 @@
 use stab_bits::BitMatrix;
 
 use super::budget::{
-    AlgebraMemoryBudget, StabilizerResource, pauli_bytes, pauli_rows_bytes, plane_bytes,
-    tableau_bytes, try_zeroed_words, words_for_bits,
+    StabilizerResource, pauli_bytes, pauli_rows_bytes, plane_bytes, tableau_bytes,
+    try_zeroed_words, words_for_bits,
 };
 use super::tableau::PauliRows;
 use super::tableau::rows::multiply_row_into;
 use super::{PauliPhase, PauliString, StabilizerError, StabilizerResult, Tableau};
+use crate::MemoryBudget;
+use crate::budget::admit;
 
 const WORD_BITS: usize = u64::BITS as usize;
 
@@ -76,14 +78,14 @@ pub struct StabilizerTableauOptions {
 
 impl Tableau {
     /// Synthesizes a tableau whose Z outputs are the independent `stabilizers`, admitted against
-    /// [`AlgebraMemoryBudget::DEFAULT`].
+    /// [`MemoryBudget::DEFAULT`].
     ///
     /// See [`Self::from_stabilizers_with_budget`].
     pub fn from_stabilizers(
         stabilizers: &[PauliString],
         options: StabilizerTableauOptions,
     ) -> StabilizerResult<Self> {
-        Self::from_stabilizers_with_budget(stabilizers, options, AlgebraMemoryBudget::DEFAULT)
+        Self::from_stabilizers_with_budget(stabilizers, options, MemoryBudget::DEFAULT)
     }
 
     /// Synthesizes a tableau from commuting stabilizer generators, as Stim's
@@ -105,7 +107,7 @@ impl Tableau {
     pub fn from_stabilizers_with_budget(
         stabilizers: &[PauliString],
         options: StabilizerTableauOptions,
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
     ) -> StabilizerResult<Self> {
         stabilizers_to_tableau(stabilizers, options, budget)
     }
@@ -114,7 +116,7 @@ impl Tableau {
 fn stabilizers_to_tableau(
     stabilizers: &[PauliString],
     options: StabilizerTableauOptions,
-    budget: AlgebraMemoryBudget,
+    budget: MemoryBudget,
 ) -> StabilizerResult<Tableau> {
     let StabilizerTableauOptions {
         allow_redundant,
@@ -122,7 +124,8 @@ fn stabilizers_to_tableau(
         inverse,
     } = options;
     let num_qubits = stabilizers.iter().map(PauliString::len).max().unwrap_or(0);
-    budget.admit(
+    admit(
+        budget,
         StabilizerResource::StabilizerSolve,
         solver_bytes(num_qubits, stabilizers.len()),
     )?;

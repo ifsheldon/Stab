@@ -11,8 +11,7 @@ use rand::Rng as _;
 use rand::SeedableRng as _;
 use rand::rngs::{SmallRng, StdRng};
 use stab_algebra::{
-    AlgebraMemoryBudget, CliffordString, SingleQubitClifford, StabilizerError, StabilizerResource,
-    Tableau,
+    CliffordString, MemoryBudget, SingleQubitClifford, StabilizerError, StabilizerResource, Tableau,
 };
 
 const CLIFFORD_CONTRACT: [(SingleQubitClifford, &str, &str, &str, &str); 24] = [
@@ -203,15 +202,14 @@ fn cq2_algebra_clifford_growth_admits_bytes_and_rejects_overflow() {
     assert_eq!(wide_left.gate_at(width - 1), Some(SingleQubitClifford::X));
     assert_eq!(wide_right, wide_right_before);
 
-    let budget = AlgebraMemoryBudget::DEFAULT.bytes();
+    let budget = MemoryBudget::DEFAULT.bytes();
     let refused = |result: Result<CliffordString, StabilizerError>| {
         assert_matches!(
             result,
             Err(StabilizerError::MemoryBudgetExceeded {
                 resource: StabilizerResource::CliffordString,
-                budget_bytes,
-                ..
-            }) if budget_bytes == budget
+                exceeded,
+            }) if exceeded.budget().bytes() == budget
         );
     };
     refused(CliffordString::identity(usize::MAX / 2));

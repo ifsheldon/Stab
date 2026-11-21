@@ -41,7 +41,7 @@ pub(super) fn validate_general_reversal(
             AnalysisOperation::TimeReversal,
             ResourceKind::MaterializedBytes,
             projected,
-            budget.bytes(),
+            budget,
         )
         .into());
     }

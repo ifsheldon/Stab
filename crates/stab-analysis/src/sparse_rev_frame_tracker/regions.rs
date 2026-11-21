@@ -1,6 +1,6 @@
-use stab_algebra::{AlgebraMemoryBudget, FlexPauliString, PauliBasis, PauliPhase, StabilizerError};
+use stab_algebra::{FlexPauliString, PauliBasis, PauliPhase, StabilizerError};
 use stab_model::advanced::CancellationCountdown;
-use stab_model::{DemTarget, QubitId};
+use stab_model::{DemTarget, MemoryBudget, QubitId};
 
 use super::{SparseReverseFrameTracker, qubit_index};
 use crate::{AnalysisError, AnalysisOperation, AnalysisResult, ResourceKind, ResourceLimitError};
@@ -12,7 +12,7 @@ impl SparseReverseFrameTracker {
     pub(crate) fn region_for_target(
         &self,
         target: DemTarget,
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
     ) -> AnalysisResult<FlexPauliString> {
         self.region_for_target_with_len(
             target,
@@ -27,7 +27,7 @@ impl SparseReverseFrameTracker {
     pub(crate) fn compact_region_for_target(
         &self,
         target: DemTarget,
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
     ) -> AnalysisResult<FlexPauliString> {
         let signal = self.cancellation_signal();
         let mut countdown = CancellationCountdown::new();
@@ -50,7 +50,7 @@ impl SparseReverseFrameTracker {
         &self,
         target: DemTarget,
         len: usize,
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
         operation: AnalysisOperation,
     ) -> AnalysisResult<FlexPauliString> {
         let signal = self.cancellation_signal();
@@ -61,12 +61,12 @@ impl SparseReverseFrameTracker {
         while remaining > 0 {
             signal.check()?;
             let step = remaining.min(REGION_CHUNK_QUBITS);
+            // The allocator, not the budget, refused these bases: the region itself is admitted
+            // against the budget when the Pauli string is built below.
             bases.try_reserve(step).map_err(|_| {
-                ResourceLimitError::memory_budget(
+                AnalysisError::allocation_failed(
                     operation,
-                    ResourceKind::MaterializedBytes,
-                    u64::try_from(len).unwrap_or(u64::MAX),
-                    budget.bytes(),
+                    format!("could not reserve {len} Pauli bases for a detecting region"),
                 )
             })?;
             bases.resize(bases.len() + step, PauliBasis::I);
@@ -119,17 +119,14 @@ impl SparseReverseFrameTracker {
         signal.check()?;
         FlexPauliString::from_phase_and_bases_with_budget(PauliPhase::Plus, bases, budget).map_err(
             |error| match error {
-                StabilizerError::MemoryBudgetExceeded {
-                    requested_bytes,
-                    budget_bytes,
-                    ..
-                } => ResourceLimitError::memory_budget(
-                    operation,
-                    ResourceKind::MaterializedBytes,
-                    u64::try_from(requested_bytes).unwrap_or(u64::MAX),
-                    budget_bytes,
-                )
-                .into(),
+                StabilizerError::MemoryBudgetExceeded { exceeded, .. } => {
+                    ResourceLimitError::budget_refusal(
+                        operation,
+                        ResourceKind::MaterializedBytes,
+                        exceeded,
+                    )
+                    .into()
+                }
                 error => AnalysisError::internal(
                     AnalysisOperation::ReverseFrameTracking,
                     format!("failed to build detecting region for {target}: {error}"),

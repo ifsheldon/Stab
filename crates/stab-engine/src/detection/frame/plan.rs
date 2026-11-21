@@ -541,7 +541,11 @@ pub(in crate::detection) fn admit_combined_compiled_storage(
         .checked_add(execution_bytes)
         .ok_or_else(storage_overflow)?;
     if combined > limit_bytes {
-        return Err(ResourceLimitError::detection_compiled_bytes(combined, limit_bytes).into());
+        return Err(ResourceLimitError::detection_compiled_bytes(
+            combined,
+            stab_model::MemoryBudget::from_bytes(limit_bytes),
+        )
+        .into());
     }
     Ok(combined)
 }

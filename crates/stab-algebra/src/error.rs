@@ -4,6 +4,7 @@ use thiserror::Error;
 
 use super::{PauliBasis, PauliPhase, StabilizerResource};
 use stab_bits::BitError;
+use stab_foundation::MemoryBudgetExceeded;
 
 /// The leading characters of rejected input text, kept so an error can show where the text
 /// started without copying all of it.
@@ -72,13 +73,15 @@ pub enum StabilizerError {
         actual_words: usize,
     },
 
+    /// The memory budget refused the storage `resource` needed, before any of it was allocated.
     #[error(
-        "{resource} needs {requested_bytes} bytes, exceeding the {budget_bytes}-byte memory budget"
+        "{resource} needs {} bytes, exceeding the {}-byte memory budget",
+        exceeded.required(),
+        exceeded.budget().bytes()
     )]
     MemoryBudgetExceeded {
         resource: StabilizerResource,
-        requested_bytes: u128,
-        budget_bytes: u64,
+        exceeded: MemoryBudgetExceeded,
     },
 
     #[error("allocating {bytes} bytes for {resource} failed")]
@@ -225,4 +228,14 @@ pub enum StabilizerError {
 
     #[error("unitary matrix is not a Clifford operation")]
     UnitaryMatrixNotClifford,
+}
+
+impl StabilizerError {
+    /// The memory-budget refusal this error reports, if it is one.
+    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match self {
+            Self::MemoryBudgetExceeded { exceeded, .. } => Some(exceeded),
+            _ => None,
+        }
+    }
 }

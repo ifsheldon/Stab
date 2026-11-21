@@ -2508,6 +2508,7 @@ dependencies = [
  "proptest",
  "rand 0.10.1",
  "stab-bits",
+ "stab-foundation",
  "stab-kernels-simd",
  "thiserror",
 ]
@@ -2647,6 +2648,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "stab-foundation"
+version = "0.2.0"
+
+[[package]]
 name = "stab-kernels-simd"
 version = "0.2.0"
 dependencies = [
@@ -2664,6 +2669,7 @@ dependencies = [
  "proptest",
  "sha2",
  "smallvec",
+ "stab-foundation",
  "thiserror",
 ]
 
@@ -2722,6 +2728,7 @@ dependencies = [
  "proptest",
  "stab-bits",
  "stab-compat-corpus",
+ "stab-foundation",
  "thiserror",
 ]
 

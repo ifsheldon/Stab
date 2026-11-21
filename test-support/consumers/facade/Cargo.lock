@@ -214,6 +214,7 @@ dependencies = [
  "num-complex",
  "rand",
  "stab-bits",
+ "stab-foundation",
  "stab-kernels-simd",
  "thiserror",
 ]
@@ -283,6 +284,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "stab-foundation"
+version = "0.2.0"
+
+[[package]]
 name = "stab-kernels-simd"
 version = "0.2.0"
 dependencies = [
@@ -298,6 +303,7 @@ dependencies = [
  "hex",
  "sha2",
  "smallvec",
+ "stab-foundation",
  "thiserror",
 ]
 
@@ -306,6 +312,7 @@ name = "stab-records"
 version = "0.2.0"
 dependencies = [
  "stab-bits",
+ "stab-foundation",
  "thiserror",
 ]
 

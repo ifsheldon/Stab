@@ -151,7 +151,7 @@ pub(super) fn parse_line_error(line_number: usize, message: impl Into<String>) -
         ParseErrorCode::InvalidSyntax,
         message.clone(),
         message,
-        ByteSpan::from_valid_range(0, 0),
+        ByteSpan::empty_at(0),
         ParseErrorContext::Model {
             dialect: ModelDialect::DetectorErrorModel,
         },

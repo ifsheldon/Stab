@@ -1,6 +1,6 @@
 use crate::{
     ByteSpan, ModelDialect, ModelError, ParseErrorCode, ParseErrorContext, ValidationError,
-    advanced::{byte_span_from_valid_range, parse_error_with_human_message},
+    advanced::parse_error_with_human_message,
 };
 
 pub(crate) fn line_error(
@@ -131,7 +131,7 @@ pub(crate) fn unterminated_repeat_block(dialect: ModelDialect, input_len: usize)
         ParseErrorCode::UnterminatedRepeatBlock,
         "unterminated repeat block",
         "unterminated repeat block",
-        byte_span_from_valid_range(input_len, 0),
+        ByteSpan::empty_at(input_len),
         ParseErrorContext::Model { dialect },
     )
 }

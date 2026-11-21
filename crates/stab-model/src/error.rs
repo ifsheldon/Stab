@@ -2,7 +2,9 @@ use std::borrow::Cow;
 
 use thiserror::Error;
 
-use crate::{Cancelled, ModelDialect, ParseError, ResourceLimitError, ValidationError};
+use crate::{
+    Cancelled, MemoryBudgetExceeded, ModelDialect, ParseError, ResourceLimitError, ValidationError,
+};
 
 /// Result type for stable model construction and validation.
 pub type ModelResult<T> = Result<T, ModelError>;
@@ -71,6 +73,13 @@ impl ModelError {
             Self::ResourceLimit(error) => Some(error),
             _ => None,
         }
+    }
+
+    /// The memory-budget refusal this error reports; `None` for fixed limits, allocator
+    /// refusals, and every other failure.
+    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        self.resource_limit_error()
+            .and_then(ResourceLimitError::memory_budget_exceeded)
     }
 
     pub fn validation_error(&self) -> Option<&ValidationError> {

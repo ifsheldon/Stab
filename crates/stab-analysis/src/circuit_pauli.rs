@@ -1,4 +1,4 @@
-use stab_algebra::{AlgebraMemoryBudget, PauliBasis, PauliString, StabilizerError, Tableau};
+use stab_algebra::{PauliBasis, PauliString, StabilizerError, Tableau};
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, GateCategory, GateKind, MemoryBudget,
     Pauli, QubitId, Target, TargetKind,
@@ -575,7 +575,7 @@ fn apply_tableau_at_width(
     inverse: bool,
     options: &PauliConjugationOptions,
 ) -> AnalysisResult<PauliString> {
-    let budget = AlgebraMemoryBudget::from_bytes(options.memory_budget.bytes());
+    let budget = options.memory_budget;
     let tableau = if inverse {
         tableau.inverse().map_err(map_tableau_error)?
     } else {
@@ -767,17 +767,14 @@ fn unsupported_instruction(instruction: &CircuitInstruction, direction: &str) ->
 /// Maps algebra failures, reporting a conjugated string the budget refuses as a resource error.
 fn map_tableau_error(error: StabilizerError) -> AnalysisError {
     match error {
-        StabilizerError::MemoryBudgetExceeded {
-            requested_bytes,
-            budget_bytes,
-            ..
-        } => ResourceLimitError::memory_budget(
-            AnalysisOperation::PauliConjugation,
-            ResourceKind::MaterializedBytes,
-            u64::try_from(requested_bytes).unwrap_or(u64::MAX),
-            budget_bytes,
-        )
-        .into(),
+        StabilizerError::MemoryBudgetExceeded { exceeded, .. } => {
+            ResourceLimitError::budget_refusal(
+                AnalysisOperation::PauliConjugation,
+                ResourceKind::MaterializedBytes,
+                exceeded,
+            )
+            .into()
+        }
         other => AnalysisError::internal(AnalysisOperation::PauliConjugation, other.to_string()),
     }
 }

@@ -261,7 +261,7 @@ impl CodeCircuitParams {
             self.task,
             self.physical_qubit_count(),
             required,
-            self.memory_budget.bytes(),
+            self.memory_budget,
         )
         .into())
     }

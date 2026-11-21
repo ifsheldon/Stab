@@ -414,7 +414,7 @@ impl Admitter {
 fn compiled_bytes_limit(combined: u64, max_combined_bytes: u64) -> DetectionError {
     DetectionError::from(ResourceLimitError::detection_compiled_bytes(
         combined,
-        max_combined_bytes,
+        stab_model::MemoryBudget::from_bytes(max_combined_bytes),
     ))
 }
 

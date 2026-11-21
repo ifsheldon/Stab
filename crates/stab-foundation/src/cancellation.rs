@@ -2,8 +2,6 @@ use std::fmt;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use thiserror::Error;
-
 /// Cloneable cooperative cancellation signal polled by long-running operations.
 ///
 /// Operations that interpret repeat blocks, stream batches, or traverse expanded work poll the
@@ -100,9 +98,16 @@ impl Eq for Cancellation {}
 ///
 /// A cancelled operation returns no partial result; work it already delivered to a sink stays
 /// delivered, and the owning operation documents whether it can be resumed.
-#[derive(Clone, Copy, Debug, Eq, Error, Hash, PartialEq)]
-#[error("operation was cancelled")]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Cancelled;
+
+impl fmt::Display for Cancelled {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("operation was cancelled")
+    }
+}
+
+impl std::error::Error for Cancelled {}
 
 /// Countdown that polls a [`Cancellation`] once every [`CancellationCountdown::INTERVAL`] ticks.
 ///

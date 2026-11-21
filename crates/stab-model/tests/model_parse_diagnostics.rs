@@ -382,7 +382,7 @@ fn byte_parsers_report_earlier_repeat_limits_before_later_invalid_utf8() {
         assert_eq!(resource.resource(), stab_model::ResourceKind::RepeatNesting);
         assert_eq!(resource.actual(), 2);
         assert_eq!(resource.limit(), 1);
-        assert_eq!(resource.span(), span(11, 10));
+        assert_eq!(resource.span(), Some(span(11, 10)));
     }
 }
 
@@ -396,7 +396,7 @@ fn parse_resource_failures_carry_the_rejected_source_span() {
     let circuit_resource = circuit_error
         .resource_limit_error()
         .expect("typed circuit resource failure");
-    assert_eq!(circuit_resource.span(), span(11, 10));
+    assert_eq!(circuit_resource.span(), Some(span(11, 10)));
     assert_eq!(
         circuit_error.to_string(),
         "failed to parse line 2: repeat nesting exceeds current limit 1"
@@ -408,7 +408,7 @@ fn parse_resource_failures_carry_the_rejected_source_span() {
     let dem_resource = dem_error
         .resource_limit_error()
         .expect("typed DEM resource failure");
-    assert_eq!(dem_resource.span(), span(11, 10));
+    assert_eq!(dem_resource.span(), Some(span(11, 10)));
     assert_eq!(
         dem_error.to_string(),
         "invalid detector error model: DEM repeat nesting exceeds current limit 1"
@@ -913,10 +913,10 @@ fn default_repeat_depth_rejects_the_first_unsafe_header_without_stack_overflow()
     );
     assert_eq!(
         circuit_resource.span(),
-        span(
+        Some(span(
             RepeatNestingLimit::HARD_MAX * "REPEAT 1 {\n".len(),
             "REPEAT 1 {".len(),
-        )
+        ))
     );
 
     let dem = nested_model(
@@ -935,10 +935,10 @@ fn default_repeat_depth_rejects_the_first_unsafe_header_without_stack_overflow()
     assert_eq!(dem_resource.limit(), RepeatNestingLimit::HARD_MAX as u64);
     assert_eq!(
         dem_resource.span(),
-        span(
+        Some(span(
             RepeatNestingLimit::HARD_MAX * "repeat 1 {\n".len(),
             "repeat 1 {".len(),
-        )
+        ))
     );
 }
 

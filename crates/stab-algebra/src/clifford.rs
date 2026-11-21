@@ -5,10 +5,10 @@ use rand::{Rng, RngExt as _};
 use super::{
     PauliBasis, PauliSign, StabilizerError, StabilizerResource, StabilizerResult, Tableau,
 };
+use crate::MemoryBudget;
 use crate::bit_runs::{extend_periodic, or_bits_at};
-use crate::budget::{
-    AlgebraMemoryBudget, clifford_bytes, try_reserve_one, try_resize_zeroed_bits, try_zeroed_bits,
-};
+use crate::budget::admit;
+use crate::budget::{clifford_bytes, try_reserve_one, try_resize_zeroed_bits, try_zeroed_bits};
 use crate::kernels::{
     CliffordNonIdentityCounts, CliffordPlanes, CliffordPlanesMut, clifford_right_multiply_words,
 };
@@ -456,18 +456,15 @@ pub struct CliffordString {
 }
 
 impl CliffordString {
-    /// Creates an identity string admitted against [`AlgebraMemoryBudget::DEFAULT`].
+    /// Creates an identity string admitted against [`MemoryBudget::DEFAULT`].
     ///
     /// See [`Self::identity_with_budget`].
     pub fn identity(num_qubits: usize) -> StabilizerResult<Self> {
-        Self::identity_with_budget(num_qubits, AlgebraMemoryBudget::DEFAULT)
+        Self::identity_with_budget(num_qubits, MemoryBudget::DEFAULT)
     }
 
     /// Creates an identity string after admitting its six packed planes against `budget`.
-    pub fn identity_with_budget(
-        num_qubits: usize,
-        budget: AlgebraMemoryBudget,
-    ) -> StabilizerResult<Self> {
+    pub fn identity_with_budget(num_qubits: usize, budget: MemoryBudget) -> StabilizerResult<Self> {
         admit_clifford_planes(budget, num_qubits, 0)?;
         Ok(Self::from_planes(zeroed_planes(num_qubits)?, 0))
     }
@@ -511,20 +508,20 @@ impl CliffordString {
         }
     }
 
-    /// Collects Clifford gates admitted against [`AlgebraMemoryBudget::DEFAULT`].
+    /// Collects Clifford gates admitted against [`MemoryBudget::DEFAULT`].
     ///
     /// See [`Self::from_gates_with_budget`].
     pub fn from_gates(
         gates: impl IntoIterator<Item = SingleQubitClifford>,
     ) -> StabilizerResult<Self> {
-        Self::from_gates_with_budget(gates, AlgebraMemoryBudget::DEFAULT)
+        Self::from_gates_with_budget(gates, MemoryBudget::DEFAULT)
     }
 
     /// Collects Clifford gates, refusing the first item whose collected gates and packed planes
     /// would exceed `budget`.
     pub fn from_gates_with_budget(
         gates: impl IntoIterator<Item = SingleQubitClifford>,
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
     ) -> StabilizerResult<Self> {
         let mut collected = Vec::new();
         for gate in gates {
@@ -571,19 +568,19 @@ impl CliffordString {
     ///
     /// Passing a seeded `rand` RNG gives deterministic Stab output. The generated stream is not
     /// intended to match Stim's C++ RNG stream. The string is admitted against
-    /// [`AlgebraMemoryBudget::DEFAULT`]; see [`Self::random_with_budget`].
+    /// [`MemoryBudget::DEFAULT`]; see [`Self::random_with_budget`].
     pub fn random<R>(num_qubits: usize, rng: &mut R) -> StabilizerResult<Self>
     where
         R: Rng + ?Sized,
     {
-        Self::random_with_budget(num_qubits, AlgebraMemoryBudget::DEFAULT, rng)
+        Self::random_with_budget(num_qubits, MemoryBudget::DEFAULT, rng)
     }
 
     /// Creates a random string after admitting its six packed planes against `budget`, before
     /// consuming randomness.
     pub fn random_with_budget<R>(
         num_qubits: usize,
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
         rng: &mut R,
     ) -> StabilizerResult<Self>
     where
@@ -677,18 +674,14 @@ impl CliffordString {
         self.non_identity_count = non_identity_count;
     }
 
-    /// Concatenates two strings, admitting the result against [`AlgebraMemoryBudget::DEFAULT`].
+    /// Concatenates two strings, admitting the result against [`MemoryBudget::DEFAULT`].
     pub fn concat(&self, rhs: &Self) -> StabilizerResult<Self> {
-        self.concat_with_budget(rhs, AlgebraMemoryBudget::DEFAULT)
+        self.concat_with_budget(rhs, MemoryBudget::DEFAULT)
     }
 
     /// Concatenates two strings after admitting the result's planes and table indices against
     /// `budget`.
-    pub fn concat_with_budget(
-        &self,
-        rhs: &Self,
-        budget: AlgebraMemoryBudget,
-    ) -> StabilizerResult<Self> {
+    pub fn concat_with_budget(&self, rhs: &Self, budget: MemoryBudget) -> StabilizerResult<Self> {
         let new_len = self
             .len()
             .checked_add(rhs.len())
@@ -713,11 +706,11 @@ impl CliffordString {
         Ok(Self::from_planes(planes, non_identity_count))
     }
 
-    /// Repeats this string, admitting the result against [`AlgebraMemoryBudget::DEFAULT`].
+    /// Repeats this string, admitting the result against [`MemoryBudget::DEFAULT`].
     ///
     /// See [`Self::repeat_with_budget`].
     pub fn repeat(&self, repetitions: usize) -> StabilizerResult<Self> {
-        self.repeat_with_budget(repetitions, AlgebraMemoryBudget::DEFAULT)
+        self.repeat_with_budget(repetitions, MemoryBudget::DEFAULT)
     }
 
     /// Repeats this string after checking multiplication overflow and admitting the resulting
@@ -725,7 +718,7 @@ impl CliffordString {
     pub fn repeat_with_budget(
         &self,
         repetitions: usize,
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
     ) -> StabilizerResult<Self> {
         if repetitions == 0 || self.is_empty() {
             return Ok(Self::from_planes(zeroed_planes(0)?, 0));
@@ -842,11 +835,12 @@ impl CliffordString {
 
 /// Admits the six planes of a `num_qubits`-gate string and `extra` bytes against `budget`.
 fn admit_clifford_planes(
-    budget: AlgebraMemoryBudget,
+    budget: MemoryBudget,
     num_qubits: usize,
     extra: u128,
 ) -> StabilizerResult<()> {
-    budget.admit(
+    admit(
+        budget,
         StabilizerResource::CliffordString,
         clifford_bytes(num_qubits) + extra,
     )

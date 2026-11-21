@@ -7,7 +7,6 @@ mod detection;
 mod fingerprint;
 mod lane_width;
 mod reference_sample_tree;
-mod resource_amount;
 mod sampled_flow;
 mod sampling;
 mod sampling_estimate;
@@ -38,7 +37,6 @@ pub use detection::{
 pub use fingerprint::{CompilationOperation, CompilationRequestFingerprint};
 pub use lane_width::LaneWidth;
 pub use reference_sample_tree::{ReferenceSampleTree, ReferenceSampleTreeError};
-pub use resource_amount::ResourceAmount;
 pub use sampled_flow::{
     SampledFlowError, SampledFlowOptions, sample_if_circuit_has_stabilizer_flows,
     sample_if_circuit_has_stabilizer_flows_with_options,

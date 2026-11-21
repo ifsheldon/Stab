@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use stab_algebra::{AlgebraMemoryBudget, FlexPauliString, PauliBasis};
+use stab_algebra::{FlexPauliString, PauliBasis};
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, CircuitTick, DemDetectorId, DemTarget,
     DemTargetKind, FoldedCircuitSummary, FoldedCount, FoldedWalkError, GateKind, MemoryBudget,
@@ -480,7 +480,7 @@ fn snapshot_regions(
     for target in active_targets {
         let output_bytes =
             budget.admit_output_candidate(context.qubit_count, tracker_live_bytes)?;
-        let region = tracker.region_for_target(target, budget.algebra_budget())?;
+        let region = tracker.region_for_target(target, budget.memory)?;
         budget.commit_output_region(output_bytes, tracker_live_bytes)?;
         tracker.set_base_bytes(budget.held_bytes());
         regions.entry(target).or_default().insert(tick, region);
@@ -1066,11 +1066,6 @@ impl DetectingRegionBudget {
         )?;
         Ok(next_output_bytes)
     }
-
-    /// The caller's budget for the algebra values built from admitted output regions.
-    fn algebra_budget(&self) -> AlgebraMemoryBudget {
-        AlgebraMemoryBudget::from_bytes(self.memory.bytes())
-    }
 }
 
 fn admit_live_state_units(budget: MemoryBudget, units: u64) -> AnalysisResult<()> {
@@ -1093,7 +1088,7 @@ fn admit_region_bytes(
         AnalysisOperation::DetectingRegions,
         resource,
         required,
-        budget.bytes(),
+        budget,
     )
     .into())
 }

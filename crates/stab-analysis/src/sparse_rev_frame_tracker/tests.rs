@@ -6,7 +6,7 @@
 )]
 
 use super::*;
-use stab_algebra::{AlgebraMemoryBudget, PauliSign, SingleQubitClifford};
+use stab_algebra::{PauliSign, SingleQubitClifford};
 use stab_model::{CircuitItem, Gate, MeasureRecordOffset};
 
 use crate::{circuit_to_tableau, decomposed_circuit};
@@ -157,7 +157,7 @@ fn sparse_rev_frame_tracker_undo_single_qubit_cliffords_match_tableau() {
                 .get(0)
                 .unwrap();
             let actual = actual
-                .region_for_target(target, AlgebraMemoryBudget::DEFAULT)
+                .region_for_target(target, MemoryBudget::DEFAULT)
                 .unwrap()
                 .get(0)
                 .unwrap();
@@ -209,7 +209,7 @@ fn sparse_rev_frame_tracker_undo_fixed_two_qubit_gates_match_tableau() {
                     ))
                     .unwrap();
                 let actual = actual
-                    .region_for_target(target, AlgebraMemoryBudget::DEFAULT)
+                    .region_for_target(target, MemoryBudget::DEFAULT)
                     .unwrap();
                 assert_eq!(
                     actual.get(0).unwrap(),
@@ -248,7 +248,7 @@ fn pf6_sparse_rev_spp_matches_decomposed_tableau_unsigned() {
                         ))
                         .unwrap();
                     let actual = actual
-                        .region_for_target(target, AlgebraMemoryBudget::DEFAULT)
+                        .region_for_target(target, MemoryBudget::DEFAULT)
                         .unwrap();
                     for index in 0..3 {
                         assert_eq!(
@@ -285,7 +285,7 @@ fn pf6_sparse_rev_spp_handles_multiple_groups_and_inverted_products() {
     let actual = actual
         .region_for_target(
             DemTarget::logical_observable(0).unwrap(),
-            AlgebraMemoryBudget::DEFAULT,
+            MemoryBudget::DEFAULT,
         )
         .unwrap();
     for index in 0..3 {

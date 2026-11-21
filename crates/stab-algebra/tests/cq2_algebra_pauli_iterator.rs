@@ -6,8 +6,8 @@
 use std::assert_matches;
 
 use stab_algebra::{
-    AlgebraMemoryBudget, PauliBasis, PauliIterationBases, PauliSign, PauliStringIterator,
-    StabilizerError, StabilizerResource, StabilizerResult,
+    MemoryBudget, PauliBasis, PauliIterationBases, PauliSign, PauliStringIterator, StabilizerError,
+    StabilizerResource, StabilizerResult,
 };
 use thiserror::Error;
 
@@ -64,9 +64,8 @@ fn cq2_algebra_pauli_iterator_runtime_contract_matches_independent_reference() -
         PauliStringIterator::new(usize::MAX / 2, 1..=1, PauliIterationBases::ALL),
         Err(StabilizerError::MemoryBudgetExceeded {
             resource: StabilizerResource::PauliString,
-            budget_bytes,
-            ..
-        }) if budget_bytes == AlgebraMemoryBudget::DEFAULT.bytes()
+            exceeded,
+        }) if exceeded.budget() == MemoryBudget::DEFAULT
     );
     Ok(())
 }

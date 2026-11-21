@@ -1,59 +1,28 @@
 use std::fmt::{Display, Formatter};
 
 use stab_bits::{BitError, BitVec};
+use stab_foundation::MemoryBudget;
 
 use super::{StabilizerError, StabilizerResult};
 
-const GIB: u64 = 1 << 30;
 const WORD_BITS: usize = u64::BITS as usize;
 const WORD_BYTES: u128 = size_of::<u64>() as u128;
 
-/// A byte bound for stabilizer-algebra values materialized from a requested size.
+/// Admits `requested` bytes of `resource` storage against `budget`, or reports the typed refusal.
 ///
 /// Constructors that turn a small request, such as a qubit count, into storage admit the
-/// conservatively counted bytes of that storage against this budget before allocating or
-/// consuming randomness, then reserve the storage fallibly. Operations whose storage is a fixed
-/// multiple of operands the caller already holds, such as composition and inversion, reserve
-/// fallibly without a budget because their operands were admitted when they were built.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct AlgebraMemoryBudget(u64);
-
-impl AlgebraMemoryBudget {
-    /// Default budget of one gibibyte, matching `stab_model::MemoryBudget::DEFAULT`.
-    pub const DEFAULT: Self = Self(GIB);
-
-    /// Budget of exactly `bytes` bytes.
-    pub const fn from_bytes(bytes: u64) -> Self {
-        Self(bytes)
-    }
-
-    /// Budget size in bytes.
-    pub const fn bytes(self) -> u64 {
-        self.0
-    }
-
-    /// Admits `requested` bytes for `resource`, or reports the typed refusal.
-    pub(crate) fn admit(
-        self,
-        resource: StabilizerResource,
-        requested: u128,
-    ) -> StabilizerResult<()> {
-        if requested <= u128::from(self.0) {
-            Ok(())
-        } else {
-            Err(StabilizerError::MemoryBudgetExceeded {
-                resource,
-                requested_bytes: requested,
-                budget_bytes: self.0,
-            })
-        }
-    }
-}
-
-impl Default for AlgebraMemoryBudget {
-    fn default() -> Self {
-        Self::DEFAULT
-    }
+/// conservatively counted bytes of that storage before allocating or consuming randomness, then
+/// reserve the storage fallibly. Operations whose storage is a fixed multiple of operands the
+/// caller already holds, such as composition and inversion, reserve fallibly without a budget
+/// because their operands were admitted when they were built.
+pub(crate) fn admit(
+    budget: MemoryBudget,
+    resource: StabilizerResource,
+    requested: u128,
+) -> StabilizerResult<()> {
+    budget
+        .admit(requested)
+        .map_err(|exceeded| StabilizerError::MemoryBudgetExceeded { resource, exceeded })
 }
 
 /// The stabilizer-algebra storage that a refusal or allocation failure refers to.

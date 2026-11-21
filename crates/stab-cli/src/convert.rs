@@ -357,8 +357,10 @@ impl ConvertStorage {
             _ => Err(stage.refusal(CliError::ConvertStorageBudget {
                 width,
                 batch_records,
-                required_bytes: u64::try_from(required).unwrap_or(u64::MAX),
-                budget_bytes: budget.bytes(),
+                exceeded: stab_model::MemoryBudgetExceeded::new(
+                    stab_model::ResourceAmount::saturating_from_u128(required),
+                    budget,
+                ),
             })),
         }
     }

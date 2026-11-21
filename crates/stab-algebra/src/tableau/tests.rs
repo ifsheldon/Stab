@@ -279,14 +279,14 @@ fn invalid_targets_are_refused_before_any_change() {
 fn appender_identity_matches_the_tableau_identity_and_its_admission() {
     for width in [0, 1, 31, 32, 33, 64, 65] {
         let exact = u64::try_from(crate::budget::tableau_bytes(width)).unwrap();
-        let budget = crate::AlgebraMemoryBudget::from_bytes(exact);
+        let budget = crate::MemoryBudget::from_bytes(exact);
         let appender = TableauAppender::identity_with_budget(width, budget).unwrap();
         assert_eq!(
             appender.finish().unwrap(),
             Tableau::identity(width).unwrap()
         );
         if let Some(short) = exact.checked_sub(1) {
-            let budget = crate::AlgebraMemoryBudget::from_bytes(short);
+            let budget = crate::MemoryBudget::from_bytes(short);
             assert_eq!(
                 TableauAppender::identity_with_budget(width, budget).err(),
                 Tableau::identity_with_budget(width, budget).err(),

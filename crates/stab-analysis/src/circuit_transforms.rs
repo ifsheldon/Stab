@@ -307,7 +307,7 @@ fn validate_flattening_budget(
             AnalysisOperation::CircuitFlatten,
             ResourceKind::MaterializedBytes,
             materialized_bytes,
-            budget.bytes(),
+            budget,
         )
         .into());
     }

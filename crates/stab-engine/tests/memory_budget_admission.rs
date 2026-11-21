@@ -99,18 +99,17 @@ fn sampling_admits_the_exact_budget_and_rejects_the_first_excess_byte_before_wor
     // One byte less is refused by a typed budget error at compilation or session creation, so
     // no RNG is seeded and no sink is ever called.
     let refused = match sampling(exact - 1).compile(&fixture) {
-        Err(SamplingCompileError::CompiledBytesLimit { required, budget }) => {
-            assert_eq!(budget, exact - 1);
-            required
+        Err(SamplingCompileError::CompiledBytesLimit { exceeded }) => {
+            assert_eq!(exceeded.budget().bytes(), exact - 1);
+            assert!(!exceeded.required().is_lower_bound());
+            exceeded.required().value()
         }
         Err(other) => panic!("unexpected compile error {other:?}"),
         Ok(plan) => match plan.session(RandomPolicy::Seeded(Seed::new(5))) {
-            Err(SamplingExecutionError::SessionStorageLimit {
-                estimated_bytes,
-                limit_bytes,
-            }) => {
-                assert_eq!(limit_bytes, exact - 1);
-                u64::try_from(estimated_bytes).expect("small estimate")
+            Err(SamplingExecutionError::SessionStorageLimit { exceeded }) => {
+                assert_eq!(exceeded.budget().bytes(), exact - 1);
+                assert!(!exceeded.required().is_lower_bound(), "small estimate");
+                exceeded.required().value()
             }
             other => panic!("expected a typed session budget refusal, got {other:?}"),
         },

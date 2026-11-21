@@ -3,8 +3,8 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 use super::{
-    AlgebraMemoryBudget, FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString,
-    StabilizerError, StabilizerResult, TextExcerpt,
+    FlexPauliString, MemoryBudget, PauliBasis, PauliPhase, PauliSign, PauliString, StabilizerError,
+    StabilizerResult, TextExcerpt,
 };
 
 /// Measurement-record term inside a stabilizer flow.
@@ -206,13 +206,13 @@ impl FromStr for Flow {
     type Err = StabilizerError;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        Self::from_str_with_budget(text, AlgebraMemoryBudget::DEFAULT)
+        Self::from_str_with_budget(text, MemoryBudget::DEFAULT)
     }
 }
 
 impl Flow {
     /// Parses flow text like [`FromStr`], admitting each parsed Pauli string's two packed planes
-    /// against `budget` instead of [`AlgebraMemoryBudget::DEFAULT`].
+    /// against `budget` instead of [`MemoryBudget::DEFAULT`].
     ///
     /// A sparse term such as `X1000000000` requests a wide string from short text, so the budget is
     /// checked before that storage is allocated.
@@ -222,7 +222,7 @@ impl Flow {
     /// Returns [`StabilizerError::MemoryBudgetExceeded`] or [`StabilizerError::AllocationFailed`]
     /// when a Pauli string does not fit, and [`StabilizerError::InvalidFlowText`] or
     /// [`StabilizerError::AntiHermitianFlow`] when the text is not a valid flow.
-    pub fn from_str_with_budget(text: &str, budget: AlgebraMemoryBudget) -> StabilizerResult<Self> {
+    pub fn from_str_with_budget(text: &str, budget: MemoryBudget) -> StabilizerResult<Self> {
         let (input_text, output_text) = split_flow_arrow(text)?;
         let (input, input_is_imaginary) = parse_flow_pauli(input_text, text, budget)?;
         let mut tokens = output_text.split_whitespace();
@@ -301,7 +301,7 @@ fn split_flow_arrow(text: &str) -> StabilizerResult<(&str, &str)> {
 fn parse_first_output_term(
     token: &str,
     original_text: &str,
-    budget: AlgebraMemoryBudget,
+    budget: MemoryBudget,
     output: &mut PauliString,
     output_is_imaginary: &mut bool,
     measurements: &mut Vec<i32>,
@@ -379,7 +379,7 @@ fn xor_merge<T: Copy + Ord>(left: &[T], right: &[T]) -> StabilizerResult<Vec<T>>
 fn parse_flow_pauli(
     text: &str,
     original_text: &str,
-    budget: AlgebraMemoryBudget,
+    budget: MemoryBudget,
 ) -> StabilizerResult<(PauliString, bool)> {
     match text {
         "1" | "+1" => Ok((PauliString::identity_unbudgeted(0), false)),

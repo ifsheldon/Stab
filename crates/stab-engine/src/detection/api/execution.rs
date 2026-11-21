@@ -226,13 +226,9 @@ pub(super) fn validate_session_storage(
     estimated_bytes: u128,
     budget: stab_model::MemoryBudget,
 ) -> Result<(), DetectionExecutionError> {
-    if !budget.admits(estimated_bytes) {
-        return Err(DetectionExecutionError::SessionStorageLimit {
-            estimated_bytes,
-            limit_bytes: budget.bytes(),
-        });
-    }
-    Ok(())
+    budget
+        .admit(estimated_bytes)
+        .map_err(|exceeded| DetectionExecutionError::SessionStorageLimit { exceeded })
 }
 
 pub(super) fn detection_rng(policy: RandomPolicy) -> SmallRng {

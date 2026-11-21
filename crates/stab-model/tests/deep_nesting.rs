@@ -292,3 +292,36 @@ fn maximally_nested_dem_text_parses_and_round_trips_on_a_small_stack() {
         );
     });
 }
+
+#[test]
+fn a_traversal_repeat_depth_cap_is_a_typed_fixed_limit_not_a_budget_refusal() {
+    on_small_stack(|| {
+        let depth = stab_model::advanced::MAX_DEM_REPEAT_NESTING + 1;
+        let model = nested_dem(depth);
+        let traversal =
+            stab_model::advanced::FoldedDemTraversal::new(&model).expect("compact traversal");
+        let error = traversal
+            .validate_repeat_depth("test traversal")
+            .expect_err("one level beyond the consumer depth");
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "invalid detector error model: DEM test traversal repeat nesting exceeds current limit {}, got {depth}",
+                depth - 1
+            )
+        );
+        assert_eq!(error.validation_error(), None);
+        assert_eq!(error.memory_budget_exceeded(), None);
+        let limit = error.resource_limit_error().expect("typed fixed limit");
+        assert_eq!(
+            limit.operation(),
+            stab_model::ResourceOperation::DetectorErrorModelTraversal
+        );
+        assert_eq!(limit.resource(), stab_model::ResourceKind::RepeatNesting);
+        assert_eq!(
+            (limit.actual(), limit.limit()),
+            (depth as u64, depth as u64 - 1)
+        );
+        assert_eq!((limit.span(), limit.source_line()), (None, None));
+    });
+}

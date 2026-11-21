@@ -58,7 +58,7 @@ pub(super) struct ErrorAccumulator {
 impl ErrorAccumulator {
     #[cfg(test)]
     pub(super) fn new() -> Self {
-        Self::with_budget(MemoryBudget::from_bytes(u64::MAX))
+        Self::with_budget(MemoryBudget::UNLIMITED)
     }
 
     pub(super) fn with_budget(budget: MemoryBudget) -> Self {
@@ -107,7 +107,7 @@ impl ErrorAccumulator {
             AnalysisOperation::CircuitToDetectorErrorModel,
             ResourceKind::MaterializedBytes,
             total,
-            self.budget.bytes(),
+            self.budget,
         )
         .into())
     }

@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use crate::{
-    ByteSpan, ModelDialect, ModelError, ModelResult, ParseError, ParseLimits,
+    ByteSpan, ModelDialect, ModelError, ModelResult, ParseError, ParseLimits, ResourceLimitError,
     advanced::invalid_utf8_parse_error, parse_limits::ParseAdmission,
 };
 
@@ -85,7 +85,7 @@ impl<'a> PreparedModelText<'a> {
         admission.admit_sanitized_copy(
             input.len(),
             first_invalid_line,
-            ByteSpan::from_valid_range(first_invalid, first_error.error_len().unwrap_or(1)),
+            crate::diagnostics::input_span(first_invalid, first_error.error_len().unwrap_or(1)),
         )?;
         let mut sanitized = Vec::new();
         sanitized.try_reserve_exact(input.len()).map_err(|error| {
@@ -201,7 +201,8 @@ fn error_precedes_invalid_utf8(error: &ModelError, invalid_utf8: &ParseError) ->
     }
     error
         .resource_limit_error()
-        .is_some_and(|resource_error| resource_error.span().byte_start() <= invalid_start)
+        .and_then(ResourceLimitError::span)
+        .is_some_and(|span| span.byte_start() <= invalid_start)
 }
 
 /// Walks the comments and tags of `input`, replacing invalid UTF-8 inside them in `sanitized`
@@ -320,7 +321,7 @@ impl MetadataScan<'_> {
         if raw_tag.is_empty() {
             return Ok(());
         }
-        let span = ByteSpan::from_valid_range(start, raw_tag.len());
+        let span = crate::diagnostics::input_span(start, raw_tag.len());
         match &mut self.mode {
             ScanMode::Recover {
                 admission, tags, ..

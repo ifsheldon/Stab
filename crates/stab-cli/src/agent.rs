@@ -12,9 +12,7 @@ use stab_model::{
     GateTargetGroupKind, GateTargetRule, ModelDialect, ModelFingerprint, ParseLimits,
     ResourceEstimate,
 };
-use stab_records::{
-    EncodedSizeEstimate, RecordFormat, codec_capabilities, validate_ptb64_shot_count,
-};
+use stab_records::{RecordFormat, codec_capabilities, validate_ptb64_shot_count};
 
 use crate::{
     Cli, CliError, FileRole, MemoryBudgetArg, MemoryLedger, PendingIo, SampleOutFormatArg,
@@ -225,10 +223,7 @@ where
     };
     if let Some(visible_measurement_count) = visible_measurements {
         let output_bytes =
-            match output_format.estimate_output_bytes(args.shots, visible_measurement_count) {
-                EncodedSizeEstimate::Exact(value) => Estimate::Exact(value),
-                EncodedSizeEstimate::Unknown => Estimate::Unknown,
-            };
+            output_format.estimate_output_bytes(args.shots, visible_measurement_count);
         estimates.output_bytes = EstimateReport::from(output_bytes);
     }
 

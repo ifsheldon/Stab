@@ -5,7 +5,7 @@ use std::sync::{Arc, OnceLock};
 
 use rand::rngs::SmallRng;
 use sha2::{Digest as _, Sha256};
-use stab_model::{Cancellation, Circuit, MemoryBudget};
+use stab_model::{Cancellation, Circuit, MemoryBudget, MemoryBudgetExceeded};
 use stab_records::{MeasurementSink, MeasurementWidth};
 use thiserror::Error;
 
@@ -700,13 +700,13 @@ pub enum SamplingExecutionError {
     #[error("sampling session shot counter overflowed")]
     ShotCounterOverflow,
 
+    /// The memory budget refused the session's bounded storage before any of it was reserved.
     #[error(
-        "sampling session needs an estimated {estimated_bytes} bytes of bounded storage, exceeding the {limit_bytes}-byte memory budget; raise the memory budget to admit it"
+        "sampling session needs an estimated {} bytes of bounded storage, exceeding the {}-byte memory budget; raise the memory budget to admit it",
+        exceeded.required(),
+        exceeded.budget().bytes()
     )]
-    SessionStorageLimit {
-        estimated_bytes: u128,
-        limit_bytes: u64,
-    },
+    SessionStorageLimit { exceeded: MemoryBudgetExceeded },
 
     #[error("sampling session could not allocate bounded storage: {message}")]
     SessionStorageAllocation { message: String },
@@ -725,6 +725,16 @@ pub enum SamplingExecutionError {
     /// while zeroing a streaming run's records; a later call starts over.
     #[error(transparent)]
     Cancelled(#[from] stab_model::Cancelled),
+}
+
+impl SamplingExecutionError {
+    /// The memory-budget refusal this error reports, if it is one.
+    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match self {
+            Self::SessionStorageLimit { exceeded } => Some(exceeded),
+            _ => None,
+        }
+    }
 }
 
 /// Sink operation that failed.
@@ -782,6 +792,15 @@ pub enum RunError<SinkError> {
 }
 
 impl<SinkError> RunError<SinkError> {
+    /// The engine's memory-budget refusal; a sink failure is the caller's own type and is not
+    /// inspected.
+    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match self {
+            Self::Engine { source, .. } => source.memory_budget_exceeded(),
+            Self::Sink { .. } => None,
+        }
+    }
+
     pub const fn progress(&self) -> SamplingRunProgress {
         match self {
             Self::Engine { progress, .. } | Self::Sink { progress, .. } => *progress,

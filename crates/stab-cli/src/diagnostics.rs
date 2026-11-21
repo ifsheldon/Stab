@@ -14,10 +14,10 @@ use stab_engine::{
     DetectionResourceLimitError, RunError, SamplingCompileError, SamplingExecutionError,
 };
 use stab_model::{
-    ByteSpan as ModelByteSpan, DiagnosticSeverity, ModelDialect, ModelError, ParseError,
+    ByteSpan, DiagnosticSeverity, MemoryBudgetExceeded, ModelDialect, ModelError, ParseError,
     ParseErrorContext, ResourceLimitError as ModelResourceLimitError, ValidationError,
 };
-use stab_records::{ByteSpan as RecordByteSpan, DetsResultType, FormatError, FormatErrorContext};
+use stab_records::{DetsResultType, FormatError, FormatErrorContext};
 use thiserror::Error;
 
 mod analysis;
@@ -185,35 +185,38 @@ pub(crate) enum CliError {
 
     /// The record storage of `convert`, admitted before any of it is allocated.
     #[error(
-        "convert needs at least {required_bytes} bytes to stream {width}-bit records in batches of {batch_records}, exceeding the {budget_bytes}-byte memory budget; raise the memory budget to admit it"
+        "convert needs at least {} bytes to stream {width}-bit records in batches of {batch_records}, exceeding the {}-byte memory budget; raise the memory budget to admit it",
+        exceeded.required().value(),
+        exceeded.budget().bytes()
     )]
     ConvertStorageBudget {
         width: usize,
         batch_records: usize,
-        required_bytes: u64,
-        budget_bytes: u64,
+        exceeded: MemoryBudgetExceeded,
     },
 
     /// The output encoders and file buffers of `sample`, `detect`, or `m2d`, admitted before
     /// the run allocates them.
     #[error(
-        "{command} needs at least {required_bytes} bytes to encode its output records, exceeding the {budget_bytes}-byte memory budget; raise the memory budget to admit it"
+        "{command} needs at least {} bytes to encode its output records, exceeding the {}-byte memory budget; raise the memory budget to admit it",
+        exceeded.required().value(),
+        exceeded.budget().bytes()
     )]
     OutputStorageBudget {
         command: &'static str,
-        required_bytes: u64,
-        budget_bytes: u64,
+        exceeded: MemoryBudgetExceeded,
     },
 
     /// The record readers of a streaming command, admitted before any batch is allocated.
     #[error(
-        "{command} needs at least {required_bytes} bytes to read its input records in batches of {batch_records}, exceeding the {budget_bytes}-byte memory budget; raise the memory budget to admit it"
+        "{command} needs at least {} bytes to read its input records in batches of {batch_records}, exceeding the {}-byte memory budget; raise the memory budget to admit it",
+        exceeded.required().value(),
+        exceeded.budget().bytes()
     )]
     InputStorageBudget {
         command: &'static str,
         batch_records: usize,
-        required_bytes: u64,
-        budget_bytes: u64,
+        exceeded: MemoryBudgetExceeded,
     },
 
     /// A stage's budget refusal while earlier stages of the same command held part of the budget.
@@ -286,22 +289,68 @@ const MEMORY_BUDGET_HELP: &str =
 
 /// Whether raising `--memory-budget` admits the refused work.
 ///
-/// Analysis refusals are classified by their typed cause, and a command-ledger refusal wraps only
-/// budget refusals. The other typed budget refusals render the budget they exceeded as an
-/// `N-byte memory budget`, which still identifies them.
+/// Every library refusal answers this through its typed `memory_budget_exceeded` accessor; the
+/// CLI adds its own input-size refusal and the command-ledger wrapper, which wraps only budget
+/// refusals.
 pub(crate) fn is_memory_budget_refusal(error: &CliError) -> bool {
-    match analysis_error(error) {
-        Some(AnalysisError::Model(_)) | None => {}
-        Some(error) => {
-            return error
-                .resource_limit_error()
-                .is_some_and(|error| error.is_memory_budget());
-        }
-    }
     matches!(
         error,
         CliError::InputTooLarge { .. } | CliError::CommandMemoryBudget { .. }
-    ) || error.to_string().contains("-byte memory budget")
+    ) || error.memory_budget_exceeded().is_some()
+}
+
+impl CliError {
+    /// The memory-budget refusal this error reports, from the CLI's own admission or from the
+    /// library error it wraps.
+    pub(crate) fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match self {
+            Self::Model(error) => error.memory_budget_exceeded(),
+            Self::Analysis(error) => error.memory_budget_exceeded(),
+            Self::SamplingCompile(error) => error.memory_budget_exceeded(),
+            Self::SamplingExecution(error) => error.memory_budget_exceeded(),
+            Self::Detection(error) => error.memory_budget_exceeded(),
+            Self::DetectionCompile(error) => error.memory_budget_exceeded(),
+            Self::DetectionExecution(error) => error.memory_budget_exceeded(),
+            Self::Dem(error) => error.memory_budget_exceeded(),
+            Self::DemSamplingExecution(error) => error.memory_budget_exceeded(),
+            Self::SampleOutput(error) | Self::SamplePath { source: error, .. } => {
+                error.memory_budget_exceeded()
+            }
+            Self::ConvertStorageBudget { exceeded, .. }
+            | Self::OutputStorageBudget { exceeded, .. }
+            | Self::InputStorageBudget { exceeded, .. } => Some(exceeded),
+            Self::CommandMemoryBudget { source, .. } => source.memory_budget_exceeded(),
+            Self::ReadInput(_)
+            | Self::ReadPath { .. }
+            | Self::WriteOutput(_)
+            | Self::WritePath { .. }
+            | Self::ConflictingFileRoles { .. }
+            | Self::IoPlanInvariant { .. }
+            | Self::MissingInspectModelType
+            | Self::UnknownInspectModelType { .. }
+            | Self::SerializeAgentOutput(_)
+            | Self::AgentOutputInvariant { .. }
+            | Self::Record(_)
+            | Self::InputRecord { .. }
+            | Self::InputByteOffsetOverflow { .. }
+            | Self::UnsupportedGenTask(_)
+            | Self::UnsupportedConversion
+            | Self::UnsupportedStimConversionOption { .. }
+            | Self::UnsupportedDetectionFormat { .. }
+            | Self::ConflictingObservableRouting
+            | Self::ReplayErrorRecordCountMismatch { .. }
+            | Self::ReplayInputNotRewindable { .. }
+            | Self::InputTooLarge { .. }
+            | Self::MissingRecordWidth
+            | Self::MissingRecordTypesForDets
+            | Self::MissingConvertTypes
+            | Self::UnknownConvertType { .. }
+            | Self::DuplicateConvertType { .. }
+            | Self::IncompletePtb64OutputGroup { .. }
+            | Self::UnknownHelpTopic { .. }
+            | Self::MeasurementCountOverflow => None,
+        }
+    }
 }
 
 pub(crate) fn write_clap_error(writer: &mut impl Write, error: &clap::Error) -> io::Result<()> {
@@ -342,24 +391,6 @@ struct JsonSpan {
     byte_length: usize,
 }
 
-impl From<ModelByteSpan> for JsonSpan {
-    fn from(span: ModelByteSpan) -> Self {
-        Self {
-            byte_start: span.byte_start(),
-            byte_length: span.byte_length(),
-        }
-    }
-}
-
-impl From<RecordByteSpan> for JsonSpan {
-    fn from(span: RecordByteSpan) -> Self {
-        Self {
-            byte_start: span.byte_start(),
-            byte_length: span.byte_length(),
-        }
-    }
-}
-
 fn write_json(writer: &mut impl Write, diagnostic: &JsonDiagnostic) -> io::Result<()> {
     serde_json::to_writer(&mut *writer, diagnostic).map_err(io::Error::other)?;
     writer.write_all(b"\n")
@@ -380,7 +411,7 @@ fn cli_error_diagnostic(error: &CliError) -> JsonDiagnostic {
             code: parse_error.code().as_str(),
             severity: parse_error.severity().as_str(),
             message: parse_error.message().to_string(),
-            span: shifted_model_span(parse_error.span(), byte_offset),
+            span: shifted_span(parse_error.span(), byte_offset),
             labels: Vec::new(),
             help: cli_error_help(error),
             context: parse_error_context(parse_error),
@@ -407,7 +438,7 @@ fn cli_error_diagnostic(error: &CliError) -> JsonDiagnostic {
             .map_or_else(|| error.to_string(), |error| error.message().to_string()),
         span: format_error
             .and_then(FormatError::span)
-            .and_then(|span| shifted_record_span(span, byte_offset.unwrap_or(0))),
+            .and_then(|span| shifted_span(span, byte_offset.unwrap_or(0))),
         labels: Vec::new(),
         help: cli_error_help(error),
         context: format_error.map_or_else(|| cli_error_context(error), format_error_context),
@@ -552,38 +583,32 @@ fn cli_error_context(error: &CliError) -> Value {
         CliError::ConvertStorageBudget {
             width,
             batch_records,
-            required_bytes,
-            budget_bytes,
+            exceeded,
         } => json!({
             "operation": "record-conversion",
             "resource": "materialized-bytes",
-            "actual": required_bytes,
-            "limit": budget_bytes,
+            "actual": exceeded.required().value(),
+            "limit": exceeded.budget().bytes(),
             "record_bits": width,
             "batch_records": batch_records,
         }),
-        CliError::OutputStorageBudget {
-            command,
-            required_bytes,
-            budget_bytes,
-        } => json!({
+        CliError::OutputStorageBudget { command, exceeded } => json!({
             "operation": "record-output",
             "command": command,
             "resource": "materialized-bytes",
-            "actual": required_bytes,
-            "limit": budget_bytes,
+            "actual": exceeded.required().value(),
+            "limit": exceeded.budget().bytes(),
         }),
         CliError::InputStorageBudget {
             command,
             batch_records,
-            required_bytes,
-            budget_bytes,
+            exceeded,
         } => json!({
             "operation": "record-input",
             "command": command,
             "resource": "materialized-bytes",
-            "actual": required_bytes,
-            "limit": budget_bytes,
+            "actual": exceeded.required().value(),
+            "limit": exceeded.budget().bytes(),
             "batch_records": batch_records,
         }),
         CliError::CommandMemoryBudget { source, .. } => cli_error_context(source),
@@ -678,15 +703,7 @@ fn model_error_from_dem(error: &DemError) -> Option<&ModelError> {
     }
 }
 
-fn shifted_model_span(span: ModelByteSpan, byte_offset: usize) -> Option<JsonSpan> {
-    let byte_start = span.byte_start().checked_add(byte_offset)?;
-    Some(JsonSpan {
-        byte_start,
-        byte_length: span.byte_length(),
-    })
-}
-
-fn shifted_record_span(span: RecordByteSpan, byte_offset: usize) -> Option<JsonSpan> {
+fn shifted_span(span: ByteSpan, byte_offset: usize) -> Option<JsonSpan> {
     let byte_start = span.byte_start().checked_add(byte_offset)?;
     Some(JsonSpan {
         byte_start,
@@ -754,10 +771,10 @@ fn sampling_compile_error_context(error: &SamplingCompileError) -> Value {
         SamplingCompileError::InvalidCircuit { .. }
         | SamplingCompileError::StorageAllocation { .. }
         | SamplingCompileError::Cancelled(_) => json!({}),
-        SamplingCompileError::CompiledBytesLimit { required, budget } => json!({
+        SamplingCompileError::CompiledBytesLimit { exceeded } => json!({
             "resource": "materialized-bytes",
-            "actual": required.to_string(),
-            "limit": budget.to_string(),
+            "actual": exceeded.required().value().to_string(),
+            "limit": exceeded.budget().bytes().to_string(),
         }),
     }
 }
@@ -886,7 +903,7 @@ impl ResourceDiagnostic<'_> {
 
     fn span(&self) -> Option<JsonSpan> {
         match self {
-            Self::Model(error) => shifted_model_span(error.span(), 0),
+            Self::Model(error) => error.span().and_then(|span| shifted_span(span, 0)),
             Self::Analysis(_) | Self::Detection(_) | Self::Dem(_) => None,
         }
     }

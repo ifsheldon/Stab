@@ -2,7 +2,9 @@ use std::fmt::{Display, Formatter};
 
 use thiserror::Error;
 
-use crate::{ResourceAmount, SamplingCompileError, SamplingExecutionError};
+use stab_model::{MemoryBudget, MemoryBudgetExceeded, ResourceAmount};
+
+use crate::{SamplingCompileError, SamplingExecutionError};
 
 pub(crate) type DetectionResult<T> = Result<T, DetectionError>;
 
@@ -17,72 +19,105 @@ pub enum DetectionResourceKind {
 }
 
 /// Typed resource-admission failure owned by the detection engine.
+///
+/// Repeat nesting is a fixed safety limit; compiled bytes and session storage are refused by
+/// the caller's memory budget and answer [`Self::memory_budget_exceeded`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DetectionResourceLimitError {
-    kind: DetectionResourceKind,
-    actual: ResourceAmount,
-    limit: u64,
+    refusal: DetectionRefusal,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum DetectionRefusal {
+    RepeatNesting {
+        actual: u64,
+        limit: u64,
+    },
+    MemoryBudget {
+        kind: DetectionResourceKind,
+        exceeded: MemoryBudgetExceeded,
+    },
 }
 
 impl DetectionResourceLimitError {
     pub(crate) const fn detection_repeat_nesting(actual: usize, limit: usize) -> Self {
         Self {
-            kind: DetectionResourceKind::RepeatNesting,
-            actual: ResourceAmount::exact(actual as u64),
-            limit: limit as u64,
+            refusal: DetectionRefusal::RepeatNesting {
+                actual: actual as u64,
+                limit: limit as u64,
+            },
         }
     }
 
-    pub(crate) const fn detection_compiled_bytes(actual: u64, limit: u64) -> Self {
-        Self {
-            kind: DetectionResourceKind::CompiledBytes,
-            actual: ResourceAmount::exact(actual),
-            limit,
-        }
+    pub(crate) const fn detection_compiled_bytes(actual: u64, budget: MemoryBudget) -> Self {
+        Self::refused_by_budget(
+            DetectionResourceKind::CompiledBytes,
+            MemoryBudgetExceeded::new(ResourceAmount::exact(actual), budget),
+        )
     }
 
-    pub(crate) fn session_storage_bytes(actual: u128, limit: u64) -> Self {
+    pub(crate) const fn refused_by_budget(
+        kind: DetectionResourceKind,
+        exceeded: MemoryBudgetExceeded,
+    ) -> Self {
         Self {
-            kind: DetectionResourceKind::SessionStorageBytes,
-            actual: ResourceAmount::saturating_from_u128(actual),
-            limit,
+            refusal: DetectionRefusal::MemoryBudget { kind, exceeded },
         }
     }
 
     pub const fn kind(&self) -> DetectionResourceKind {
-        self.kind
+        match self.refusal {
+            DetectionRefusal::RepeatNesting { .. } => DetectionResourceKind::RepeatNesting,
+            DetectionRefusal::MemoryBudget { kind, .. } => kind,
+        }
+    }
+
+    /// The memory-budget refusal, for the kinds a caller-selected budget limits.
+    pub const fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match &self.refusal {
+            DetectionRefusal::MemoryBudget { exceeded, .. } => Some(exceeded),
+            DetectionRefusal::RepeatNesting { .. } => None,
+        }
+    }
+
+    const fn amount(&self) -> ResourceAmount {
+        match self.refusal {
+            DetectionRefusal::RepeatNesting { actual, .. } => ResourceAmount::exact(actual),
+            DetectionRefusal::MemoryBudget { exceeded, .. } => exceeded.required(),
+        }
     }
 
     pub const fn actual(&self) -> u64 {
-        self.actual.value()
+        self.amount().value()
     }
 
     pub const fn actual_is_lower_bound(&self) -> bool {
-        self.actual.is_lower_bound()
+        self.amount().is_lower_bound()
     }
 
     pub const fn limit(&self) -> u64 {
-        self.limit
+        match self.refusal {
+            DetectionRefusal::RepeatNesting { limit, .. } => limit,
+            DetectionRefusal::MemoryBudget { exceeded, .. } => exceeded.budget().bytes(),
+        }
     }
 }
 
 impl Display for DetectionResourceLimitError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.kind {
+        let (actual, limit) = (self.amount(), self.limit());
+        match self.kind() {
             DetectionResourceKind::RepeatNesting => write!(
                 formatter,
-                "cannot compile circuit sampler: detection conversion repeat nesting {} exceeds fixed safety limit {}",
-                self.actual, self.limit
+                "cannot compile circuit sampler: detection conversion repeat nesting {actual} exceeds fixed safety limit {limit}"
             ),
             DetectionResourceKind::CompiledBytes => write!(
                 formatter,
-                "cannot compile circuit sampler: the compiled plan and its records need at least {} bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
-                self.actual, self.limit
+                "cannot compile circuit sampler: the compiled plan and its records need at least {actual} bytes, exceeding the {limit}-byte memory budget; raise the memory budget to admit it"
             ),
             DetectionResourceKind::SessionStorageBytes => write!(
                 formatter,
-                "sampling session needs an estimated {} bytes of bounded storage, exceeding the {}-byte memory budget; raise the memory budget to admit it",
-                self.actual, self.limit
+                "sampling session needs an estimated {actual} bytes of bounded storage, exceeding the {limit}-byte memory budget; raise the memory budget to admit it"
             ),
         }
     }
@@ -117,6 +152,20 @@ pub enum DetectionError {
 }
 
 impl DetectionError {
+    /// The memory-budget refusal this error reports, from the detection engine or from the
+    /// model or analysis layer it wraps.
+    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match self {
+            Self::Model(error) => error.memory_budget_exceeded(),
+            Self::Analysis(error) => error.memory_budget_exceeded(),
+            Self::ResourceLimit(error) => error.memory_budget_exceeded(),
+            Self::InvalidSamplerCompilation { .. }
+            | Self::InvalidResultFormat { .. }
+            | Self::StorageAllocation { .. }
+            | Self::Cancelled(_) => None,
+        }
+    }
+
     pub(crate) fn invalid_sampler_compilation(message: impl Into<String>) -> Self {
         Self::InvalidSamplerCompilation {
             message: message.into(),
@@ -144,9 +193,12 @@ impl From<SamplingCompileError> for DetectionError {
             SamplingCompileError::InvalidCircuit { message } => {
                 Self::invalid_sampler_compilation(message)
             }
-            SamplingCompileError::CompiledBytesLimit { required, budget } => Self::ResourceLimit(
-                DetectionResourceLimitError::detection_compiled_bytes(required, budget),
-            ),
+            SamplingCompileError::CompiledBytesLimit { exceeded } => {
+                Self::ResourceLimit(DetectionResourceLimitError::refused_by_budget(
+                    DetectionResourceKind::CompiledBytes,
+                    exceeded,
+                ))
+            }
             SamplingCompileError::StorageAllocation { message } => {
                 Self::StorageAllocation { message }
             }
@@ -164,13 +216,12 @@ impl From<SamplingExecutionError> for DetectionError {
                 ))
             }
             SamplingExecutionError::Cancelled(cancelled) => Self::Cancelled(cancelled),
-            SamplingExecutionError::SessionStorageLimit {
-                estimated_bytes,
-                limit_bytes,
-            } => Self::ResourceLimit(DetectionResourceLimitError::session_storage_bytes(
-                estimated_bytes,
-                limit_bytes,
-            )),
+            SamplingExecutionError::SessionStorageLimit { exceeded } => {
+                Self::ResourceLimit(DetectionResourceLimitError::refused_by_budget(
+                    DetectionResourceKind::SessionStorageBytes,
+                    exceeded,
+                ))
+            }
             error @ SamplingExecutionError::SessionStorageAllocation { .. } => {
                 Self::storage_allocation(error.to_string())
             }

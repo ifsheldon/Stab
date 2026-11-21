@@ -180,7 +180,7 @@ impl DemFlatteningBudget {
                 AnalysisOperation::DetectorErrorModelFlatten,
                 ResourceKind::MaterializedBytes,
                 self.materialized_bytes,
-                budget.bytes(),
+                budget,
             )
             .into());
         }

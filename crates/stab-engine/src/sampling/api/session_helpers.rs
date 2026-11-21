@@ -15,13 +15,9 @@ pub(super) fn validate_session_storage(
     memory_budget: MemoryBudget,
 ) -> Result<(), SamplingExecutionError> {
     let estimated_bytes = session_storage_bytes(plan, reference_mode, lane_width);
-    if !memory_budget.admits(estimated_bytes) {
-        return Err(SamplingExecutionError::SessionStorageLimit {
-            estimated_bytes,
-            limit_bytes: memory_budget.bytes(),
-        });
-    }
-    Ok(())
+    memory_budget
+        .admit(estimated_bytes)
+        .map_err(|exceeded| SamplingExecutionError::SessionStorageLimit { exceeded })
 }
 
 /// Reusable storage of a materializing session: the frame with one plane per measurement and
@@ -52,13 +48,9 @@ pub(super) fn validate_streaming_storage(
     memory_budget: MemoryBudget,
 ) -> Result<(), SamplingExecutionError> {
     let estimated_bytes = streaming_storage_bytes(plan, reference_mode, lane_width, shots);
-    if !memory_budget.admits(estimated_bytes) {
-        return Err(SamplingExecutionError::SessionStorageLimit {
-            estimated_bytes,
-            limit_bytes: memory_budget.bytes(),
-        });
-    }
-    Ok(())
+    memory_budget
+        .admit(estimated_bytes)
+        .map_err(|exceeded| SamplingExecutionError::SessionStorageLimit { exceeded })
 }
 
 /// Reusable storage of a streaming run of `shots` shots: the frame with its bounded window of

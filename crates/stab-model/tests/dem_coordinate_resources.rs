@@ -31,6 +31,13 @@ fn dem_coordinate_all_map_is_admitted_against_the_memory_budget_but_selected_que
         resource.operation(),
         ResourceOperation::DetectorErrorModelDetectorCoordinates
     );
+    // A query over a parsed model has no parse location, and its refusal is the budget's.
+    assert_eq!((resource.span(), resource.source_line()), (None, None));
+    let exceeded = error
+        .memory_budget_exceeded()
+        .expect("a budget refusal, not a fixed limit");
+    assert_eq!(exceeded.budget(), MemoryBudget::DEFAULT);
+    assert_eq!(exceeded.required().value(), resource.actual());
 
     let small = DetectorErrorModel::from_dem_str(
         "repeat 3 {\n\
@@ -43,7 +50,7 @@ fn dem_coordinate_all_map_is_admitted_against_the_memory_budget_but_selected_que
     let exact = MemoryBudget::from_bytes(3 * (96 + 2 * 8));
     assert_eq!(
         small
-            .detector_coordinates_with_memory_budget(exact)
+            .detector_coordinates_with_budget(exact)
             .expect("exact budget admits the map")
             .len(),
         3
@@ -52,7 +59,7 @@ fn dem_coordinate_all_map_is_admitted_against_the_memory_budget_but_selected_que
     let measured = allocation_counter::measure(|| {
         std::hint::black_box(
             small
-                .detector_coordinates_with_memory_budget(excess)
+                .detector_coordinates_with_budget(excess)
                 .expect_err("one byte below the requirement is refused"),
         );
     });

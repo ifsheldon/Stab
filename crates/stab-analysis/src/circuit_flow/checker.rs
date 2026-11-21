@@ -1,8 +1,7 @@
 use std::collections::BTreeSet;
 
 use stab_algebra::{
-    AlgebraMemoryBudget, Flow, FlowMeasurementIndex, PauliBasis, PauliSign, PauliString,
-    StabilizerError, Tableau,
+    Flow, FlowMeasurementIndex, PauliBasis, PauliSign, PauliString, StabilizerError, Tableau,
 };
 use stab_model::advanced::FoldedCircuitEvent;
 use stab_model::{
@@ -29,12 +28,6 @@ pub struct UnsignedFlowCheckOptions {
     pub memory_budget: MemoryBudget,
     /// Signal polled once per instruction, Tableau composition, seeded flow term, and checked flow.
     pub cancellation: Cancellation,
-}
-
-impl UnsignedFlowCheckOptions {
-    fn algebra_budget(&self) -> AlgebraMemoryBudget {
-        AlgebraMemoryBudget::from_bytes(self.memory_budget.bytes())
-    }
 }
 
 /// Checks unsigned stabilizer flows with the default memory budget, reporting `false` for a flow
@@ -218,19 +211,14 @@ fn dense_flow_image_or_reason(
     let padded = match PauliString::from_bases_with_budget(
         PauliSign::Plus,
         (0..tableau.len()).map(|index| input.get(index).unwrap_or(PauliBasis::I)),
-        options.algebra_budget(),
+        options.memory_budget,
     ) {
         Ok(padded) => padded,
-        Err(StabilizerError::MemoryBudgetExceeded {
-            requested_bytes,
-            budget_bytes,
-            ..
-        }) => {
-            return Err(ResourceLimitError::memory_budget(
+        Err(StabilizerError::MemoryBudgetExceeded { exceeded, .. }) => {
+            return Err(ResourceLimitError::budget_refusal(
                 AnalysisOperation::FlowCheck,
                 ResourceKind::MaterializedBytes,
-                u64::try_from(requested_bytes).unwrap_or(u64::MAX),
-                budget_bytes,
+                exceeded,
             )
             .into());
         }
@@ -489,7 +477,7 @@ fn pull_back_paulis_with_sparse_tracker(
         .map(|target| {
             tracker.check_cancelled()?;
             Ok(tracker
-                .compact_region_for_target(target, options.algebra_budget())?
+                .compact_region_for_target(target, options.memory_budget)?
                 .value()
                 .clone())
         })
@@ -681,7 +669,7 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
                 ));
             }
             let region =
-                tracker.compact_region_for_target(tracked_target, options.algebra_budget())?;
+                tracker.compact_region_for_target(tracked_target, options.memory_budget)?;
             let region_pauli = region.value();
             let target_len = flow.input().len().max(region_pauli.len());
             let mut bases = Vec::new();

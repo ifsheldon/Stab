@@ -10,9 +10,10 @@ use stab_bits::transpose_bit_tile;
 
 use super::small_gate::{SignFormula, SmallGate};
 use super::{Tableau, validate_tableau_targets};
+use crate::MemoryBudget;
+use crate::budget::admit;
 use crate::budget::{
-    AlgebraMemoryBudget, StabilizerResource, tableau_bytes, try_filled, try_zeroed_words,
-    words_for_bits,
+    StabilizerResource, tableau_bytes, try_filled, try_zeroed_words, words_for_bits,
 };
 use crate::{PauliBasis, PauliPhase, PauliSign, StabilizerError, StabilizerResult};
 
@@ -47,11 +48,12 @@ impl TableauAppender {
     ///
     /// The held planes are admitted against `budget` as the bytes of the equivalent Tableau, so
     /// this refuses exactly when [`Tableau::identity_with_budget`] would.
-    pub fn identity_with_budget(
-        num_qubits: usize,
-        budget: AlgebraMemoryBudget,
-    ) -> StabilizerResult<Self> {
-        budget.admit(StabilizerResource::Tableau, tableau_bytes(num_qubits))?;
+    pub fn identity_with_budget(num_qubits: usize, budget: MemoryBudget) -> StabilizerResult<Self> {
+        admit(
+            budget,
+            StabilizerResource::Tableau,
+            tableau_bytes(num_qubits),
+        )?;
         let row_count = num_qubits
             .checked_mul(2)
             .ok_or(StabilizerError::ResourceSizeOverflow {

@@ -7,8 +7,8 @@
 //! recursion, and polls one [`Cancellation`]. It never allocates in proportion to a repeat count.
 
 use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
-use crate::cancellation::CancellationCountdown;
 use crate::{Cancellation, Cancelled, GateKind, ModelResult, RepeatNestingLimit, ValidationError};
+use stab_foundation::CancellationCountdown;
 
 /// An expanded count through repeat blocks, or the fact that it exceeds `u64`.
 ///

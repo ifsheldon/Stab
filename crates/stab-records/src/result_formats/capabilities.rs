@@ -1,4 +1,4 @@
-use crate::EncodedSizeEstimate as Estimate;
+use crate::Estimate;
 
 /// Physical encoding used by a registered result-record codec.
 #[non_exhaustive]

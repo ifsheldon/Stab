@@ -81,11 +81,9 @@ pub fn circuit_reference_signs_with_limits(
             )
         })?;
     if !budget.admits(u128::from(total_bytes)) {
-        return Err(DetectionResourceLimitError::detection_compiled_bytes(
-            total_bytes,
-            budget.bytes(),
-        )
-        .into());
+        return Err(
+            DetectionResourceLimitError::detection_compiled_bytes(total_bytes, budget).into(),
+        );
     }
     let mut record: DetectionRecordBuffer = prepared.try_reusable_detection_record()?;
     prepared

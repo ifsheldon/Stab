@@ -3,7 +3,9 @@ use std::ops::{Bound, ControlFlow, Range, RangeBounds};
 
 use crate::advanced::CancellationCountdown;
 use crate::resource_limit::admit_detector_coordinate_map;
-use crate::{Cancellation, MemoryBudget, ModelDialect, ModelError, ModelResult};
+use crate::{
+    Cancellation, MemoryBudget, ModelDialect, ModelError, ModelResult, ResourceLimitError,
+};
 
 use super::coordinate_scan::{
     MAX_DEM_SELECTED_COORDINATE_FLATTENED_DECLARATIONS, RepeatScanGeometry,
@@ -217,7 +219,7 @@ impl DetectorErrorModel {
 
     /// Materializes every detector's coordinates within the default memory budget.
     pub fn detector_coordinates(&self) -> ModelResult<BTreeMap<DemDetectorId, Vec<f64>>> {
-        self.detector_coordinates_with_memory_budget(MemoryBudget::DEFAULT)
+        self.detector_coordinates_with_budget(MemoryBudget::DEFAULT)
     }
 
     /// Materializes every detector's coordinates after admitting the conservative map size
@@ -225,7 +227,7 @@ impl DetectorErrorModel {
     ///
     /// A map beyond `budget` is refused with a [`crate::ResourceLimitError`] of kind
     /// [`crate::ResourceKind::MaterializedBytes`] before anything is allocated.
-    pub fn detector_coordinates_with_memory_budget(
+    pub fn detector_coordinates_with_budget(
         &self,
         budget: MemoryBudget,
     ) -> ModelResult<BTreeMap<DemDetectorId, Vec<f64>>> {
@@ -524,10 +526,11 @@ impl FoldedDemVisitor for SelectedCoordinateVisitor<'_> {
             .iter()
             .find(|detector| !self.coordinates.contains_key(detector))
         {
-            return Err(ModelError::invalid_detector_error_model(format!(
-                "DEM detector_coordinates_for retains at most {MAX_DEM_SELECTED_COORDINATE_REPEAT_CANDIDATES} overlapping repeat candidates within the default memory budget before finding detector {}",
-                detector.get()
-            )));
+            return Err(ResourceLimitError::dem_selected_coordinate_candidates(
+                *detector,
+                MAX_DEM_SELECTED_COORDINATE_REPEAT_CANDIDATES,
+            )
+            .into());
         }
         Ok(ControlFlow::Continue(()))
     }

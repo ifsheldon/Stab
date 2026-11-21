@@ -5,7 +5,8 @@ use stab_analysis::advanced::flow_record_index;
 use stab_model::advanced::{CancellationCountdown, circuit_declaration_admitted_bytes};
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, GateCategory, GateKind,
-    MeasureRecordOffset, MemoryBudget, QubitId, Target, TargetKind,
+    MeasureRecordOffset, MemoryBudget, MemoryBudgetExceeded, QubitId, ResourceAmount, Target,
+    TargetKind,
 };
 use stab_records::{BitIndex, MeasurementBatchView, MeasurementSink, ShotIndex};
 use thiserror::Error;
@@ -39,6 +40,17 @@ pub enum SampledFlowError {
 }
 
 impl SampledFlowError {
+    /// The memory-budget refusal this error reports, from any layer it wraps.
+    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match self {
+            Self::Model(error) => error.memory_budget_exceeded(),
+            Self::Analysis(error) => error.memory_budget_exceeded(),
+            Self::SamplingCompile(error) => error.memory_budget_exceeded(),
+            Self::SamplingExecution(error) => error.memory_budget_exceeded(),
+            Self::InvalidFlow { .. } | Self::Cancelled(_) => None,
+        }
+    }
+
     fn invalid_flow(message: impl Into<String>) -> Self {
         Self::InvalidFlow {
             message: message.into(),
@@ -164,10 +176,12 @@ fn sample_if_noiseless_circuit_has_stabilizer_flow(
         .cancellation(options.cancellation.clone())
         .compile(&augmented)
         .map_err(|error| match error {
-            crate::SamplingCompileError::CompiledBytesLimit { required, .. } => {
+            crate::SamplingCompileError::CompiledBytesLimit { exceeded } => {
                 crate::SamplingCompileError::CompiledBytesLimit {
-                    required: augmented_bytes.saturating_add(required),
-                    budget: options.memory_budget.bytes(),
+                    exceeded: MemoryBudgetExceeded::new(
+                        exceeded.required().saturating_add(augmented_bytes),
+                        options.memory_budget,
+                    ),
                 }
                 .into()
             }
@@ -180,13 +194,15 @@ fn sample_if_noiseless_circuit_has_stabilizer_flow(
         MemoryBudget::from_bytes(options.memory_budget.bytes().saturating_sub(plan_bytes));
     let map_session_refusal = |error: SamplingExecutionError| -> SampledFlowError {
         match error {
-            SamplingExecutionError::SessionStorageLimit {
-                estimated_bytes, ..
-            } => SamplingExecutionError::SessionStorageLimit {
-                estimated_bytes: u128::from(plan_bytes).saturating_add(estimated_bytes),
-                limit_bytes: options.memory_budget.bytes(),
+            SamplingExecutionError::SessionStorageLimit { exceeded } => {
+                SamplingExecutionError::SessionStorageLimit {
+                    exceeded: MemoryBudgetExceeded::new(
+                        exceeded.required().saturating_add(plan_bytes),
+                        options.memory_budget,
+                    ),
+                }
+                .into()
             }
-            .into(),
             other => other.into(),
         }
     };
@@ -286,8 +302,7 @@ impl<'a> AugmentedAdmission<'a> {
             return Ok(());
         }
         Err(crate::SamplingCompileError::CompiledBytesLimit {
-            required,
-            budget: self.budget.bytes(),
+            exceeded: MemoryBudgetExceeded::new(ResourceAmount::exact(required), self.budget),
         }
         .into())
     }

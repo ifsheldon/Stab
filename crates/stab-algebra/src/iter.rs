@@ -1,9 +1,9 @@
 use std::ops::RangeInclusive;
 
 use super::{
-    AlgebraMemoryBudget, PauliBasis, PauliSign, PauliString, StabilizerError, StabilizerResult,
-    Tableau,
+    MemoryBudget, PauliBasis, PauliSign, PauliString, StabilizerError, StabilizerResult, Tableau,
 };
+use crate::budget::admit;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommutingPauliStringIterator {
@@ -308,7 +308,7 @@ pub struct PauliStringIterator {
 }
 
 impl PauliStringIterator {
-    /// Creates reusable iterator state admitted against [`AlgebraMemoryBudget::DEFAULT`].
+    /// Creates reusable iterator state admitted against [`MemoryBudget::DEFAULT`].
     ///
     /// See [`Self::new_with_budget`].
     pub fn new(
@@ -316,7 +316,7 @@ impl PauliStringIterator {
         weights: RangeInclusive<usize>,
         bases: PauliIterationBases,
     ) -> StabilizerResult<Self> {
-        Self::new_with_budget(num_qubits, weights, bases, AlgebraMemoryBudget::DEFAULT)
+        Self::new_with_budget(num_qubits, weights, bases, MemoryBudget::DEFAULT)
     }
 
     /// Creates reusable iterator state after admitting its result string and position buffers
@@ -329,12 +329,13 @@ impl PauliStringIterator {
         num_qubits: usize,
         weights: RangeInclusive<usize>,
         bases: PauliIterationBases,
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
     ) -> StabilizerResult<Self> {
         let (min_weight, max_weight) = weights.into_inner();
         let buffers =
             num_qubits as u128 * (size_of::<usize>() as u128 + size_of::<PauliBasis>() as u128);
-        budget.admit(
+        admit(
+            budget,
             super::StabilizerResource::PauliString,
             crate::budget::pauli_bytes(num_qubits) + buffers,
         )?;

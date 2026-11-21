@@ -53,6 +53,14 @@ pub enum DemSamplingExecutionError {
 }
 
 impl DemSamplingExecutionError {
+    /// The memory-budget refusal of the wrapped request failure, if this error is one.
+    pub fn memory_budget_exceeded(&self) -> Option<&stab_model::MemoryBudgetExceeded> {
+        match self {
+            Self::InvalidRequest(error) => error.memory_budget_exceeded(),
+            _ => None,
+        }
+    }
+
     pub fn into_dem_error(self) -> DemError {
         match self {
             Self::InvalidRequest(error) => error,
@@ -103,6 +111,15 @@ pub enum DemSamplingRunError<SinkError> {
 }
 
 impl<SinkError> DemSamplingRunError<SinkError> {
+    /// The engine's memory-budget refusal; a sink failure is the caller's own type and is not
+    /// inspected.
+    pub fn memory_budget_exceeded(&self) -> Option<&stab_model::MemoryBudgetExceeded> {
+        match self {
+            Self::Engine { source, .. } => source.memory_budget_exceeded(),
+            Self::Sink { .. } => None,
+        }
+    }
+
     pub const fn progress(&self) -> DemSamplingRunProgress {
         match self {
             Self::Engine { progress, .. } | Self::Sink { progress, .. } => *progress,

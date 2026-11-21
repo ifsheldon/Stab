@@ -24,10 +24,8 @@ fn sparse_single_measurement_circuit() -> Circuit {
 fn assert_storage_limit(error: SamplingExecutionError) {
     assert_matches!(
         error,
-        SamplingExecutionError::SessionStorageLimit {
-            limit_bytes: 1_073_741_824,
-            ..
-        }
+        SamplingExecutionError::SessionStorageLimit { exceeded }
+            if exceeded.budget().bytes() == 1_073_741_824
     );
 }
 

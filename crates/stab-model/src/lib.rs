@@ -1,7 +1,6 @@
 //! Stable typed Stim circuit and detector-error-model values.
 
 mod approximate;
-mod cancellation;
 mod circuit;
 mod controlled_pauli;
 mod dem;
@@ -11,7 +10,6 @@ mod error;
 mod fingerprint;
 mod gate;
 mod ids;
-mod memory_budget;
 mod model_bytes;
 mod model_parse;
 mod model_tag;
@@ -23,7 +21,6 @@ mod source_text;
 mod target;
 mod validation;
 
-pub use cancellation::{Cancellation, Cancelled};
 pub use circuit::{
     Circuit, CircuitFlattenedInstructionIter, CircuitFlattenedInstructionRevIter,
     CircuitInstruction, CircuitItem, FoldedCircuitSummary, FoldedCount, FoldedWalkError,
@@ -35,9 +32,7 @@ pub use dem::{
     DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemInstructionView, DemItem,
     DemRepeatBlock, DemTarget, DemTargetKind, DetectorErrorModel,
 };
-pub use diagnostics::{
-    ByteSpan, DiagnosticSeverity, ParseError, ParseErrorCode, ParseErrorContext,
-};
+pub use diagnostics::{ParseError, ParseErrorCode, ParseErrorContext};
 pub use dialect::ModelDialect;
 pub use error::{ModelError, ModelResult};
 pub use fingerprint::ModelFingerprint;
@@ -49,10 +44,13 @@ pub use ids::{
     AbsoluteTolerance, CircuitDetectorId, CircuitTick, DemRepeatCount, MeasureRecordOffset,
     MeasureRecordOffsetText, ObservableId, Probability, ProbabilityStimText, QubitId, RepeatCount,
 };
-pub use memory_budget::{MemoryBudget, MemoryBudgetParseError};
 pub use parse_limits::{ParseLimits, RepeatNestingLimit, RepeatNestingLimitError};
 pub use resource_limit::{ResourceKind, ResourceLimitError, ResourceOperation};
-pub use resources::{Estimate, EstimateClass, ResourceEstimate, ResourceEstimateBuilder};
+pub use resources::{ResourceEstimate, ResourceEstimateBuilder};
+pub use stab_foundation::{
+    ByteSpan, Cancellation, Cancelled, DiagnosticSeverity, Estimate, MemoryBudget,
+    MemoryBudgetExceeded, MemoryBudgetParseError, ResourceAmount,
+};
 pub use target::{Pauli, Target, TargetKind};
 pub use validation::{ValidationError, ValidationErrorCode};
 
@@ -66,7 +64,6 @@ pub mod advanced {
         ModelResult, ObservableId, ParseError, ParseErrorCode, ParseErrorContext, Probability,
         RepeatBlock, RepeatCount, Target,
     };
-    pub use crate::cancellation::CancellationCountdown;
     pub use crate::circuit::{FoldedCircuitEvent, FoldedVisitError, visit_folded_circuit};
     pub use crate::controlled_pauli::{
         ClassicalControl, ControlledPauliTargetPair, classify_controlled_pauli_target_pair,
@@ -78,6 +75,7 @@ pub mod advanced {
         shifted_targets,
     };
     pub use crate::gate::GateUnitaryRows;
+    pub use stab_foundation::CancellationCountdown;
     /// Stim's exclusive upper bound for encoded target values.
     pub const STIM_TARGET_VALUE_LIMIT: u32 = crate::ids::STIM_TARGET_VALUE_LIMIT;
 
@@ -256,11 +254,6 @@ pub mod advanced {
     /// Removes the tag from a DEM instruction in place.
     pub fn dem_instruction_clear_tag(instruction: &mut DemInstruction) {
         instruction.clear_tag();
-    }
-
-    /// Constructs a span after the caller has proved that the range does not overflow.
-    pub const fn byte_span_from_valid_range(byte_start: usize, byte_length: usize) -> ByteSpan {
-        ByteSpan::from_valid_range(byte_start, byte_length)
     }
 
     /// Bounds attacker-controlled text using the model diagnostic contract.

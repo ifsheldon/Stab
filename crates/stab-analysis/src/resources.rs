@@ -1,5 +1,7 @@
 use std::fmt::{Display, Formatter};
 
+use stab_model::{MemoryBudget, MemoryBudgetExceeded, ResourceAmount};
+
 use crate::{AnalysisOperation, CodeTask};
 
 /// Analysis resource dimension whose configurable budget was exceeded.
@@ -106,10 +108,6 @@ enum ResourceLimitCause {
         operation: AnalysisOperation,
         resource: ResourceKind,
     },
-    MemoryBudget {
-        operation: AnalysisOperation,
-        resource: ResourceKind,
-    },
     CircuitToDetectorErrorModel {
         resource: ResourceKind,
     },
@@ -139,9 +137,34 @@ enum ResourceLimitCause {
     LogicalErrorTraversalRepeatIterations {
         context: &'static str,
     },
+}
+
+/// What a caller-selected memory budget refused.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum MemoryBudgetCause {
+    Operation {
+        operation: AnalysisOperation,
+        resource: ResourceKind,
+    },
+    /// The projected payload bytes of a circuit pass.
+    CircuitPass { stage: CircuitPassStage },
     GeneratedCircuit {
         task: CodeTask,
         physical_qubits: u64,
+    },
+}
+
+/// A fixed safety limit with its counted amount, or a memory-budget refusal.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum Refusal {
+    Fixed {
+        cause: ResourceLimitCause,
+        actual: u64,
+        limit: u64,
+    },
+    MemoryBudget {
+        cause: MemoryBudgetCause,
+        exceeded: MemoryBudgetExceeded,
     },
 }
 
@@ -170,9 +193,7 @@ impl CircuitPassStage {
 /// Typed resource-admission failure produced by pure analysis operations.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ResourceLimitError {
-    cause: ResourceLimitCause,
-    actual: u64,
-    limit: u64,
+    refusal: Refusal,
 }
 
 impl ResourceLimitError {
@@ -182,31 +203,60 @@ impl ResourceLimitError {
         actual: u64,
         limit: u64,
     ) -> Self {
-        Self {
-            cause: ResourceLimitCause::FixedOperation {
+        Self::fixed(
+            ResourceLimitCause::FixedOperation {
                 operation,
                 resource,
             },
             actual,
             limit,
+        )
+    }
+
+    const fn fixed(cause: ResourceLimitCause, actual: u64, limit: u64) -> Self {
+        Self {
+            refusal: Refusal::Fixed {
+                cause,
+                actual,
+                limit,
+            },
         }
     }
 
-    /// A conservative byte requirement that exceeds the operation's caller-selected budget.
+    const fn refused_by_budget(cause: MemoryBudgetCause, exceeded: MemoryBudgetExceeded) -> Self {
+        Self {
+            refusal: Refusal::MemoryBudget { cause, exceeded },
+        }
+    }
+
+    /// A conservative byte requirement of `required` bytes that exceeds the operation's
+    /// caller-selected `budget`.
     pub(crate) const fn memory_budget(
         operation: AnalysisOperation,
         resource: ResourceKind,
-        actual: u64,
-        limit: u64,
+        required: u64,
+        budget: MemoryBudget,
     ) -> Self {
-        Self {
-            cause: ResourceLimitCause::MemoryBudget {
+        Self::budget_refusal(
+            operation,
+            resource,
+            MemoryBudgetExceeded::new(ResourceAmount::exact(required), budget),
+        )
+    }
+
+    /// A refusal another component's memory-budget admission reported for this operation.
+    pub(crate) const fn budget_refusal(
+        operation: AnalysisOperation,
+        resource: ResourceKind,
+        exceeded: MemoryBudgetExceeded,
+    ) -> Self {
+        Self::refused_by_budget(
+            MemoryBudgetCause::Operation {
                 operation,
                 resource,
             },
-            actual,
-            limit,
-        }
+            exceeded,
+        )
     }
 
     pub(crate) const fn circuit_to_detector_error_model(
@@ -214,56 +264,67 @@ impl ResourceLimitError {
         actual: u64,
         limit: u64,
     ) -> Self {
-        Self {
-            cause: ResourceLimitCause::CircuitToDetectorErrorModel { resource },
+        Self::fixed(
+            ResourceLimitCause::CircuitToDetectorErrorModel { resource },
             actual,
             limit,
-        }
+        )
     }
 
+    /// A circuit-pass limit; the projected payload bytes are limited by the caller's memory
+    /// budget, every other resource by a fixed limit.
     pub(crate) const fn circuit_pass(
         stage: CircuitPassStage,
         resource: ResourceKind,
         actual: u64,
         limit: u64,
     ) -> Self {
-        Self {
-            cause: ResourceLimitCause::CircuitPass { stage, resource },
-            actual,
-            limit,
+        match resource {
+            ResourceKind::ProjectedPayloadBytes => Self::refused_by_budget(
+                MemoryBudgetCause::CircuitPass { stage },
+                MemoryBudgetExceeded::new(
+                    ResourceAmount::exact(actual),
+                    MemoryBudget::from_bytes(limit),
+                ),
+            ),
+            resource => Self::fixed(
+                ResourceLimitCause::CircuitPass { stage, resource },
+                actual,
+                limit,
+            ),
         }
     }
 
     pub(crate) const fn detecting_regions(resource: ResourceKind, actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::DetectingRegions { resource },
+        Self::fixed(
+            ResourceLimitCause::DetectingRegions { resource },
             actual,
             limit,
-        }
+        )
     }
 
     pub(crate) const fn circuit_flatten_repeat_nesting(actual: usize, limit: usize) -> Self {
-        Self {
-            cause: ResourceLimitCause::CircuitFlattenRepeatNesting,
-            actual: actual as u64,
-            limit: limit as u64,
-        }
+        Self::fixed(
+            ResourceLimitCause::CircuitFlattenRepeatNesting,
+            actual as u64,
+            limit as u64,
+        )
     }
 
     pub(crate) const fn circuit_flatten_materialized_units(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::CircuitFlattenMaterializedUnits,
+        Self::fixed(
+            ResourceLimitCause::CircuitFlattenMaterializedUnits,
             actual,
             limit,
-        }
+        )
     }
 
     pub(crate) const fn dem_flatten_materialized_units(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::DemFlattenMaterializedUnits,
+        Self::fixed(
+            ResourceLimitCause::DemFlattenMaterializedUnits,
             actual,
             limit,
-        }
+        )
     }
 
     pub(crate) const fn sat_materialization(
@@ -271,11 +332,11 @@ impl ResourceLimitError {
         actual: u64,
         limit: u64,
     ) -> Self {
-        Self {
-            cause: ResourceLimitCause::SatMaterialization { resource },
+        Self::fixed(
+            ResourceLimitCause::SatMaterialization { resource },
             actual,
             limit,
-        }
+        )
     }
 
     pub(crate) const fn sat_traversal_repeat_iterations(
@@ -283,11 +344,11 @@ impl ResourceLimitError {
         actual: u64,
         limit: u64,
     ) -> Self {
-        Self {
-            cause: ResourceLimitCause::SatTraversalRepeatIterations { context },
+        Self::fixed(
+            ResourceLimitCause::SatTraversalRepeatIterations { context },
             actual,
             limit,
-        }
+        )
     }
 
     pub(crate) const fn logical_error_search(
@@ -296,11 +357,11 @@ impl ResourceLimitError {
         actual: u64,
         limit: u64,
     ) -> Self {
-        Self {
-            cause: ResourceLimitCause::LogicalErrorSearch { context, resource },
+        Self::fixed(
+            ResourceLimitCause::LogicalErrorSearch { context, resource },
             actual,
             limit,
-        }
+        )
     }
 
     pub(crate) const fn missing_detector_discovery(
@@ -308,11 +369,11 @@ impl ResourceLimitError {
         actual: u64,
         limit: u64,
     ) -> Self {
-        Self {
-            cause: ResourceLimitCause::MissingDetectorDiscovery { resource },
+        Self::fixed(
+            ResourceLimitCause::MissingDetectorDiscovery { resource },
             actual,
             limit,
-        }
+        )
     }
 
     pub(crate) const fn logical_error_traversal_repeat_iterations(
@@ -320,11 +381,11 @@ impl ResourceLimitError {
         actual: u64,
         limit: u64,
     ) -> Self {
-        Self {
-            cause: ResourceLimitCause::LogicalErrorTraversalRepeatIterations { context },
+        Self::fixed(
+            ResourceLimitCause::LogicalErrorTraversalRepeatIterations { context },
             actual,
             limit,
-        }
+        )
     }
 
     /// A generated circuit whose projected peak memory exceeds the caller-selected budget.
@@ -332,30 +393,24 @@ impl ResourceLimitError {
         task: CodeTask,
         physical_qubits: u64,
         required_bytes: u64,
-        budget_bytes: u64,
+        budget: MemoryBudget,
     ) -> Self {
-        Self {
-            cause: ResourceLimitCause::GeneratedCircuit {
+        Self::refused_by_budget(
+            MemoryBudgetCause::GeneratedCircuit {
                 task,
                 physical_qubits,
             },
-            actual: required_bytes,
-            limit: budget_bytes,
-        }
+            MemoryBudgetExceeded::new(ResourceAmount::exact(required_bytes), budget),
+        )
     }
 
-    /// Whether a caller-selected memory budget, rather than a fixed safety limit, refused the
-    /// work; raising the budget admits it.
-    pub const fn is_memory_budget(self) -> bool {
-        matches!(
-            self.cause,
-            ResourceLimitCause::MemoryBudget { .. }
-                | ResourceLimitCause::CircuitPass {
-                    resource: ResourceKind::ProjectedPayloadBytes,
-                    ..
-                }
-                | ResourceLimitCause::GeneratedCircuit { .. }
-        )
+    /// The caller-selected memory budget's refusal, when that budget rather than a fixed safety
+    /// limit refused the work; raising the budget admits it.
+    pub const fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match &self.refusal {
+            Refusal::MemoryBudget { exceeded, .. } => Some(exceeded),
+            Refusal::Fixed { .. } => None,
+        }
     }
 
     pub const fn code(self) -> &'static str {
@@ -363,8 +418,19 @@ impl ResourceLimitError {
     }
 
     pub const fn operation(self) -> AnalysisOperation {
-        match self.cause {
-            ResourceLimitCause::MemoryBudget { operation, .. } => operation,
+        let cause = match self.refusal {
+            Refusal::MemoryBudget { cause, .. } => {
+                return match cause {
+                    MemoryBudgetCause::Operation { operation, .. } => operation,
+                    MemoryBudgetCause::CircuitPass { .. } => AnalysisOperation::CircuitPass,
+                    MemoryBudgetCause::GeneratedCircuit { .. } => {
+                        AnalysisOperation::CircuitGeneration
+                    }
+                };
+            }
+            Refusal::Fixed { cause, .. } => cause,
+        };
+        match cause {
             ResourceLimitCause::FixedOperation { operation, .. } => operation,
             ResourceLimitCause::CircuitToDetectorErrorModel { .. } => {
                 AnalysisOperation::CircuitToDetectorErrorModel
@@ -389,14 +455,22 @@ impl ResourceLimitError {
             ResourceLimitCause::MissingDetectorDiscovery { .. } => {
                 AnalysisOperation::MissingDetectorDiscovery
             }
-            ResourceLimitCause::GeneratedCircuit { .. } => AnalysisOperation::CircuitGeneration,
         }
     }
 
     pub const fn resource(self) -> ResourceKind {
-        match self.cause {
-            ResourceLimitCause::FixedOperation { resource, .. }
-            | ResourceLimitCause::MemoryBudget { resource, .. } => resource,
+        let cause = match self.refusal {
+            Refusal::MemoryBudget { cause, .. } => {
+                return match cause {
+                    MemoryBudgetCause::Operation { resource, .. } => resource,
+                    MemoryBudgetCause::CircuitPass { .. } => ResourceKind::ProjectedPayloadBytes,
+                    MemoryBudgetCause::GeneratedCircuit { .. } => ResourceKind::MaterializedBytes,
+                };
+            }
+            Refusal::Fixed { cause, .. } => cause,
+        };
+        match cause {
+            ResourceLimitCause::FixedOperation { resource, .. } => resource,
             ResourceLimitCause::CircuitToDetectorErrorModel { resource } => resource,
             ResourceLimitCause::CircuitPass { resource, .. } => resource,
             ResourceLimitCause::DetectingRegions { resource } => resource,
@@ -448,29 +522,80 @@ impl ResourceLimitError {
                 ResourceKind::RepeatIterations
             }
             ResourceLimitCause::MissingDetectorDiscovery { resource } => resource,
-            ResourceLimitCause::GeneratedCircuit { .. } => ResourceKind::MaterializedBytes,
         }
     }
 
+    /// The counted amount, or the required bytes of a memory-budget refusal (its lower bound
+    /// when the requirement does not fit `u64`).
     pub const fn actual(self) -> u64 {
-        self.actual
+        match self.refusal {
+            Refusal::Fixed { actual, .. } => actual,
+            Refusal::MemoryBudget { exceeded, .. } => exceeded.required().value(),
+        }
     }
 
+    /// The fixed limit, or the bytes of the refusing memory budget.
     pub const fn limit(self) -> u64 {
-        self.limit
+        match self.refusal {
+            Refusal::Fixed { limit, .. } => limit,
+            Refusal::MemoryBudget { exceeded, .. } => exceeded.budget().bytes(),
+        }
     }
 
     pub(crate) const fn circuit_pass_stage(self) -> Option<CircuitPassStage> {
-        match self.cause {
-            ResourceLimitCause::CircuitPass { stage, .. } => Some(stage),
-            _ => None,
+        match self.refusal {
+            Refusal::Fixed {
+                cause: ResourceLimitCause::CircuitPass { stage, .. },
+                ..
+            }
+            | Refusal::MemoryBudget {
+                cause: MemoryBudgetCause::CircuitPass { stage },
+                ..
+            } => Some(stage),
+            Refusal::Fixed { .. } | Refusal::MemoryBudget { .. } => None,
         }
     }
 }
 
 impl Display for ResourceLimitError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.cause {
+        let (cause, actual, limit) = match self.refusal {
+            Refusal::MemoryBudget { cause, exceeded } => {
+                // The requirement is already worded as a minimum, so a lower bound prints alone.
+                let required = exceeded.required().value();
+                let budget = exceeded.budget().bytes();
+                return match cause {
+                    MemoryBudgetCause::Operation {
+                        operation,
+                        resource,
+                    } => write!(
+                        formatter,
+                        "{} {} needs at least {required} bytes, exceeding the {budget}-byte memory budget; raise the memory budget to admit it",
+                        operation.as_str(),
+                        resource.as_str(),
+                    ),
+                    MemoryBudgetCause::CircuitPass { stage } => write!(
+                        formatter,
+                        "circuit pass {} needs at least {required} projected payload bytes, exceeding the {budget}-byte memory budget; raise the memory budget to admit it",
+                        stage.as_str(),
+                    ),
+                    MemoryBudgetCause::GeneratedCircuit {
+                        task,
+                        physical_qubits,
+                    } => write!(
+                        formatter,
+                        "invalid generated circuit size value {physical_qubits} physical qubits for {} need at least {required} bytes, exceeding the {budget}-byte memory budget; raise the memory budget to admit it",
+                        crate::circuit_generation::budget_family_name(task),
+                    ),
+                };
+            }
+            Refusal::Fixed {
+                cause,
+                actual,
+                limit,
+            } => (cause, actual, limit),
+        };
+        match cause {
             ResourceLimitCause::FixedOperation {
                 operation,
                 resource,
@@ -479,211 +604,180 @@ impl Display for ResourceLimitError {
                 "{} {} value {} exceeds current limit {}",
                 operation.as_str(),
                 resource.as_str(),
-                self.actual,
-                self.limit
-            ),
-            ResourceLimitCause::MemoryBudget {
-                operation,
-                resource,
-            } => write!(
-                formatter,
-                "{} {} needs at least {} bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
-                operation.as_str(),
-                resource.as_str(),
-                self.actual,
-                self.limit
+                actual,
+                limit
             ),
             ResourceLimitCause::CircuitToDetectorErrorModel { resource } => write!(
                 formatter,
                 "circuit-to-detector-error-model {} value {} exceeds current limit {}",
                 resource.as_str(),
-                self.actual,
-                self.limit
-            ),
-            ResourceLimitCause::CircuitPass {
-                stage,
-                resource: ResourceKind::ProjectedPayloadBytes,
-            } => write!(
-                formatter,
-                "circuit pass {} needs at least {} projected payload bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
-                stage.as_str(),
-                self.actual,
-                self.limit
+                actual,
+                limit
             ),
             ResourceLimitCause::CircuitPass { stage, resource } => write!(
                 formatter,
                 "circuit pass {} {} value {} exceeds current limit {}",
                 stage.as_str(),
                 resource.as_str(),
-                self.actual,
-                self.limit
+                actual,
+                limit
             ),
             ResourceLimitCause::DetectingRegions { resource } => write!(
                 formatter,
                 "detecting-regions {} value {} exceeds current limit {}",
                 resource.as_str(),
-                self.actual,
-                self.limit
+                actual,
+                limit
             ),
             ResourceLimitCause::CircuitFlattenRepeatNesting => write!(
                 formatter,
                 "invalid flattened circuit repeat nesting value {} exceeds fixed safety limit {}",
-                self.actual, self.limit
+                actual, limit
             ),
             ResourceLimitCause::CircuitFlattenMaterializedUnits => write!(
                 formatter,
                 "invalid flattened circuit instruction vector would require {} materialized units; platform limit is {}",
-                self.actual, self.limit
+                actual, limit
             ),
             ResourceLimitCause::DemFlattenMaterializedUnits => write!(
                 formatter,
                 "invalid detector error model: DEM flattened instruction vector would require {} materialized units; platform limit is {}",
-                self.actual, self.limit
+                actual, limit
             ),
             ResourceLimitCause::SatMaterialization { resource } => match resource {
                 SatMaterializationResource::ExpandedInstructions => write!(
                     formatter,
                     "invalid detector error model: DEM SAT problem generation currently supports at most {} expanded instructions, got at least {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 SatMaterializationResource::ErrorMechanisms => write!(
                     formatter,
                     "invalid detector error model: SAT problem generation currently supports at most {} error mechanisms, got at least {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 SatMaterializationResource::TargetOccurrences => write!(
                     formatter,
                     "invalid detector error model: SAT problem generation currently supports at most {} target occurrences, got at least {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 SatMaterializationResource::Variables => write!(
                     formatter,
                     "invalid detector error model: SAT problem generation currently supports at most {} variables, got at least {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 SatMaterializationResource::Clauses => write!(
                     formatter,
                     "invalid detector error model: SAT problem generation currently supports at most {} clauses, got at least {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 SatMaterializationResource::ClauseLiterals => write!(
                     formatter,
                     "invalid detector error model: SAT problem generation currently supports at most {} clause literals, got at least {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 SatMaterializationResource::OutputBytes => write!(
                     formatter,
                     "invalid detector error model: SAT problem generation currently supports at most {} WDIMACS output bytes, got at least {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
             },
             ResourceLimitCause::SatTraversalRepeatIterations { context } => write!(
                 formatter,
                 "invalid detector error model: DEM {context} traversal currently supports at most {} expanded repeat iterations, got at least {}",
-                self.limit, self.actual
+                limit, actual
             ),
             ResourceLimitCause::LogicalErrorSearch { context, resource } => match resource {
                 LogicalErrorSearchResource::RepeatCount => write!(
                     formatter,
                     "invalid detector error model: DEM {context} currently supports repeat counts up to {}, got {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 LogicalErrorSearchResource::ExpandedErrorMechanisms => write!(
                     formatter,
                     "invalid detector error model: DEM {context} currently supports at most {} expanded nonzero error mechanisms, got at least {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 LogicalErrorSearchResource::ErrorTargetOccurrencesPerMechanism => write!(
                     formatter,
                     "invalid detector error model: DEM {context} currently supports at most {} target occurrences per nonzero error mechanism, got {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 LogicalErrorSearchResource::TotalErrorTargetOccurrences => write!(
                     formatter,
                     "invalid detector error model: DEM {context} currently supports at most {} total target occurrences across expanded nonzero error mechanisms, got at least {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 LogicalErrorSearchResource::EffectiveDetectorNodes => write!(
                     formatter,
                     "invalid detector error model: {context} currently supports at most {} effective detector nodes, got {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 LogicalErrorSearchResource::UniqueGraphEdges => write!(
                     formatter,
                     "invalid detector error model: {context} currently supports at most {} unique graph edges, got at least {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 LogicalErrorSearchResource::StoredGraphTerms => write!(
                     formatter,
                     "invalid detector error model: {context} currently supports at most {} stored graph payload terms, got at least {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 LogicalErrorSearchResource::HyperedgeDegree => write!(
                     formatter,
                     "invalid detector error model: {context} currently supports edges with at most {} detectors, got {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 LogicalErrorSearchResource::HyperedgeIncidences => write!(
                     formatter,
                     "invalid detector error model: {context} currently supports at most {} edge incidences, got at least {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 LogicalErrorSearchResource::SearchStates => write!(
                     formatter,
                     "invalid detector error model: {context} currently supports at most {} search states, got at least {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 LogicalErrorSearchResource::SearchTransitions => write!(
                     formatter,
                     "invalid detector error model: {context} currently supports at most {} search transitions, got at least {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 LogicalErrorSearchResource::SearchStateTerms => write!(
                     formatter,
                     "invalid detector error model: {context} currently supports at most {} detector and observable terms per search state, got {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
                 LogicalErrorSearchResource::StoredSearchStateTerms => write!(
                     formatter,
                     "invalid detector error model: {context} currently supports at most {} stored detector and observable search-state terms, got at least {}",
-                    self.limit, self.actual
+                    limit, actual
                 ),
             },
             ResourceLimitCause::LogicalErrorTraversalRepeatIterations { context } => write!(
                 formatter,
                 "invalid detector error model: DEM {context} traversal currently supports at most {} expanded repeat iterations, got at least {}",
-                self.limit, self.actual
+                limit, actual
             ),
             ResourceLimitCause::MissingDetectorDiscovery {
                 resource: ResourceKind::ExpandedOperations,
             } => write!(
                 formatter,
                 "missing-detector analysis currently supports at most {} expanded instructions, got at least {}",
-                self.limit, self.actual
+                limit, actual
             ),
             ResourceLimitCause::MissingDetectorDiscovery {
                 resource: ResourceKind::RepeatNesting,
             } => write!(
                 formatter,
                 "missing-detector repeat nesting exceeds current limit {}, got {}",
-                self.limit, self.actual
+                limit, actual
             ),
             ResourceLimitCause::MissingDetectorDiscovery { resource } => write!(
                 formatter,
                 "missing-detector discovery {} value {} exceeds current limit {}",
                 resource.as_str(),
-                self.actual,
-                self.limit
-            ),
-            ResourceLimitCause::GeneratedCircuit {
-                task,
-                physical_qubits,
-            } => write!(
-                formatter,
-                "invalid generated circuit size value {physical_qubits} physical qubits for {} need at least {} bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
-                crate::circuit_generation::budget_family_name(task),
-                self.actual,
-                self.limit
+                actual,
+                limit
             ),
         }
     }

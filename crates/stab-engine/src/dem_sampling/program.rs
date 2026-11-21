@@ -95,7 +95,7 @@ impl<'a> DemCompileMeter<'a> {
         if self.budget.admits(u128::from(required)) {
             return Ok(());
         }
-        Err(DemResourceLimitError::compiled_bytes(required, self.budget.bytes()).into())
+        Err(DemResourceLimitError::compiled_bytes(required, self.budget).into())
     }
 
     fn commit(&mut self, bytes: u64) -> DemResult<()> {

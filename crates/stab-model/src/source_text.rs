@@ -1,4 +1,5 @@
-use crate::{ByteSpan, advanced::byte_span_from_valid_range};
+use crate::ByteSpan;
+use crate::diagnostics::input_span;
 
 // Stim uses C `isspace` between commands, which also includes vertical tabs.
 // Whitespace within instruction arguments and targets follows stricter rules.
@@ -30,11 +31,11 @@ impl<'a> SourceSlice<'a> {
     }
 
     pub(crate) fn span(self) -> ByteSpan {
-        byte_span_from_valid_range(self.byte_start, self.text.len())
+        input_span(self.byte_start, self.text.len())
     }
 
     pub(crate) fn end_span(self) -> ByteSpan {
-        byte_span_from_valid_range(self.byte_start + self.text.len(), 0)
+        ByteSpan::empty_at(self.byte_end())
     }
 
     pub(crate) fn subspan(self, relative_start: usize, byte_length: usize) -> Option<ByteSpan> {
@@ -150,7 +151,7 @@ impl<'a> SourceCommands<'a> {
             && (is_complete_terminal_block_command(source.text())
                 || is_complete_block_terminator(source.text()))
         {
-            let terminal_brace_span = byte_span_from_valid_range(source.byte_end() - 1, 1);
+            let terminal_brace_span = input_span(source.byte_end() - 1, 1);
             self.current_line = None;
             return Some(SourceCommand {
                 line_number: line.line_number(),
@@ -216,7 +217,7 @@ impl<'a> SourceCommands<'a> {
                     return Some(SourceCommand {
                         line_number: line.line_number(),
                         source: command,
-                        end_error_span: byte_span_from_valid_range(source.byte_start() + index, 1),
+                        end_error_span: input_span(source.byte_start() + index, 1),
                     });
                 }
                 b'{' if !in_tag && !in_arguments => {
@@ -229,7 +230,7 @@ impl<'a> SourceCommands<'a> {
                     return Some(SourceCommand {
                         line_number: line.line_number(),
                         source: command,
-                        end_error_span: byte_span_from_valid_range(source.byte_start() + index, 1),
+                        end_error_span: input_span(source.byte_start() + index, 1),
                     });
                 }
                 b'}' if !in_tag && !in_arguments && !has_non_space => {
@@ -242,7 +243,7 @@ impl<'a> SourceCommands<'a> {
                     return Some(SourceCommand {
                         line_number: line.line_number(),
                         source: command,
-                        end_error_span: byte_span_from_valid_range(source.byte_start() + index, 1),
+                        end_error_span: input_span(source.byte_start() + index, 1),
                     });
                 }
                 byte if !is_command_space(char::from(byte)) => {

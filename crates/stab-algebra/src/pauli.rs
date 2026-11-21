@@ -4,9 +4,9 @@ use std::str::FromStr;
 use rand::{Rng, RngExt as _};
 
 use super::{StabilizerError, StabilizerResource, StabilizerResult, TextExcerpt};
-use crate::budget::{
-    AlgebraMemoryBudget, pauli_bytes, try_reserve_one, try_resize_zeroed_bits, try_zeroed_bits,
-};
+use crate::MemoryBudget;
+use crate::budget::admit;
+use crate::budget::{pauli_bytes, try_reserve_one, try_resize_zeroed_bits, try_zeroed_bits};
 use crate::kernels::{PauliPlanes, PauliPlanesMut, pauli_right_multiply_words};
 use stab_bits::{BitError, BitVec};
 
@@ -68,19 +68,20 @@ impl PartialEq for PauliString {
 impl Eq for PauliString {}
 
 impl PauliString {
-    /// Creates an all-identity string admitted against [`AlgebraMemoryBudget::DEFAULT`].
+    /// Creates an all-identity string admitted against [`MemoryBudget::DEFAULT`].
     ///
     /// See [`Self::identity_with_budget`].
     pub fn identity(num_qubits: usize) -> StabilizerResult<Self> {
-        Self::identity_with_budget(num_qubits, AlgebraMemoryBudget::DEFAULT)
+        Self::identity_with_budget(num_qubits, MemoryBudget::DEFAULT)
     }
 
     /// Creates an all-identity string after admitting its two packed planes against `budget`.
-    pub fn identity_with_budget(
-        num_qubits: usize,
-        budget: AlgebraMemoryBudget,
-    ) -> StabilizerResult<Self> {
-        budget.admit(StabilizerResource::PauliString, pauli_bytes(num_qubits))?;
+    pub fn identity_with_budget(num_qubits: usize, budget: MemoryBudget) -> StabilizerResult<Self> {
+        admit(
+            budget,
+            StabilizerResource::PauliString,
+            pauli_bytes(num_qubits),
+        )?;
         Self::try_identity_admitted(num_qubits)
     }
 
@@ -108,20 +109,20 @@ impl PauliString {
     ///
     /// Passing a seeded `rand` RNG gives deterministic Stab output. The sign and each Pauli basis
     /// are independently uniform, but the generated stream is not intended to match Stim's C++ RNG
-    /// stream. The string is admitted against [`AlgebraMemoryBudget::DEFAULT`]; see
+    /// stream. The string is admitted against [`MemoryBudget::DEFAULT`]; see
     /// [`Self::random_with_budget`].
     pub fn random<R>(num_qubits: usize, rng: &mut R) -> StabilizerResult<Self>
     where
         R: Rng + ?Sized,
     {
-        Self::random_with_budget(num_qubits, AlgebraMemoryBudget::DEFAULT, rng)
+        Self::random_with_budget(num_qubits, MemoryBudget::DEFAULT, rng)
     }
 
     /// Creates a random Pauli string after admitting its two packed planes against `budget`,
     /// before consuming randomness.
     pub fn random_with_budget<R>(
         num_qubits: usize,
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
         rng: &mut R,
     ) -> StabilizerResult<Self>
     where
@@ -132,14 +133,14 @@ impl PauliString {
         Ok(result)
     }
 
-    /// Collects Pauli bases admitted against [`AlgebraMemoryBudget::DEFAULT`].
+    /// Collects Pauli bases admitted against [`MemoryBudget::DEFAULT`].
     ///
     /// See [`Self::from_bases_with_budget`].
     pub fn from_bases(
         sign: PauliSign,
         bases: impl IntoIterator<Item = PauliBasis>,
     ) -> StabilizerResult<Self> {
-        Self::from_bases_with_budget(sign, bases, AlgebraMemoryBudget::DEFAULT)
+        Self::from_bases_with_budget(sign, bases, MemoryBudget::DEFAULT)
     }
 
     /// Collects Pauli bases, refusing the first item whose collected bases and packed planes
@@ -147,12 +148,13 @@ impl PauliString {
     pub fn from_bases_with_budget(
         sign: PauliSign,
         bases: impl IntoIterator<Item = PauliBasis>,
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
     ) -> StabilizerResult<Self> {
         let mut collected = Vec::new();
         for basis in bases {
             let count = collected.len().saturating_add(1);
-            budget.admit(
+            admit(
+                budget,
                 StabilizerResource::PauliString,
                 collected_bases_bytes(count),
             )?;
@@ -472,15 +474,15 @@ impl PauliString {
     }
 
     /// Parses dense Pauli text like [`FromStr`], admitting the string's two packed planes against
-    /// `budget` instead of [`AlgebraMemoryBudget::DEFAULT`].
-    pub fn from_str_with_budget(text: &str, budget: AlgebraMemoryBudget) -> StabilizerResult<Self> {
+    /// `budget` instead of [`MemoryBudget::DEFAULT`].
+    pub fn from_str_with_budget(text: &str, budget: MemoryBudget) -> StabilizerResult<Self> {
         Self::parse_dense(text, false, budget)
     }
 
     fn parse_dense(
         text: &str,
         allow_lowercase: bool,
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
     ) -> StabilizerResult<Self> {
         let (sign, body) = parse_real_prefix(text);
         let mut result = Self::parse_dense_body(body, allow_lowercase, budget)?;
@@ -493,7 +495,7 @@ impl PauliString {
     fn parse_dense_body(
         body: &str,
         allow_lowercase: bool,
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
     ) -> StabilizerResult<Self> {
         let mut result = Self::identity_with_budget(body.chars().count(), budget)?;
         for (offset, character) in body.chars().enumerate() {
@@ -584,7 +586,7 @@ impl FromStr for PauliString {
     type Err = StabilizerError;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        Self::from_str_with_budget(text, AlgebraMemoryBudget::DEFAULT)
+        Self::from_str_with_budget(text, MemoryBudget::DEFAULT)
     }
 }
 
@@ -597,14 +599,11 @@ pub struct FlexPauliString {
 impl FlexPauliString {
     /// Creates an all-identity value admitted like [`PauliString::identity`].
     pub fn identity(num_qubits: usize) -> StabilizerResult<Self> {
-        Self::identity_with_budget(num_qubits, AlgebraMemoryBudget::DEFAULT)
+        Self::identity_with_budget(num_qubits, MemoryBudget::DEFAULT)
     }
 
     /// Creates an all-identity value admitted like [`PauliString::identity_with_budget`].
-    pub fn identity_with_budget(
-        num_qubits: usize,
-        budget: AlgebraMemoryBudget,
-    ) -> StabilizerResult<Self> {
+    pub fn identity_with_budget(num_qubits: usize, budget: MemoryBudget) -> StabilizerResult<Self> {
         Ok(Self {
             value: PauliString::identity_with_budget(num_qubits, budget)?,
             imaginary: false,
@@ -660,14 +659,14 @@ impl FlexPauliString {
         phase: PauliPhase,
         bases: impl IntoIterator<Item = PauliBasis>,
     ) -> StabilizerResult<Self> {
-        Self::from_phase_and_bases_with_budget(phase, bases, AlgebraMemoryBudget::DEFAULT)
+        Self::from_phase_and_bases_with_budget(phase, bases, MemoryBudget::DEFAULT)
     }
 
     /// Collects Pauli bases admitted like [`PauliString::from_bases_with_budget`].
     pub fn from_phase_and_bases_with_budget(
         phase: PauliPhase,
         bases: impl IntoIterator<Item = PauliBasis>,
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
     ) -> StabilizerResult<Self> {
         let imaginary = phase.is_imaginary();
         let value = PauliString::from_bases_with_budget(phase.sign(), bases, budget)?;
@@ -709,11 +708,11 @@ impl FlexPauliString {
     }
 
     /// Parses dense or sparse Pauli text like [`FromStr`], admitting the value's two packed
-    /// planes against `budget` instead of [`AlgebraMemoryBudget::DEFAULT`].
+    /// planes against `budget` instead of [`MemoryBudget::DEFAULT`].
     ///
     /// A sparse text's width is its largest qubit index plus one, so a short text can request a
     /// wide value; the budget is checked before that storage is allocated.
-    pub fn from_str_with_budget(text: &str, budget: AlgebraMemoryBudget) -> StabilizerResult<Self> {
+    pub fn from_str_with_budget(text: &str, budget: MemoryBudget) -> StabilizerResult<Self> {
         let (phase, body) = parse_flex_prefix(text);
         let sparse_size = sparse_size_if_sparse(body)?;
         if sparse_size > 0 {
@@ -735,7 +734,7 @@ impl FlexPauliString {
         body: &str,
         num_qubits: usize,
         original_text: &str,
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
     ) -> StabilizerResult<Self> {
         let mut value = PauliString::identity_with_budget(num_qubits, budget)?;
         value.sign = phase.sign();
@@ -815,7 +814,7 @@ impl FromStr for FlexPauliString {
     type Err = StabilizerError;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        Self::from_str_with_budget(text, AlgebraMemoryBudget::DEFAULT)
+        Self::from_str_with_budget(text, MemoryBudget::DEFAULT)
     }
 }
 

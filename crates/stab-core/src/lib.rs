@@ -8,9 +8,9 @@ pub use stab_decoder as decoder;
 pub use stab_engine as execution;
 
 pub use stab_algebra::{
-    AlgebraMemoryBudget, CliffordString, FlexPauliString, Flow, FlowMeasurementIndex, PauliBasis,
-    PauliPhase, PauliSign, PauliString, SingleQubitClifford, StabilizerError, StabilizerResource,
-    StabilizerResult, Tableau,
+    CliffordString, FlexPauliString, Flow, FlowMeasurementIndex, PauliBasis, PauliPhase, PauliSign,
+    PauliString, SingleQubitClifford, StabilizerError, StabilizerResource, StabilizerResult,
+    Tableau,
 };
 pub use stab_decoder::{
     DecodeBatchError, DecodeBatchStatus, DecodeBatchSummary, DecodeContractError,
@@ -23,18 +23,19 @@ pub use stab_model::{
     DemErrorMechanismView, DemErrorMechanismVisitError, DemErrorMechanismVisitor, DemErrorTarget,
     DemErrorTargetIter, DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem,
     DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, DiagnosticSeverity, Estimate,
-    EstimateClass, Gate, GateArgumentRule, GateCategory, GateDecomposition, GateKind,
-    GateTargetGroupKind, GateTargetRule, MeasureRecordOffset, MemoryBudget, MemoryBudgetParseError,
-    ModelDialect, ModelError, ModelFingerprint, ModelResult, ObservableId, ParseError,
-    ParseErrorCode, ParseErrorContext, ParseLimits, Pauli, Probability, ProbabilityStimText,
-    QubitId, RepeatBlock, RepeatCount, RepeatNestingLimit, RepeatNestingLimitError,
-    ResourceEstimate, Target, TargetKind, ValidationError, ValidationErrorCode,
+    Gate, GateArgumentRule, GateCategory, GateDecomposition, GateKind, GateTargetGroupKind,
+    GateTargetRule, MeasureRecordOffset, MemoryBudget, MemoryBudgetExceeded,
+    MemoryBudgetParseError, ModelDialect, ModelError, ModelFingerprint, ModelResult, ObservableId,
+    ParseError, ParseErrorCode, ParseErrorContext, ParseLimits, Pauli, Probability,
+    ProbabilityStimText, QubitId, RepeatBlock, RepeatCount, RepeatNestingLimit,
+    RepeatNestingLimitError, ResourceAmount, ResourceEstimate, Target, TargetKind, ValidationError,
+    ValidationErrorCode,
 };
 pub use stab_records::{
     BitIndex, BitPlaneBatch, BitPlaneBatchView, CodecCapability, CorrectionWidth,
     DemSampleBatchView, DemSampleSink, DetectionBatchView, DetectionSink, DetectorWidth,
-    EncodedSizeEstimate, FormatError, FormatErrorCode, FormatErrorContext, MeasurementBatchView,
-    MeasurementSink, MeasurementWidth, ObservablePredictionBatch, ObservableWidth, PackedShotBatch,
+    FormatError, FormatErrorCode, FormatErrorContext, MeasurementBatchView, MeasurementSink,
+    MeasurementWidth, ObservablePredictionBatch, ObservableWidth, PackedShotBatch,
     PackedShotBatchView, RecordBatchView, RecordEncoding, RecordFormat, RecordLayout,
     SampledErrorWidth, ShotIndex,
 };

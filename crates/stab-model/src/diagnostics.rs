@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::ModelDialect;
+use crate::{ByteSpan, DiagnosticSeverity, ModelDialect};
 
 const MAX_PARSE_DIAGNOSTIC_TEXT_BYTES: usize = 256;
 
@@ -22,59 +22,13 @@ pub(crate) fn bounded_parse_diagnostic_text(value: &str) -> String {
     excerpt
 }
 
-/// A half-open byte range in the original input.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct ByteSpan {
-    byte_start: usize,
-    byte_length: usize,
-}
-
-impl ByteSpan {
-    pub(crate) const fn from_valid_range(byte_start: usize, byte_length: usize) -> Self {
-        Self {
-            byte_start,
-            byte_length,
-        }
-    }
-
-    pub const fn try_new(byte_start: usize, byte_length: usize) -> Option<Self> {
-        match byte_start.checked_add(byte_length) {
-            Some(_) => Some(Self {
-                byte_start,
-                byte_length,
-            }),
-            None => None,
-        }
-    }
-
-    pub const fn byte_start(self) -> usize {
-        self.byte_start
-    }
-
-    pub const fn byte_length(self) -> usize {
-        self.byte_length
-    }
-
-    pub const fn byte_end(self) -> usize {
-        self.byte_start + self.byte_length
-    }
-}
-
-/// Machine-readable diagnostic severity.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[non_exhaustive]
-pub enum DiagnosticSeverity {
-    Error,
-    Warning,
-}
-
-impl DiagnosticSeverity {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Error => "error",
-            Self::Warning => "warning",
-        }
-    }
+/// The span of `byte_length` bytes at `byte_start` inside one in-memory input.
+///
+/// Both ends index the same input slice, whose length is at most `isize::MAX`, so the end cannot
+/// overflow; a caller that broke that would get the empty span at `byte_start`, never an invalid
+/// span.
+pub(crate) fn input_span(byte_start: usize, byte_length: usize) -> ByteSpan {
+    ByteSpan::try_new(byte_start, byte_length).unwrap_or(ByteSpan::empty_at(byte_start))
 }
 
 /// Stable machine-readable model-parse failure classes.
@@ -309,8 +263,8 @@ impl ParseError {
         byte_length: usize,
         error_length: Option<usize>,
     ) -> Self {
-        let span = ByteSpan::try_new(byte_start, byte_length)
-            .unwrap_or_else(|| ByteSpan::from_valid_range(byte_start, 0));
+        let span =
+            ByteSpan::try_new(byte_start, byte_length).unwrap_or(ByteSpan::empty_at(byte_start));
         Self::new(
             ParseErrorCode::InvalidUtf8Input,
             "input is not valid UTF-8 text",

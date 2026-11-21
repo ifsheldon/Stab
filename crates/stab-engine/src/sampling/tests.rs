@@ -359,11 +359,12 @@ fn compiled_program_bytes_are_admitted_against_the_budget_before_materialization
         .memory_budget(MemoryBudget::from_bytes(0))
         .compile(&circuit)
         .expect_err("the program exceeds a zero budget");
-    let SamplingCompileError::CompiledBytesLimit { required, budget } = error.clone() else {
+    let SamplingCompileError::CompiledBytesLimit { exceeded } = error.clone() else {
         panic!("expected a typed compiled-bytes refusal, got {error:?}");
     };
-    assert_eq!(budget, 0);
-    assert!(required > 0);
+    assert_eq!(exceeded.budget(), MemoryBudget::from_bytes(0));
+    assert!(exceeded.required().value() > 0);
+    assert_eq!(error.memory_budget_exceeded(), Some(&exceeded));
     let crate::DetectionError::ResourceLimit(detection_limit) = crate::DetectionError::from(error)
     else {
         panic!("detection sampling must preserve the typed refusal");

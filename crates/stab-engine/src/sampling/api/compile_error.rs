@@ -1,3 +1,4 @@
+use stab_model::MemoryBudgetExceeded;
 use thiserror::Error;
 
 /// Failure to compile an immutable sampling plan.
@@ -12,10 +13,13 @@ pub enum SamplingCompileError {
     #[error("cannot compile circuit sampler: {message}")]
     InvalidCircuit { message: String },
 
+    /// The memory budget refused the compiled program before any of it was reserved.
     #[error(
-        "cannot compile circuit sampler: the compiled program needs at least {required} bytes, exceeding the {budget}-byte memory budget; raise the memory budget to admit it"
+        "cannot compile circuit sampler: the compiled program needs at least {} bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
+        exceeded.required().value(),
+        exceeded.budget().bytes()
     )]
-    CompiledBytesLimit { required: u64, budget: u64 },
+    CompiledBytesLimit { exceeded: MemoryBudgetExceeded },
 
     /// The allocator refused storage that admission had already accepted.
     #[error("cannot compile circuit sampler: {message}")]
@@ -26,6 +30,19 @@ pub enum SamplingCompileError {
 }
 
 impl SamplingCompileError {
+    /// The memory-budget refusal this error reports, including one from the model or analysis
+    /// layer.
+    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match self {
+            Self::Model(error) => error.memory_budget_exceeded(),
+            Self::Analysis(error) => error.memory_budget_exceeded(),
+            Self::CompiledBytesLimit { exceeded } => Some(exceeded),
+            Self::InvalidCircuit { .. } | Self::StorageAllocation { .. } | Self::Cancelled(_) => {
+                None
+            }
+        }
+    }
+
     pub(crate) fn invalid_circuit(message: impl Into<String>) -> Self {
         Self::InvalidCircuit {
             message: message.into(),

@@ -996,10 +996,23 @@ fn detection_sampling_handles_gauge_detectors_structurally() {
 /// a storage-allocation failure, instead of both becoming an invalid-compilation error.
 #[test]
 fn execution_refusals_keep_their_resource_classification_across_conversions() {
-    let converted = DetectionError::from(crate::SamplingExecutionError::SessionStorageLimit {
-        estimated_bytes: u128::from(u64::MAX) + 1,
-        limit_bytes: 4096,
-    });
+    let exceeded = stab_model::MemoryBudgetExceeded::new(
+        stab_model::ResourceAmount::saturating_from_u128(u128::from(u64::MAX) + 1),
+        stab_model::MemoryBudget::from_bytes(4096),
+    );
+    let sampling = crate::SamplingExecutionError::SessionStorageLimit { exceeded };
+    let converted = DetectionError::from(sampling.clone());
+    // The one refusal value survives every wrapper a detection caller can observe it through.
+    assert_eq!(converted.memory_budget_exceeded(), Some(&exceeded));
+    assert_eq!(
+        crate::DetectionExecutionError::from(converted.clone()).memory_budget_exceeded(),
+        Some(&exceeded)
+    );
+    assert_eq!(
+        crate::DetectionExecutionError::Sampling(sampling.clone()).memory_budget_exceeded(),
+        Some(&exceeded)
+    );
+
     assert!(
         matches!(
             &converted,

@@ -6,8 +6,8 @@
 use std::collections::HashSet;
 
 use stab_records::{
-    ByteSpan, DiagnosticSeverity, EncodedSizeEstimate, FormatError, FormatErrorCode,
-    FormatErrorContext, RecordEncoding, RecordFormat, codec_capabilities, read_records,
+    ByteSpan, DiagnosticSeverity, Estimate, FormatError, FormatErrorCode, FormatErrorContext,
+    RecordEncoding, RecordFormat, codec_capabilities, read_records,
 };
 
 #[test]
@@ -69,19 +69,19 @@ fn record_capabilities_report_exact_formats_layouts_and_sizes() {
 
     assert_eq!(
         RecordFormat::ZeroOne.estimate_output_bytes(3, 7),
-        EncodedSizeEstimate::Exact(24)
+        Estimate::Exact(24)
     );
     assert_eq!(
         RecordFormat::B8.estimate_output_bytes(3, 9),
-        EncodedSizeEstimate::Exact(6)
+        Estimate::Exact(6)
     );
     assert_eq!(
         RecordFormat::Ptb64.estimate_output_bytes(64, 17),
-        EncodedSizeEstimate::Exact(136)
+        Estimate::Exact(136)
     );
     assert_eq!(
         RecordFormat::Ptb64.estimate_output_bytes(63, 17),
-        EncodedSizeEstimate::Unknown
+        Estimate::Unknown
     );
     assert_eq!(RecordFormat::Hits.estimate_output_bytes(3, 7).value(), None);
 }

@@ -437,7 +437,7 @@ impl FeedbackRepeatBudget {
                 AnalysisOperation::FeedbackInlining,
                 ResourceKind::MaterializedBytes,
                 actual,
-                self.budget.bytes(),
+                self.budget,
             )
             .into());
         }
@@ -941,8 +941,7 @@ mod tests {
 
         let one_iteration = Circuit::from_stim_str("REPEAT 1 {\nTICK\n}\n").unwrap();
         let exact =
-            validate_feedback_repeat_budget(&one_iteration, MemoryBudget::from_bytes(u64::MAX))
-                .unwrap();
+            validate_feedback_repeat_budget(&one_iteration, MemoryBudget::UNLIMITED).unwrap();
         assert!(exact > 0);
         validate_feedback_repeat_budget(&one_iteration, MemoryBudget::from_bytes(exact)).unwrap();
         let error =

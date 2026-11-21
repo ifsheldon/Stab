@@ -314,7 +314,7 @@ fn admit_missing_detector_bytes(
             AnalysisOperation::MissingDetectorDiscovery,
             resource,
             projected,
-            budget.bytes(),
+            budget,
         )
         .into());
     }

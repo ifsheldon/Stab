@@ -2,7 +2,7 @@ use std::convert::Infallible;
 
 use stab_model::advanced::{FoldedCircuitEvent, visit_folded_circuit};
 use stab_model::{Cancellation, Circuit, Estimate, ParseLimits, ResourceEstimate};
-use stab_records::{EncodedSizeEstimate, RecordFormat};
+use stab_records::RecordFormat;
 
 /// Estimates cheaply knowable resource properties of a sampling request without compiling or
 /// executing it.
@@ -22,7 +22,7 @@ pub fn estimate_sampling_request(
         .ok()
         .and_then(|measurements| usize::try_from(measurements).ok())
         .map_or(Estimate::Unknown, |measurements| {
-            estimate_from_encoded(output_format.estimate_output_bytes(shots, measurements))
+            output_format.estimate_output_bytes(shots, measurements)
         });
 
     ResourceEstimate::builder()
@@ -31,13 +31,6 @@ pub fn estimate_sampling_request(
         .folded_traversal(input_items.map_or(Estimate::Unknown, Estimate::Exact))
         .output_bytes(output_bytes)
         .build()
-}
-
-fn estimate_from_encoded<T>(estimate: EncodedSizeEstimate<T>) -> Estimate<T> {
-    match estimate {
-        EncodedSizeEstimate::Exact(value) => Estimate::Exact(value),
-        EncodedSizeEstimate::Unknown => Estimate::Unknown,
-    }
 }
 
 /// Counts folded items and expanded instructions in one folded walk.

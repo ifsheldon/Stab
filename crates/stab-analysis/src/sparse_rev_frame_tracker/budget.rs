@@ -76,7 +76,7 @@ impl TrackerMeter {
             policy.operation,
             policy.resource,
             required,
-            policy.budget.bytes(),
+            policy.budget,
         )
         .into())
     }

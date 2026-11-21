@@ -10,6 +10,11 @@ use stab_model::ModelError;
 use super::CliError;
 
 pub(super) fn cli_error_code(error: &CliError) -> &'static str {
+    // A memory-budget refusal has one code wherever it is wrapped, including inside a run
+    // failure; the CLI's own input-size refusal keeps its more specific code.
+    if error.memory_budget_exceeded().is_some() {
+        return RESOURCE_LIMIT_CODE;
+    }
     match error {
         CliError::ReadInput(_) => "stdin-read-failed",
         CliError::ReadPath { .. } => "path-read-failed",

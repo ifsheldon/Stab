@@ -12,7 +12,10 @@ const MINIMUM_RUST_MAJOR: u64 = 1;
 const MINIMUM_RUST_MINOR: u64 = 100;
 const MINIMUM_RUST_PATCH: u64 = 0;
 pub(crate) const PRODUCT_PACKAGE_CONTRACTS: &[ProductPackageContract] = &[
-    ProductPackageContract::library("stab-algebra", &["stab-bits", "stab-kernels-simd"]),
+    ProductPackageContract::library(
+        "stab-algebra",
+        &["stab-bits", "stab-foundation", "stab-kernels-simd"],
+    ),
     ProductPackageContract::library("stab-analysis", &["stab-algebra", "stab-model"]),
     ProductPackageContract::library("stab-bits", &["stab-kernels-simd"]),
     ProductPackageContract::binary(
@@ -48,9 +51,10 @@ pub(crate) const PRODUCT_PACKAGE_CONTRACTS: &[ProductPackageContract] = &[
             "stab-records",
         ],
     ),
+    ProductPackageContract::library("stab-foundation", &[]),
     ProductPackageContract::library("stab-kernels-simd", &[]),
-    ProductPackageContract::library("stab-model", &[]),
-    ProductPackageContract::library("stab-records", &["stab-bits"]),
+    ProductPackageContract::library("stab-model", &["stab-foundation"]),
+    ProductPackageContract::library("stab-records", &["stab-bits", "stab-foundation"]),
 ];
 const MINIMUM_RUST_TEST_SUPPORT_PACKAGES: &[&str] =
     &["stab-reference-decoder", "stab-reference-noise-pass"];

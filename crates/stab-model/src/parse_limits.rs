@@ -218,19 +218,17 @@ impl ParseAdmission {
         limits: ParseLimits,
     ) -> ModelResult<()> {
         let budget = limits.memory_budget();
-        if !budget.admits(input_len as u128) {
-            let span_start = budget.bytes_usize();
-            return Err(ResourceLimitError::new(
+        budget.admit(input_len as u128).map_err(|exceeded| {
+            let span_start = budget.bytes_saturating_usize();
+            ResourceLimitError::parse_memory_budget(
                 dialect,
                 ResourceKind::SourceBytes,
                 None,
-                input_len as u64,
-                budget.bytes(),
-                ByteSpan::from_valid_range(span_start, 1),
+                exceeded,
+                crate::diagnostics::input_span(span_start, 1),
             )
-            .into());
-        }
-        Ok(())
+            .into()
+        })
     }
 
     /// The retained model bytes charged so far, excluding the source bytes.
@@ -249,13 +247,12 @@ impl ParseAdmission {
     fn admitted_total(&self, bytes: u128, source_line: usize, span: ByteSpan) -> ModelResult<u64> {
         let required = u128::from(self.charged_bytes).saturating_add(bytes);
         let budget = self.limits.memory_budget();
-        if !budget.admits(required) {
-            return Err(ResourceLimitError::new(
+        if let Err(exceeded) = budget.admit(required) {
+            return Err(ResourceLimitError::parse_memory_budget(
                 self.dialect,
                 ResourceKind::RetainedBytes,
                 Some(source_line),
-                u64::try_from(required).unwrap_or(u64::MAX),
-                budget.bytes(),
+                exceeded,
                 span,
             )
             .into());
@@ -447,10 +444,9 @@ impl ParseAdmission {
     ) -> ModelResult<()> {
         let limit = self.limits.repeat_nesting_limit().get();
         if actual > limit {
-            return Err(ResourceLimitError::new(
+            return Err(ResourceLimitError::parse_repeat_nesting(
                 self.dialect,
-                ResourceKind::RepeatNesting,
-                Some(source_line),
+                source_line,
                 actual as u64,
                 limit as u64,
                 span,

@@ -216,7 +216,7 @@ pub(super) fn validate_session_storage(
     if !budget.admits(estimated_bytes) {
         let actual = u64::try_from(estimated_bytes).unwrap_or(u64::MAX);
         return Err(DemSamplingExecutionError::InvalidRequest(
-            DemResourceLimitError::active_batch_bytes(actual, budget.bytes()).into(),
+            DemResourceLimitError::active_batch_bytes(actual, budget).into(),
         ));
     }
     Ok(())

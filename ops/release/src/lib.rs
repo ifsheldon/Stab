@@ -32,6 +32,7 @@ pub use error::ReleaseError;
 pub const RELEASE_VERSION: &str = "0.2.0";
 pub const RELEASE_TAG: &str = "v0.2.0";
 pub const PRODUCT_PACKAGE_ORDER: &[&str] = &[
+    "stab-foundation",
     "stab-kernels-simd",
     "stab-model",
     "stab-bits",

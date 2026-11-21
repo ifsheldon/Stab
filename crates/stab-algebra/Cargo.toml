@@ -16,6 +16,7 @@ workspace = true
 num-complex = { workspace = true }
 rand = { workspace = true, default-features = false }
 stab-bits = { workspace = true }
+stab-foundation = { workspace = true }
 stab-kernels-simd = { workspace = true }
 thiserror = { workspace = true }
 

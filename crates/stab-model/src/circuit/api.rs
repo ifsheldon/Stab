@@ -207,7 +207,7 @@ impl Circuit {
 
     /// Materializes every detector's coordinates within the default memory budget.
     pub fn detector_coordinates(&self) -> ModelResult<BTreeMap<CircuitDetectorId, Vec<f64>>> {
-        self.detector_coordinates_with_memory_budget(MemoryBudget::DEFAULT)
+        self.detector_coordinates_with_budget(MemoryBudget::DEFAULT)
     }
 
     /// Materializes every detector's coordinates after admitting the conservative map size
@@ -217,7 +217,7 @@ impl Circuit {
     /// [`crate::ResourceKind::MaterializedBytes`] before anything is allocated, so a huge
     /// `REPEAT` cannot force an allocation proportional to its detector count. Use
     /// [`Self::detector_coordinates_for`] to look up selected detectors without this charge.
-    pub fn detector_coordinates_with_memory_budget(
+    pub fn detector_coordinates_with_budget(
         &self,
         budget: MemoryBudget,
     ) -> ModelResult<BTreeMap<CircuitDetectorId, Vec<f64>>> {

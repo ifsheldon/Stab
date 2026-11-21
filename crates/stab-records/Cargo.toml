@@ -14,6 +14,7 @@ workspace = true
 
 [dependencies]
 stab-bits = { workspace = true }
+stab-foundation = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

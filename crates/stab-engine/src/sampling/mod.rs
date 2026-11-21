@@ -2,15 +2,15 @@
 use rand::Rng;
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
-use stab_model::{Circuit, MemoryBudget, ModelDialect};
+use stab_model::{Circuit, MemoryBudget, MemoryBudgetExceeded, ModelDialect};
 use stab_records::MeasurementWidth;
 
 #[cfg(test)]
 use self::execute::{ExecutionBuffers, ExecutionMode, execute_program};
 #[cfg(test)]
 use self::stabilizer_frame::StabilizerFrame;
+use crate::detection::DetectionError;
 use crate::detection::frame::CircuitProgram;
-use crate::detection::{DetectionError, DetectionResourceKind};
 use crate::{CompilationDescriptor, CompilationOperation, CompilationRequestFingerprint};
 
 mod api;
@@ -145,13 +145,9 @@ pub(crate) fn validate_simulator_work_storage(
 ) -> Result<(), SamplingExecutionError> {
     let estimated_bytes =
         simulator_work_storage_bytes(qubit_count, measurement_count, include_reference_snapshot);
-    if !budget.admits(estimated_bytes) {
-        return Err(SamplingExecutionError::SessionStorageLimit {
-            estimated_bytes,
-            limit_bytes: budget.bytes(),
-        });
-    }
-    Ok(())
+    budget
+        .admit(estimated_bytes)
+        .map_err(|exceeded| SamplingExecutionError::SessionStorageLimit { exceeded })
 }
 
 /// Conservative scratch storage of one reference-simulator run, including its output sample of
@@ -195,24 +191,41 @@ fn sampling_compile_error(error: DetectionError) -> SamplingCompileError {
         | DetectionError::InvalidResultFormat { message } => {
             SamplingCompileError::InvalidCircuit { message }
         }
-        DetectionError::ResourceLimit(limit) => match limit.kind() {
-            DetectionResourceKind::RepeatNesting => SamplingCompileError::invalid_circuit(format!(
+        // Lowering refuses only compiled bytes or repeat nesting; a session-storage refusal is
+        // still a budget refusal, so it keeps the resource classification.
+        DetectionError::ResourceLimit(limit) => match limit.memory_budget_exceeded() {
+            Some(exceeded) => SamplingCompileError::CompiledBytesLimit {
+                exceeded: *exceeded,
+            },
+            None => SamplingCompileError::invalid_circuit(format!(
                 "repeat nesting exceeds sampler limit {}",
                 stab_model::RepeatNestingLimit::HARD_MAX
             )),
-            // Lowering refuses only compiled bytes; a session-storage refusal is still a budget
-            // refusal, so it keeps the resource classification.
-            DetectionResourceKind::CompiledBytes | DetectionResourceKind::SessionStorageBytes => {
-                SamplingCompileError::CompiledBytesLimit {
-                    required: limit.actual(),
-                    budget: limit.limit(),
-                }
-            }
         },
         DetectionError::StorageAllocation { message } => {
             SamplingCompileError::StorageAllocation { message }
         }
         DetectionError::Cancelled(cancelled) => SamplingCompileError::Cancelled(cancelled),
+    }
+}
+
+impl CountDeterminedMeasurementsError {
+    /// The memory-budget refusal of compilation or execution, if this error is one.
+    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match self {
+            Self::Compile(error) => error.memory_budget_exceeded(),
+            Self::Execution(error) => error.memory_budget_exceeded(),
+        }
+    }
+}
+
+impl CircuitReferenceSampleError {
+    /// The memory-budget refusal of compilation or execution, if this error is one.
+    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match self {
+            Self::Compile(error) => error.memory_budget_exceeded(),
+            Self::Execution(error) => error.memory_budget_exceeded(),
+        }
     }
 }
 

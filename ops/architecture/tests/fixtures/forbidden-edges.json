@@ -1,5 +1,6 @@
 {
   "packages": [
+    { "name": "stab-foundation", "path": "crates/stab-foundation" },
     { "name": "stab-kernels-simd", "path": "crates/stab-kernels-simd" },
     { "name": "stab-bits", "path": "crates/stab-bits" },
     { "name": "stab-records", "path": "crates/stab-records" },
@@ -8,12 +9,14 @@
     { "name": "stab-architecture", "path": "ops/architecture" }
   ],
   "edges": [
+    { "from": "stab-foundation", "to": "stab-bits", "kind": "normal" },
     { "from": "stab-kernels-simd", "to": "stab-bits", "kind": "normal" },
     { "from": "stab-records", "to": "stab-engine", "kind": "normal" },
     { "from": "stab-analysis", "to": "stab-engine", "kind": "normal" },
     { "from": "stab-bits", "to": "stab-architecture", "kind": "development" }
   ],
   "expected_violation_codes": [
+    "forbidden-product-edge",
     "forbidden-product-edge",
     "forbidden-product-edge",
     "forbidden-product-edge",

@@ -2,8 +2,8 @@ use std::error::Error;
 
 use stab_model::advanced::CancellationCountdown;
 use stab_model::{
-    Cancellation, Cancelled, Circuit, CircuitItem, MemoryBudget, ParseLimits, RepeatNestingLimit,
-    Target,
+    Cancellation, Cancelled, Circuit, CircuitItem, MemoryBudget, MemoryBudgetExceeded, ParseLimits,
+    RepeatNestingLimit, Target,
 };
 use thiserror::Error;
 
@@ -34,10 +34,7 @@ impl CircuitPassLimits {
 
     /// Returns the widest policy permitted by the fixed repeat-nesting safety envelope.
     pub fn maximal() -> Self {
-        Self::new(
-            MemoryBudget::from_bytes(u64::MAX),
-            ParseLimits::DEFAULT_REPEAT_NESTING,
-        )
+        Self::new(MemoryBudget::UNLIMITED, ParseLimits::DEFAULT_REPEAT_NESTING)
     }
 
     /// Returns the budget for admitted logical payload, excluding allocator metadata and spare
@@ -342,6 +339,17 @@ impl<D: Error + 'static> CircuitPassError<D> {
                 None
             }
             Self::ResourceLimit(error) => Some(error),
+        }
+    }
+
+    /// The memory-budget refusal of the framework's resource admission; a pass-specific
+    /// diagnostic is the pass's own type and is not inspected.
+    pub const fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match self {
+            Self::ResourceLimit(error) => error.memory_budget_exceeded(),
+            Self::Diagnostic(_) | Self::ProjectionUnderestimated { .. } | Self::Cancelled(_) => {
+                None
+            }
         }
     }
 

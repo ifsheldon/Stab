@@ -17,8 +17,10 @@ mod tests;
 pub use appender::TableauAppender;
 pub(crate) use rows::PauliRows;
 
-use super::budget::{AlgebraMemoryBudget, StabilizerResource, tableau_bytes};
+use super::budget::{StabilizerResource, tableau_bytes};
 use super::{PauliBasis, PauliPhase, PauliSign, PauliString, StabilizerError, StabilizerResult};
+use crate::MemoryBudget;
+use crate::budget::admit;
 
 /// A Clifford operation stored as the signed images of its `2n` canonical generators.
 ///
@@ -32,17 +34,18 @@ pub struct Tableau {
 }
 
 impl Tableau {
-    /// Creates an identity Tableau admitted against [`AlgebraMemoryBudget::DEFAULT`].
+    /// Creates an identity Tableau admitted against [`MemoryBudget::DEFAULT`].
     pub fn identity(num_qubits: usize) -> StabilizerResult<Self> {
-        Self::identity_with_budget(num_qubits, AlgebraMemoryBudget::DEFAULT)
+        Self::identity_with_budget(num_qubits, MemoryBudget::DEFAULT)
     }
 
     /// Creates an identity Tableau after admitting its packed rows against `budget`.
-    pub fn identity_with_budget(
-        num_qubits: usize,
-        budget: AlgebraMemoryBudget,
-    ) -> StabilizerResult<Self> {
-        budget.admit(StabilizerResource::Tableau, tableau_bytes(num_qubits))?;
+    pub fn identity_with_budget(num_qubits: usize, budget: MemoryBudget) -> StabilizerResult<Self> {
+        admit(
+            budget,
+            StabilizerResource::Tableau,
+            tableau_bytes(num_qubits),
+        )?;
         Self::identity_unadmitted(num_qubits)
     }
 
@@ -123,14 +126,14 @@ impl Tableau {
     }
 
     /// Samples a uniformly random Clifford tableau admitted against
-    /// [`AlgebraMemoryBudget::DEFAULT`].
+    /// [`MemoryBudget::DEFAULT`].
     ///
     /// See [`Self::random_with_budget`].
     pub fn random<R>(num_qubits: usize, rng: &mut R) -> StabilizerResult<Self>
     where
         R: Rng + ?Sized,
     {
-        Self::random_with_budget(num_qubits, AlgebraMemoryBudget::DEFAULT, rng)
+        Self::random_with_budget(num_qubits, MemoryBudget::DEFAULT, rng)
     }
 
     /// Samples a uniformly random Clifford tableau using the caller-owned RNG.
@@ -143,13 +146,14 @@ impl Tableau {
     /// `O(n^3 / 64)` word operations.
     pub fn random_with_budget<R>(
         num_qubits: usize,
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
         rng: &mut R,
     ) -> StabilizerResult<Self>
     where
         R: Rng + ?Sized,
     {
-        budget.admit(
+        admit(
+            budget,
             StabilizerResource::RandomTableau,
             random::random_tableau_bytes(num_qubits),
         )?;
@@ -202,21 +206,25 @@ impl Tableau {
     }
 
     /// Returns the Tableau of conjugation by `pauli`, admitted against
-    /// [`AlgebraMemoryBudget::DEFAULT`].
+    /// [`MemoryBudget::DEFAULT`].
     ///
     /// See [`Self::from_pauli_string_with_budget`].
     pub fn from_pauli_string(pauli: &PauliString) -> StabilizerResult<Self> {
-        Self::from_pauli_string_with_budget(pauli, AlgebraMemoryBudget::DEFAULT)
+        Self::from_pauli_string_with_budget(pauli, MemoryBudget::DEFAULT)
     }
 
     /// Returns the Tableau of conjugation by `pauli`, admitted against `budget` because its size
     /// is quadratic in the string's width.
     pub fn from_pauli_string_with_budget(
         pauli: &PauliString,
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
     ) -> StabilizerResult<Self> {
         let num_qubits = pauli.len();
-        budget.admit(StabilizerResource::Tableau, tableau_bytes(num_qubits))?;
+        admit(
+            budget,
+            StabilizerResource::Tableau,
+            tableau_bytes(num_qubits),
+        )?;
         let mut result = Self::identity_unadmitted(num_qubits)?;
         for (index, basis) in pauli.active_terms() {
             if basis.z_bit() {
@@ -421,10 +429,10 @@ impl Tableau {
 
     /// Embeds this Tableau into `num_qubits`, acting on `targets` in the supplied order.
     ///
-    /// The result is admitted against [`AlgebraMemoryBudget::DEFAULT`]; see
+    /// The result is admitted against [`MemoryBudget::DEFAULT`]; see
     /// [`Self::embedded_with_budget`].
     pub fn embedded(&self, num_qubits: usize, targets: &[usize]) -> StabilizerResult<Self> {
-        self.embedded_with_budget(num_qubits, targets, AlgebraMemoryBudget::DEFAULT)
+        self.embedded_with_budget(num_qubits, targets, MemoryBudget::DEFAULT)
     }
 
     /// Embeds this Tableau into `num_qubits`, acting on `targets` in the supplied order.
@@ -435,10 +443,14 @@ impl Tableau {
         &self,
         num_qubits: usize,
         targets: &[usize],
-        budget: AlgebraMemoryBudget,
+        budget: MemoryBudget,
     ) -> StabilizerResult<Self> {
         validate_tableau_targets(self.len(), num_qubits, targets)?;
-        budget.admit(StabilizerResource::Tableau, tableau_bytes(num_qubits))?;
+        admit(
+            budget,
+            StabilizerResource::Tableau,
+            tableau_bytes(num_qubits),
+        )?;
         let mut result = Self::identity_unadmitted(num_qubits)?;
         let width = self.len();
         for (local_index, global_index) in targets.iter().copied().enumerate() {

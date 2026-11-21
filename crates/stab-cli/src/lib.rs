@@ -773,12 +773,9 @@ fn one_shot_visible_measurements(
         return Ok(None);
     };
     let required = (visible_count as u128).saturating_mul(size_of::<usize>() as u128);
-    if !budget.admits(required) {
+    if let Err(exceeded) = budget.admit(required) {
         return Err(
-            stage.refusal(stab_engine::SamplingExecutionError::SessionStorageLimit {
-                estimated_bytes: required,
-                limit_bytes: budget.bytes(),
-            }),
+            stage.refusal(stab_engine::SamplingExecutionError::SessionStorageLimit { exceeded })
         );
     }
     let mut visible = Vec::new();

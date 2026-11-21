@@ -1,4 +1,4 @@
-use stab_model::{DetectorErrorModel, ModelError, ModelFingerprint};
+use stab_model::{DetectorErrorModel, MemoryBudgetExceeded, ModelError, ModelFingerprint};
 use stab_records::{CorrectionWidth, DetectorWidth, ObservableWidth};
 use thiserror::Error;
 
@@ -86,4 +86,14 @@ pub enum DecoderModelViewError {
 
     #[error("observable count {actual} does not fit the platform decoder width")]
     ObservableWidthOverflow { actual: u64 },
+}
+
+impl DecoderModelViewError {
+    /// The memory-budget refusal of the wrapped model failure, if this error is one.
+    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match self {
+            Self::Model(error) => error.memory_budget_exceeded(),
+            Self::DetectorWidthOverflow { .. } | Self::ObservableWidthOverflow { .. } => None,
+        }
+    }
 }

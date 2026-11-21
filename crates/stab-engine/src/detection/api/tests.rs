@@ -1030,8 +1030,7 @@ fn direct_session_storage_admits_the_exact_budget_and_rejects_the_first_excess_b
         assert_eq!(
             rejected,
             Some(DetectionExecutionError::SessionStorageLimit {
-                estimated_bytes: exact,
-                limit_bytes: u64::try_from(exact - 1).expect("small budget"),
+                exceeded: refusal(exact),
             }),
             "{lane_width:?}"
         );
@@ -1067,8 +1066,7 @@ fn conversion_session_storage_admits_the_exact_budget_and_rejects_the_first_exce
     assert_eq!(
         rejected,
         Some(DetectionExecutionError::SessionStorageLimit {
-            estimated_bytes: exact,
-            limit_bytes: u64::try_from(exact - 1).expect("small budget"),
+            exceeded: refusal(exact),
         })
     );
 }
@@ -1148,4 +1146,13 @@ fn wide_detectors_and_observables_convert_to_the_parity_of_every_term() {
         assert_eq!(converted.observables, vec![m1 ^ m0]);
     }
     assert_eq!(sink.records.len(), records.len());
+}
+
+/// The refusal of an exact `required`-byte requirement by a budget one byte smaller.
+fn refusal(required: u128) -> stab_model::MemoryBudgetExceeded {
+    let required = u64::try_from(required).expect("small requirement");
+    stab_model::MemoryBudgetExceeded::new(
+        stab_model::ResourceAmount::exact(required),
+        stab_model::MemoryBudget::from_bytes(required - 1),
+    )
 }

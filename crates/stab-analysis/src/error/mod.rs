@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 
 use stab_algebra::PauliPhase;
-use stab_model::{DemTarget, GateKind, ModelError};
+use stab_model::{DemTarget, GateKind, MemoryBudgetExceeded, ModelError};
 
 use crate::ResourceLimitError;
 
@@ -448,6 +448,16 @@ impl AnalysisError {
     pub const fn resource_limit_error(&self) -> Option<&ResourceLimitError> {
         match self {
             Self::ResourceLimit(error) => Some(error),
+            _ => None,
+        }
+    }
+
+    /// The memory-budget refusal this error reports, from the analysis itself or from the model
+    /// layer; `None` for fixed safety limits and every other failure.
+    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match self {
+            Self::ResourceLimit(error) => error.memory_budget_exceeded(),
+            Self::Model(error) => error.memory_budget_exceeded(),
             _ => None,
         }
     }

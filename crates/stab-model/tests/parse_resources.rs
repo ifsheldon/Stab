@@ -4,9 +4,9 @@
 )]
 
 use stab_model::{
-    ByteSpan, Circuit, DetectorErrorModel, DiagnosticSeverity, Estimate, EstimateClass,
-    MemoryBudget, ModelDialect, ModelError, ModelResult, ParseError, ParseErrorCode,
-    ParseErrorContext, ParseLimits, RepeatNestingLimit, ResourceKind, ResourceOperation, advanced,
+    ByteSpan, Circuit, DetectorErrorModel, DiagnosticSeverity, Estimate, MemoryBudget,
+    ModelDialect, ModelError, ModelResult, ParseError, ParseErrorCode, ParseErrorContext,
+    ParseLimits, RepeatNestingLimit, ResourceKind, ResourceOperation, advanced,
 };
 
 type ParseStr = fn(&str, ParseLimits) -> ModelResult<()>;
@@ -52,7 +52,6 @@ fn byte_spans_reject_overflow_and_preserve_half_open_offsets() {
     assert_eq!(span.byte_length(), 7);
     assert_eq!(span.byte_end(), 12);
     assert_eq!(ByteSpan::try_new(usize::MAX, 1), None);
-    assert_eq!(advanced::byte_span_from_valid_range(5, 7), span);
 }
 
 #[test]
@@ -98,7 +97,6 @@ fn parse_estimates_preserve_exact_line_and_byte_accounting() {
     let estimate = ParseLimits::default().estimate("H 0\r\nM 0\n");
     assert_eq!(estimate.input_bytes(), Estimate::Exact(9));
     assert_eq!(estimate.input_items(), Estimate::Exact(2));
-    assert_eq!(estimate.input_bytes().class(), EstimateClass::Exact);
     assert_eq!(estimate.input_bytes().value(), Some(&9));
     assert_eq!(estimate.expanded_operations(), Estimate::Unknown);
     assert_eq!(estimate.folded_traversal(), Estimate::Unknown);
@@ -238,7 +236,7 @@ fn parser_admission_accepts_the_exact_budget_and_rejects_the_first_excess_byte()
             assert_eq!(resource.actual(), case.input.len() as u64);
             assert_eq!(resource.limit(), case.input.len() as u64 - 1);
             assert_eq!(resource.source_line(), None);
-            assert_eq!(resource.span(), span(case.input.len() - 1, 1));
+            assert_eq!(resource.span(), Some(span(case.input.len() - 1, 1)));
         }
     }
 
@@ -258,7 +256,7 @@ fn parser_admission_accepts_the_exact_budget_and_rejects_the_first_excess_byte()
             .expect("source byte policy wins before UTF-8 decoding");
         assert_eq!(resource.resource(), ResourceKind::SourceBytes);
         assert_eq!((resource.actual(), resource.limit()), (1, 0));
-        assert_eq!(resource.span(), span(0, 1));
+        assert_eq!(resource.span(), Some(span(0, 1)));
     }
 }
 

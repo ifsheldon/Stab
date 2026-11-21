@@ -12,7 +12,7 @@ mod pauli;
 mod tableau;
 mod unitary;
 
-pub use budget::{AlgebraMemoryBudget, StabilizerResource};
+pub use budget::StabilizerResource;
 pub use clifford::{CliffordString, SingleQubitClifford};
 pub use conversions::StabilizerTableauOptions;
 pub use error::{StabilizerError, StabilizerResult, TextExcerpt};
@@ -22,6 +22,7 @@ pub use iter::{
     TableauIterator,
 };
 pub use pauli::{FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString};
+pub use stab_foundation::{MemoryBudget, MemoryBudgetExceeded, ResourceAmount};
 pub use tableau::{Tableau, TableauAppender};
 pub use unitary::Endianness;
 

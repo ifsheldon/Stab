@@ -421,14 +421,14 @@ fn circuit_detector_coordinate_map_is_admitted_against_the_memory_budget() {
     let exact = MemoryBudget::from_bytes(3 * (96 + 2 * 8));
     assert_eq!(
         small
-            .detector_coordinates_with_memory_budget(exact)
+            .detector_coordinates_with_budget(exact)
             .expect("exact budget admits the map")
             .len(),
         3
     );
     let excess = MemoryBudget::from_bytes(exact.bytes() - 1);
     let error = small
-        .detector_coordinates_with_memory_budget(excess)
+        .detector_coordinates_with_budget(excess)
         .expect_err("one byte below the requirement is refused");
     assert_eq!(
         error

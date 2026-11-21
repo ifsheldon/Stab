@@ -1,4 +1,4 @@
-use stab_algebra::{AlgebraMemoryBudget, StabilizerError, Tableau, TableauAppender};
+use stab_algebra::{StabilizerError, Tableau, TableauAppender};
 use stab_model::advanced::CancellationCountdown;
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, GateCategory, MemoryBudget, Target,
@@ -58,7 +58,7 @@ pub fn circuit_to_tableau_with_options(
 ) -> AnalysisResult<Tableau> {
     options.cancellation.check()?;
     let num_qubits = stab_model::advanced::circuit_simulated_qubit_count(circuit);
-    let budget = AlgebraMemoryBudget::from_bytes(options.memory_budget.bytes());
+    let budget = options.memory_budget;
     let result =
         TableauAppender::identity_with_budget(num_qubits, budget).map_err(map_tableau_error)?;
     let mut conversion = Conversion {
@@ -214,14 +214,13 @@ impl Conversion<'_> {
 
 /// An identity appender of an already admitted width.
 fn identity_appender(num_qubits: usize) -> AnalysisResult<TableauAppender> {
-    TableauAppender::identity_with_budget(num_qubits, AlgebraMemoryBudget::from_bytes(u64::MAX))
+    TableauAppender::identity_with_budget(num_qubits, MemoryBudget::UNLIMITED)
         .map_err(map_tableau_error)
 }
 
 /// An identity Tableau of `tableau`'s width, which is already admitted.
 fn identity_like(tableau: &Tableau) -> AnalysisResult<Tableau> {
-    Tableau::identity_with_budget(tableau.len(), AlgebraMemoryBudget::from_bytes(u64::MAX))
-        .map_err(map_tableau_error)
+    Tableau::identity_with_budget(tableau.len(), MemoryBudget::UNLIMITED).map_err(map_tableau_error)
 }
 
 fn apply_unitary_group_to_tableau(
@@ -278,17 +277,14 @@ fn target_qubit_index(gate_name: &str, target: &Target) -> AnalysisResult<usize>
 /// Maps algebra failures, reporting a refused Tableau as a memory-budget refusal.
 pub(crate) fn map_tableau_error(error: StabilizerError) -> AnalysisError {
     match error {
-        StabilizerError::MemoryBudgetExceeded {
-            requested_bytes,
-            budget_bytes,
-            ..
-        } => ResourceLimitError::memory_budget(
-            AnalysisOperation::TableauConversion,
-            ResourceKind::MaterializedBytes,
-            u64::try_from(requested_bytes).unwrap_or(u64::MAX),
-            budget_bytes,
-        )
-        .into(),
+        StabilizerError::MemoryBudgetExceeded { exceeded, .. } => {
+            ResourceLimitError::budget_refusal(
+                AnalysisOperation::TableauConversion,
+                ResourceKind::MaterializedBytes,
+                exceeded,
+            )
+            .into()
+        }
         other => AnalysisError::internal(AnalysisOperation::TableauConversion, other.to_string()),
     }
 }

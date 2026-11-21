@@ -101,8 +101,10 @@ impl OutputStorage {
             Ok(bytes) if budget.admits(self.bytes) => Ok(ledger.hold(bytes)),
             _ => Err(stage.refusal(CliError::OutputStorageBudget {
                 command: self.command,
-                required_bytes: u64::try_from(self.bytes).unwrap_or(u64::MAX),
-                budget_bytes: budget.bytes(),
+                exceeded: stab_model::MemoryBudgetExceeded::new(
+                    stab_model::ResourceAmount::saturating_from_u128(self.bytes),
+                    budget,
+                ),
             })),
         }
     }

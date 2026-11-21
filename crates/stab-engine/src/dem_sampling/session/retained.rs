@@ -62,11 +62,13 @@ impl DemSamplingPlan {
         limits: &DemSamplerLimits,
         input_bytes: u64,
     ) -> Result<MemoryBudget, DemSamplingExecutionError> {
-        let budget = limits.memory_budget().bytes();
+        let budget = limits.memory_budget();
         let required =
             u128::from(input_bytes).saturating_add(session_storage_bytes(self, 1, 1, true));
         match u64::try_from(required) {
-            Ok(required) if required <= budget => Ok(MemoryBudget::from_bytes(budget - required)),
+            Ok(required) if required <= budget.bytes() => {
+                Ok(MemoryBudget::from_bytes(budget.bytes() - required))
+            }
             _ => Err(DemSamplingExecutionError::InvalidRequest(
                 DemResourceLimitError::active_batch_bytes(
                     u64::try_from(required).unwrap_or(u64::MAX),

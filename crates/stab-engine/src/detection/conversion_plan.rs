@@ -858,7 +858,7 @@ impl ConversionPlan {
     fn admit_bytes(&self, bytes: u64) -> DetectionResult<()> {
         let budget = self.limits.memory_budget();
         if !budget.admits(u128::from(bytes)) {
-            return Err(ResourceLimitError::detection_compiled_bytes(bytes, budget.bytes()).into());
+            return Err(ResourceLimitError::detection_compiled_bytes(bytes, budget).into());
         }
         Ok(())
     }

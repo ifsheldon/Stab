@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 
+use stab_model::{MemoryBudget, MemoryBudgetExceeded, ResourceAmount};
 use thiserror::Error;
 
 pub(crate) type DemResult<T> = Result<T, DemError>;
@@ -11,28 +12,26 @@ pub enum DemResourceKind {
     CompiledBytes,
 }
 
-/// Typed resource-admission failure owned by the DEM sampling engine.
+/// Typed memory-budget refusal owned by the DEM sampling engine.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DemResourceLimitError {
     kind: DemResourceKind,
-    actual: u64,
-    limit: u64,
+    exceeded: MemoryBudgetExceeded,
 }
 
 impl DemResourceLimitError {
-    pub(crate) const fn active_batch_bytes(actual: u64, limit: u64) -> Self {
-        Self::new(DemResourceKind::ActiveBatchBytes, actual, limit)
+    pub(crate) const fn active_batch_bytes(actual: u64, budget: MemoryBudget) -> Self {
+        Self::new(DemResourceKind::ActiveBatchBytes, actual, budget)
     }
 
-    pub(crate) const fn compiled_bytes(actual: u64, limit: u64) -> Self {
-        Self::new(DemResourceKind::CompiledBytes, actual, limit)
+    pub(crate) const fn compiled_bytes(actual: u64, budget: MemoryBudget) -> Self {
+        Self::new(DemResourceKind::CompiledBytes, actual, budget)
     }
 
-    const fn new(kind: DemResourceKind, actual: u64, limit: u64) -> Self {
+    const fn new(kind: DemResourceKind, actual: u64, budget: MemoryBudget) -> Self {
         Self {
             kind,
-            actual,
-            limit,
+            exceeded: MemoryBudgetExceeded::new(ResourceAmount::exact(actual), budget),
         }
     }
 
@@ -40,27 +39,31 @@ impl DemResourceLimitError {
         self.kind
     }
 
+    /// The memory-budget refusal; every DEM sampling resource limit is a memory budget.
+    pub const fn memory_budget_exceeded(&self) -> &MemoryBudgetExceeded {
+        &self.exceeded
+    }
+
     pub const fn actual(&self) -> u64 {
-        self.actual
+        self.exceeded.required().value()
     }
 
     pub const fn limit(&self) -> u64 {
-        self.limit
+        self.exceeded.budget().bytes()
     }
 }
 
 impl Display for DemResourceLimitError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        let (actual, limit) = (self.actual(), self.limit());
         match self.kind {
             DemResourceKind::ActiveBatchBytes => write!(
                 formatter,
-                "cannot compile DEM sampler: the sampling session would require at least {} bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
-                self.actual, self.limit
+                "cannot compile DEM sampler: the sampling session would require at least {actual} bytes, exceeding the {limit}-byte memory budget; raise the memory budget to admit it"
             ),
             DemResourceKind::CompiledBytes => write!(
                 formatter,
-                "cannot compile DEM sampler: compiled DEM program requires {} bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
-                self.actual, self.limit
+                "cannot compile DEM sampler: compiled DEM program requires {actual} bytes, exceeding the {limit}-byte memory budget; raise the memory budget to admit it"
             ),
         }
     }
@@ -92,6 +95,19 @@ pub enum DemError {
 }
 
 impl DemError {
+    /// The memory-budget refusal this error reports, from the DEM sampling engine or the model
+    /// layer.
+    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match self {
+            Self::Model(error) => error.memory_budget_exceeded(),
+            Self::ResourceLimit(error) => Some(error.memory_budget_exceeded()),
+            Self::InvalidSamplerCompilation { .. }
+            | Self::InvalidResultFormat { .. }
+            | Self::StorageAllocation { .. }
+            | Self::Cancelled(_) => None,
+        }
+    }
+
     pub(crate) fn invalid_sampler_compilation(message: impl Into<String>) -> Self {
         Self::InvalidSamplerCompilation {
             message: message.into(),

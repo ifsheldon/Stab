@@ -1,7 +1,7 @@
 use crate::{
-    DemSampleBatchView, DetectionBatchView, DetectorWidth, DetsResultType, EncodedSizeEstimate,
-    FormatError, MeasurementBatchView, MeasurementWidth, ObservableWidth, RecordBatchPart,
-    RecordEncoder, RecordFormat, RecordResult, RecordWriteError, SampledErrorWidth,
+    DemSampleBatchView, DetectionBatchView, DetectorWidth, DetsResultType, FormatError,
+    MeasurementBatchView, MeasurementWidth, ObservableWidth, RecordBatchPart, RecordEncoder,
+    RecordFormat, RecordResult, RecordWriteError, SampledErrorWidth,
 };
 
 /// Receives complete batches of measurement records.
@@ -335,10 +335,11 @@ impl EncodedOutput {
                 .and_then(|words| words.checked_mul(size_of::<u64>()))
                 .ok_or_else(|| FormatError::invalid_data("ptb64 output size overflowed"))?
         } else {
-            match format.estimate_output_bytes(record_count, width) {
-                EncodedSizeEstimate::Exact(bytes) => bytes,
-                EncodedSizeEstimate::Unknown => 0,
-            }
+            format
+                .estimate_output_bytes(record_count, width)
+                .value()
+                .copied()
+                .unwrap_or(0)
         };
         self.bytes.try_reserve(additional).map_err(|error| {
             FormatError::invalid_data(format!(

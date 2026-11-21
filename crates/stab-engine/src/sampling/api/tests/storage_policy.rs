@@ -98,8 +98,10 @@ fn pauli_frame_session_storage_admits_the_exact_budget_and_rejects_the_first_exc
         assert_eq!(
             rejected,
             Some(SamplingExecutionError::SessionStorageLimit {
-                estimated_bytes: exact,
-                limit_bytes: exact_u64 - 1,
+                exceeded: stab_model::MemoryBudgetExceeded::new(
+                    stab_model::ResourceAmount::exact(exact_u64),
+                    MemoryBudget::from_bytes(exact_u64 - 1),
+                ),
             }),
             "{lane_width:?}"
         );

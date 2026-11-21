@@ -254,13 +254,11 @@ fn sampled_flow_compacts_sparse_qubits_and_ignores_coordinate_only_width() {
 fn refused_bytes(error: &SampledFlowError) -> Option<u64> {
     match error {
         SampledFlowError::SamplingExecution(SamplingExecutionError::SessionStorageLimit {
-            estimated_bytes,
-            ..
-        }) => u64::try_from(*estimated_bytes).ok(),
-        SampledFlowError::SamplingCompile(SamplingCompileError::CompiledBytesLimit {
-            required,
-            ..
-        }) => Some(*required),
+            exceeded,
+        })
+        | SampledFlowError::SamplingCompile(SamplingCompileError::CompiledBytesLimit {
+            exceeded,
+        }) => (!exceeded.required().is_lower_bound()).then_some(exceeded.required().value()),
         _ => None,
     }
 }
@@ -358,10 +356,8 @@ fn sampled_flow_charges_augmented_witness_circuit_without_retaining_dropped_nois
     .expect_err("1,000-gate augmented witness circuit exceeds 16 KiB");
     assert_matches!(
         refused,
-        SampledFlowError::SamplingCompile(SamplingCompileError::CompiledBytesLimit {
-            budget: 16_384,
-            ..
-        })
+        SampledFlowError::SamplingCompile(SamplingCompileError::CompiledBytesLimit { exceeded })
+            if exceeded.budget().bytes() == 16_384
     );
 
     let mut noisy_heavy = "X_ERROR(0.1) 0\nY_ERROR(0.1) 0\n".repeat(2000);

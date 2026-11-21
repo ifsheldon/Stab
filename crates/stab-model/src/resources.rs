@@ -1,36 +1,4 @@
-/// Whether a resource estimate is exact, an upper bound, or unavailable.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum EstimateClass {
-    Exact,
-    UpperBound,
-    Unknown,
-}
-
-/// A resource quantity together with the strength of the estimate.
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub enum Estimate<T> {
-    Exact(T),
-    UpperBound(T),
-    #[default]
-    Unknown,
-}
-
-impl<T> Estimate<T> {
-    pub const fn class(&self) -> EstimateClass {
-        match self {
-            Self::Exact(_) => EstimateClass::Exact,
-            Self::UpperBound(_) => EstimateClass::UpperBound,
-            Self::Unknown => EstimateClass::Unknown,
-        }
-    }
-
-    pub const fn value(&self) -> Option<&T> {
-        match self {
-            Self::Exact(value) | Self::UpperBound(value) => Some(value),
-            Self::Unknown => None,
-        }
-    }
-}
+use crate::Estimate;
 
 /// Cheap resource information collected without executing the described operation.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]

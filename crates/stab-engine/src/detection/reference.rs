@@ -36,7 +36,7 @@ pub(super) fn static_reference_sample(
     if !budget.admits(estimated_bytes) {
         return Err(DetectionResourceLimitError::detection_compiled_bytes(
             u64::try_from(estimated_bytes).unwrap_or(u64::MAX),
-            budget.bytes(),
+            budget,
         )
         .into());
     }

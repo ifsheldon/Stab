@@ -1,5 +1,6 @@
 use std::fmt;
 
+use stab_model::MemoryBudgetExceeded;
 use thiserror::Error;
 
 use crate::{SamplingExecutionError, ShotCount, SinkFailurePhase};
@@ -28,13 +29,13 @@ pub enum DetectionExecutionError {
     #[error("detection session shot counter overflowed")]
     ShotCounterOverflow,
 
+    /// The memory budget refused the session's bounded storage before any of it was reserved.
     #[error(
-        "detection session needs an estimated {estimated_bytes} bytes of bounded storage, exceeding the {limit_bytes}-byte memory budget; raise the memory budget to admit it"
+        "detection session needs an estimated {} bytes of bounded storage, exceeding the {}-byte memory budget; raise the memory budget to admit it",
+        exceeded.required(),
+        exceeded.budget().bytes()
     )]
-    SessionStorageLimit {
-        estimated_bytes: u128,
-        limit_bytes: u64,
-    },
+    SessionStorageLimit { exceeded: MemoryBudgetExceeded },
 
     #[error("detection session could not allocate bounded storage: {message}")]
     SessionStorageAllocation { message: String },
@@ -57,6 +58,28 @@ pub enum DetectionExecutionError {
     /// records are zeroed.
     #[error(transparent)]
     Cancelled(#[from] stab_model::Cancelled),
+}
+
+impl DetectionCompileError {
+    /// The memory-budget refusal this error reports, if it is one.
+    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match self {
+            Self::InvalidCircuit(error) => error.memory_budget_exceeded(),
+        }
+    }
+}
+
+impl DetectionExecutionError {
+    /// The memory-budget refusal this error reports, including one from the wrapped conversion
+    /// or measurement-sampling failure.
+    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match self {
+            Self::SessionStorageLimit { exceeded } => Some(exceeded),
+            Self::Conversion(error) => error.memory_budget_exceeded(),
+            Self::Sampling(error) => error.memory_budget_exceeded(),
+            _ => None,
+        }
+    }
 }
 
 impl From<DetectionError> for DetectionExecutionError {
@@ -107,6 +130,15 @@ pub enum DetectionRunError<SinkError> {
 }
 
 impl<SinkError> DetectionRunError<SinkError> {
+    /// The engine's memory-budget refusal; a sink failure is the caller's own type and is not
+    /// inspected.
+    pub fn memory_budget_exceeded(&self) -> Option<&MemoryBudgetExceeded> {
+        match self {
+            Self::Engine { source, .. } => source.memory_budget_exceeded(),
+            Self::Sink { .. } => None,
+        }
+    }
+
     pub const fn progress(&self) -> DetectionRunProgress {
         match self {
             Self::Engine { progress, .. } | Self::Sink { progress, .. } => *progress,

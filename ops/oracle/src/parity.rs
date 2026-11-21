@@ -31,18 +31,19 @@ const STIM_GATE_DOC_PATH: &str = "doc/gates.md";
 const LEDGER_SCHEMA_VERSION: u32 = 3;
 const MAX_LEDGER_BYTES: usize = 2 * 1024 * 1024;
 const MAX_GENERATED_DOC_BYTES: usize = 4 * 1024 * 1024;
-const PRODUCT_OWNERS: [&str; 9] = [
+const PRODUCT_OWNERS: [&str; 10] = [
     "stab-algebra",
     "stab-analysis",
     "stab-bits",
     "stab-cli",
     "stab-decoder",
     "stab-engine",
+    "stab-foundation",
     "stab-kernels-simd",
     "stab-model",
     "stab-records",
 ];
-const TEST_PACKAGES: [&str; 14] = [
+const TEST_PACKAGES: [&str; 15] = [
     "stab-algebra",
     "stab-analysis",
     "stab-bits",
@@ -50,6 +51,7 @@ const TEST_PACKAGES: [&str; 14] = [
     "stab-core",
     "stab-decoder",
     "stab-engine",
+    "stab-foundation",
     "stab-kernels-simd",
     "stab-model",
     "stab-oracle",

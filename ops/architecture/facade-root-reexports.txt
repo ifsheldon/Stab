@@ -5,7 +5,6 @@
 # their directly coupled errors, and sink/session contracts. Algorithms and lower-level
 # implementation types belong in their owning component namespaces or crates.
 stab_model::AbsoluteTolerance
-stab_algebra::AlgebraMemoryBudget
 stab_records::BitIndex
 stab_records::BitPlaneBatch
 stab_records::BitPlaneBatchView
@@ -52,9 +51,7 @@ stab_records::DetectionSink
 stab_model::DetectorErrorModel
 stab_records::DetectorWidth
 stab_model::DiagnosticSeverity
-stab_records::EncodedSizeEstimate
 stab_model::Estimate
-stab_model::EstimateClass
 stab_algebra::FlexPauliString
 stab_algebra::Flow
 stab_algebra::FlowMeasurementIndex
@@ -73,6 +70,7 @@ stab_records::MeasurementBatchView
 stab_records::MeasurementSink
 stab_records::MeasurementWidth
 stab_model::MemoryBudget
+stab_model::MemoryBudgetExceeded
 stab_model::MemoryBudgetParseError
 stab_model::ModelDialect
 stab_model::ModelError
@@ -103,6 +101,7 @@ stab_model::RepeatBlock
 stab_model::RepeatCount
 stab_model::RepeatNestingLimit
 stab_model::RepeatNestingLimitError
+stab_model::ResourceAmount
 stab_model::ResourceEstimate
 stab_records::SampledErrorWidth
 stab_records::ShotIndex

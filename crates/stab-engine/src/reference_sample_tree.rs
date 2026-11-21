@@ -15,6 +15,16 @@ pub enum ReferenceSampleTreeError {
     SamplingExecution(#[from] SamplingExecutionError),
 }
 
+impl ReferenceSampleTreeError {
+    /// The memory-budget refusal of compilation or execution, if this error is one.
+    pub fn memory_budget_exceeded(&self) -> Option<&stab_model::MemoryBudgetExceeded> {
+        match self {
+            Self::SamplingCompile(error) => error.memory_budget_exceeded(),
+            Self::SamplingExecution(error) => error.memory_budget_exceeded(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ReferenceSampleTree {
     prefix_bits: ReferenceSample,

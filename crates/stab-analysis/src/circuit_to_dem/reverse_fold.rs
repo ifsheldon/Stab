@@ -135,7 +135,7 @@ impl<'c> ReverseFoldAnalyzer<'c> {
                 AnalysisOperation::CircuitToDetectorErrorModel,
                 ResourceKind::MaterializedBytes,
                 total,
-                budget.bytes(),
+                budget,
             )
             .into());
         }

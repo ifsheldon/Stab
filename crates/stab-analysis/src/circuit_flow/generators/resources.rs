@@ -19,7 +19,7 @@ pub(super) fn admit_flow_generator_rows(
             AnalysisOperation::FlowGeneration,
             ResourceKind::ProjectedPayloadBytes,
             projected_bytes,
-            budget.bytes(),
+            budget,
         )
         .into());
     }

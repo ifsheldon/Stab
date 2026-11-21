@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use thiserror::Error;
+use crate::{MemoryBudgetExceeded, ResourceAmount};
 
 const KIB: u64 = 1024;
 const MIB: u64 = 1024 * KIB;
@@ -20,6 +20,12 @@ impl MemoryBudget {
     /// Default budget of one gibibyte.
     pub const DEFAULT: Self = Self(GIB);
 
+    /// The largest budget, `u64::MAX` bytes, which admits every requirement that fits `u64`.
+    ///
+    /// Callers use it where storage is already bounded by values they hold and no separate
+    /// budget applies.
+    pub const UNLIMITED: Self = Self(u64::MAX);
+
     /// Budget of exactly `bytes` bytes.
     pub const fn from_bytes(bytes: u64) -> Self {
         Self(bytes)
@@ -35,8 +41,20 @@ impl MemoryBudget {
         required <= self.0 as u128
     }
 
+    /// Admits a conservative requirement of `required` bytes, or reports the refusal.
+    pub fn admit(self, required: u128) -> Result<(), MemoryBudgetExceeded> {
+        if self.admits(required) {
+            Ok(())
+        } else {
+            Err(MemoryBudgetExceeded::new(
+                ResourceAmount::saturating_from_u128(required),
+                self,
+            ))
+        }
+    }
+
     /// Budget size as a platform size, saturating where the platform cannot address it.
-    pub fn bytes_usize(self) -> usize {
+    pub fn bytes_saturating_usize(self) -> usize {
         usize::try_from(self.0).unwrap_or(usize::MAX)
     }
 }
@@ -61,15 +79,27 @@ impl fmt::Display for MemoryBudget {
 }
 
 /// Invalid memory-budget text.
-#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MemoryBudgetParseError {
-    #[error(
-        "memory budget must be an integer number of bytes with an optional KiB, MiB, or GiB suffix, got {text:?}"
-    )]
     Syntax { text: String },
-    #[error("memory budget {text:?} exceeds {max} bytes")]
     Overflow { text: String, max: u64 },
 }
+
+impl fmt::Display for MemoryBudgetParseError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Syntax { text } => write!(
+                formatter,
+                "memory budget must be an integer number of bytes with an optional KiB, MiB, or GiB suffix, got {text:?}"
+            ),
+            Self::Overflow { text, max } => {
+                write!(formatter, "memory budget {text:?} exceeds {max} bytes")
+            }
+        }
+    }
+}
+
+impl std::error::Error for MemoryBudgetParseError {}
 
 impl FromStr for MemoryBudget {
     type Err = MemoryBudgetParseError;
