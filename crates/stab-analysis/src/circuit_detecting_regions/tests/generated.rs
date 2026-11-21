@@ -1,6 +1,7 @@
 use super::*;
 use crate::{
-    CodeCircuitParams, CodeDistance, CodeTask, RepetitionCodeTask, RoundCount, SurfaceCodeTask,
+    CircuitGenerationOptions, CodeCircuitParams, CodeDistance, CodeTask, RepetitionCodeTask,
+    RoundCount, SurfaceCodeTask,
 };
 
 pub(super) fn assert_generated_code_regions() {
@@ -17,7 +18,9 @@ fn assert_generated_repetition_code_filters_and_regions() {
         RoundCount::try_new(3).unwrap(),
     )
     .unwrap();
-    let generated = params.generate().unwrap();
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .unwrap();
     let circuit = generated.circuit();
 
     let all_targets = all_detecting_region_targets(circuit, &Default::default()).unwrap();
@@ -63,7 +66,9 @@ fn assert_generated_rotated_surface_code_filters_and_regions() {
         RoundCount::try_new(3).unwrap(),
     )
     .unwrap();
-    let generated = params.generate().unwrap();
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .unwrap();
     let circuit = generated.circuit();
 
     let all_targets = all_detecting_region_targets(circuit, &Default::default()).unwrap();
@@ -162,7 +167,9 @@ fn assert_generated_unrotated_surface_code_filters_and_regions() {
         RoundCount::try_new(3).unwrap(),
     )
     .unwrap();
-    let generated = params.generate().unwrap();
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .unwrap();
     let circuit = generated.circuit();
 
     let all_targets = all_detecting_region_targets(circuit, &Default::default()).unwrap();
@@ -347,7 +354,9 @@ fn assert_surface_code_regions(
         RoundCount::try_new(3).unwrap(),
     )
     .unwrap();
-    let generated = params.generate().unwrap();
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .unwrap();
     let circuit = generated.circuit();
 
     let all_targets = all_detecting_region_targets(circuit, &Default::default()).unwrap();

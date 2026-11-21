@@ -168,7 +168,9 @@ fn folded_reference_matches_iteration_on_surface_code_with_inserted_paulis() {
         RoundCount::try_new(25).expect("valid round count"),
     )
     .expect("valid surface-code parameters");
-    let generated = params.generate().expect("generate surface circuit");
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .expect("generate surface circuit");
     let text = generated.circuit().to_stim_string();
     let baseline = ReferencePaths::compute(generated.circuit());
     baseline.assert_agree("surface code");
@@ -499,7 +501,7 @@ fn reference_samples_satisfy_every_deterministic_detector_with_folded_and_nested
             .expect("surface parameters");
         circuits.push(
             params
-                .generate()
+                .generate(&CircuitGenerationOptions::default())
                 .expect("generate surface circuit")
                 .circuit()
                 .to_stim_string(),
@@ -510,7 +512,7 @@ fn reference_samples_satisfy_every_deterministic_detector_with_folded_and_nested
             .expect("color parameters");
     circuits.push(
         color
-            .generate()
+            .generate(&CircuitGenerationOptions::default())
             .expect("generate color circuit")
             .circuit()
             .to_stim_string(),
@@ -523,7 +525,7 @@ fn reference_samples_satisfy_every_deterministic_detector_with_folded_and_nested
     .expect("repetition parameters");
     circuits.push(
         repetition
-            .generate()
+            .generate(&CircuitGenerationOptions::default())
             .expect("generate repetition circuit")
             .circuit()
             .to_stim_string(),
@@ -620,7 +622,9 @@ fn sessions_share_the_plan_reference_instead_of_recomputing_it() {
     )
     .expect("valid surface-code parameters")
     .with_before_measure_flip_probability(Probability::try_new(0.01).expect("probability"));
-    let generated = params.generate().expect("generate surface circuit");
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .expect("generate surface circuit");
     let plan = SamplingCompiler::default()
         .compile(generated.circuit())
         .expect("compile surface circuit");
@@ -672,7 +676,9 @@ fn memory_experiment_rounds_fold_once_the_state_recurs() {
         )
         .expect("valid surface-code parameters")
         .with_after_clifford_depolarization(probability);
-        let generated = params.generate().expect("generate surface circuit");
+        let generated = params
+            .generate(&CircuitGenerationOptions::default())
+            .expect("generate surface circuit");
         let paths = ReferencePaths::compute(generated.circuit());
         paths.assert_agree(&format!("{task:?}"));
         // The round's Clifford does not return the preparing tableau to itself, so this fold
@@ -861,7 +867,9 @@ fn fold_probes_are_skipped_when_the_saved_iterations_cannot_repay_them() {
         )
         .expect("valid surface-code parameters")
         .with_after_clifford_depolarization(probability);
-        let generated = params.generate().expect("generate surface circuit");
+        let generated = params
+            .generate(&CircuitGenerationOptions::default())
+            .expect("generate surface circuit");
         let paths = ReferencePaths::compute(generated.circuit());
         paths.assert_agree(&format!("{rounds} rounds"));
         assert_eq!(

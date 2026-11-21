@@ -1,6 +1,7 @@
 use stab_analysis::{
-    AnalysisOperation, CodeCircuitParams, CodeDistance, CodeTask, ColorCodeTask, GeneratedCircuit,
-    GeneratorParameter, RepetitionCodeTask, ResourceKind, RoundCount, SurfaceCodeTask,
+    AnalysisOperation, CircuitGenerationOptions, CodeCircuitParams, CodeDistance, CodeTask,
+    ColorCodeTask, GeneratedCircuit, GeneratorParameter, RepetitionCodeTask, ResourceKind,
+    RoundCount, SurfaceCodeTask,
 };
 use stab_model::{CircuitItem, MemoryBudget, Probability};
 
@@ -44,7 +45,7 @@ fn assert_repetition_generation_boundary() {
     )
     .expect("repetition parameters");
     let generated = accepted
-        .generate()
+        .generate(&CircuitGenerationOptions::default())
         .expect("maximum repetition distance remains admissible");
     assert_eq!(generated.circuit().count_qubits(), 4093);
     assert_eq!(accepted.physical_qubit_count(), 4093);
@@ -63,7 +64,12 @@ fn params(task: CodeTask, distance: u32, rounds: u64) -> CodeCircuitParams {
         RoundCount::try_new(rounds).expect("rounds"),
     )
     .expect("valid parameters")
-    .with_memory_budget(BUDGET)
+}
+
+fn budget_options() -> CircuitGenerationOptions {
+    CircuitGenerationOptions {
+        memory_budget: BUDGET,
+    }
 }
 
 fn budget_refusal(qubits: u64, family: &str) -> String {
@@ -108,7 +114,7 @@ fn assert_generation_boundary(task: CodeTask, accepted_distance: u32, rejected_d
     };
     for distance in small {
         let params = params(task, distance, 2);
-        let generated = params.generate().expect("small code");
+        let generated = params.generate(&budget_options()).expect("small code");
         assert_eq!(
             qubit_coordinate_target_count(&generated),
             physical_qubits(task, distance),
@@ -126,7 +132,7 @@ fn assert_generation_boundary(task: CodeTask, accepted_distance: u32, rejected_d
     let rejected_qubits = physical_qubits(task, rejected_distance);
     assert!(rejected_qubits > BUDGET_QUBITS);
     let error = params(task, rejected_distance, 2)
-        .generate()
+        .generate(&budget_options())
         .expect_err("a generation beyond the budget is refused");
     let resource = error
         .resource_limit_error()
@@ -157,7 +163,7 @@ fn assert_generation_boundary(task: CodeTask, accepted_distance: u32, rejected_d
 
 fn assert_rotated_surface_boundary_materializes() {
     let generated = params(CodeTask::Surface(SurfaceCodeTask::RotatedMemoryZ), 207, 1)
-        .generate()
+        .generate(&budget_options())
         .expect("rotated distance 207 is the largest admissible rotated surface code");
     assert!(!generated.layout_text().is_empty());
     assert_eq!(qubit_coordinate_target_count(&generated), 85_697);
@@ -181,7 +187,7 @@ fn assert_projection_dominates_peak_allocation() {
             .with_after_reset_flip_probability(noise)
             .with_after_clifford_depolarization(noise);
         let measured = allocation_counter::measure(|| {
-            std::hint::black_box(params.generate().expect("generate"));
+            std::hint::black_box(params.generate(&budget_options()).expect("generate"));
         });
         let projected = params.projected_generation_bytes();
         assert_eq!(
@@ -221,7 +227,9 @@ fn assert_huge_round_counts_stay_folded() {
         rounds,
     )
     .expect("repetition parameters");
-    let generated = repetition.generate().expect("fold repetition rounds");
+    let generated = repetition
+        .generate(&CircuitGenerationOptions::default())
+        .expect("fold repetition rounds");
     assert!(
         generated
             .circuit()
@@ -235,7 +243,9 @@ fn assert_huge_round_counts_stay_folded() {
         rounds,
     )
     .expect("surface parameters");
-    let generated = surface.generate().expect("fold surface rounds");
+    let generated = surface
+        .generate(&CircuitGenerationOptions::default())
+        .expect("fold surface rounds");
     assert!(
         generated
             .circuit()
@@ -249,7 +259,9 @@ fn assert_huge_round_counts_stay_folded() {
         rounds,
     )
     .expect("color parameters");
-    let generated = color.generate().expect("fold color rounds");
+    let generated = color
+        .generate(&CircuitGenerationOptions::default())
+        .expect("fold color rounds");
     assert!(
         generated
             .circuit()

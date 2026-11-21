@@ -41,8 +41,9 @@ pub use circuit_flow::{
     solve_for_flow_measurements,
 };
 pub use circuit_generation::{
-    CodeCircuitParams, CodeDistance, CodeFamily, CodeTask, ColorCodeTask, GeneratedCircuit,
-    RepetitionCodeTask, RoundCount, SurfaceCodeTask, UnknownCodeFamily, UnknownCodeTask,
+    CircuitGenerationOptions, CodeCircuitParams, CodeDistance, CodeFamily, CodeTask, ColorCodeTask,
+    GeneratedCircuit, RepetitionCodeTask, RoundCount, SurfaceCodeTask, UnknownCodeFamily,
+    UnknownCodeTask,
 };
 pub use circuit_inverse::{
     InverseQecOptions, TimeReversedForFlowsOptions, circuit_inverse_qec, circuit_inverse_unitary,

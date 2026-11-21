@@ -4,8 +4,8 @@
 )]
 
 use stab_analysis::{
-    CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions, RepetitionCodeTask,
-    RoundCount, circuit_to_detector_error_model,
+    CircuitGenerationOptions, CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions,
+    RepetitionCodeTask, RoundCount, circuit_to_detector_error_model,
 };
 use stab_decoder::{DecodeBatchError, DecodeBatchStatus, DecoderInputBatchView, decode_batch};
 use stab_engine::{
@@ -62,7 +62,9 @@ fn run_experiment(partitions: &[u64]) -> ExperimentReport {
     .with_before_measure_flip_probability(probability(0.025))
     .with_after_reset_flip_probability(probability(0.0125))
     .with_after_clifford_depolarization(probability(0.00625));
-    let generated = params.generate().expect("generate repetition circuit");
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .expect("generate repetition circuit");
     let circuit = generated.circuit();
     let model = circuit_to_detector_error_model(circuit, &ErrorAnalyzerOptions::default())
         .expect("lower detector-error model");

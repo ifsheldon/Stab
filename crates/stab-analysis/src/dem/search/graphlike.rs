@@ -1,7 +1,8 @@
 mod algo;
+mod hyperedges;
 
-pub(super) use algo::shortest_graphlike_search;
 pub use algo::shortest_graphlike_undetectable_logical_error;
+pub(super) use algo::two_detector_hyperedge_search;
 
 use std::collections::BTreeSet;
 use std::hash::{Hash, Hasher};
@@ -24,6 +25,8 @@ use super::{
 };
 use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisResult};
+
+const GRAPHLIKE_SEARCH: &str = "graphlike search";
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(super) struct Edge {
@@ -73,8 +76,12 @@ impl Node {
         Self { edges, edge_index }
     }
 
+    fn contains(&self, edge: &Edge) -> bool {
+        self.edge_index.find(edge, &self.edges).is_some()
+    }
+
     fn add_edge(&mut self, edge: Edge, budget: &mut GraphConstructionBudget) -> AnalysisResult<()> {
-        if self.edge_index.find(&edge, &self.edges).is_some() {
+        if self.contains(&edge) {
             return Ok(());
         }
         let edge_hash = self.edge_index.hash(&edge);
@@ -132,7 +139,7 @@ impl Graph {
             has_declared_detectors: node_count > 0,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
-            construction_budget: GraphConstructionBudget::new("graphlike search", limits),
+            construction_budget: GraphConstructionBudget::new(GRAPHLIKE_SEARCH, limits),
         }
     }
 
@@ -146,6 +153,7 @@ impl Graph {
             detectors,
             num_observables,
             has_declared_detectors,
+            GRAPHLIKE_SEARCH,
             LogicalErrorSearchLimits::default(),
         )
     }
@@ -154,6 +162,7 @@ impl Graph {
         detectors: BTreeSet<DemDetectorId>,
         num_observables: usize,
         has_declared_detectors: bool,
+        context: &'static str,
         limits: LogicalErrorSearchLimits,
     ) -> AnalysisResult<Self> {
         let node_count = detectors.len();
@@ -172,8 +181,13 @@ impl Graph {
             has_declared_detectors,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
-            construction_budget: GraphConstructionBudget::new("graphlike search", limits),
+            construction_budget: GraphConstructionBudget::new(context, limits),
         })
+    }
+
+    /// The search named in this graph's resource-limit errors.
+    pub(super) const fn context(&self) -> &'static str {
+        self.construction_budget.context()
     }
 
     #[cfg(test)]
@@ -189,7 +203,7 @@ impl Graph {
             num_observables,
             distance_1_error_mask,
             construction_budget: GraphConstructionBudget::new(
-                "graphlike search",
+                GRAPHLIKE_SEARCH,
                 LogicalErrorSearchLimits::default(),
             ),
         }
@@ -318,17 +332,33 @@ impl Graph {
         ignore_ungraphlike_errors: bool,
         limits: &LogicalErrorSearchLimits,
     ) -> AnalysisResult<Self> {
-        let traversal = FoldedDemTraversal::new(model)?;
-        let full_detector_count = traversal.root().summary().detector_count()?;
-        let full_observable_count = traversal.root().summary().observable_count();
-        let effective_detectors = search_graph_nonzero_error_targets(
-            &traversal,
-            "graphlike search",
+        Self::from_dem_errors(
+            model,
+            GRAPHLIKE_SEARCH,
             SearchGraphTargetPolicy::Graphlike {
                 ignore_ungraphlike_errors,
             },
             limits,
-        )?;
+            |graph, targets| {
+                graph.add_edges_from_separable_targets(targets, ignore_ungraphlike_errors)
+            },
+        )
+    }
+
+    /// Builds the graph over the detectors `policy` keeps, handing each nonzero-probability
+    /// error's shifted targets to `add_error`.
+    fn from_dem_errors(
+        model: &DetectorErrorModel,
+        context: &'static str,
+        policy: SearchGraphTargetPolicy,
+        limits: &LogicalErrorSearchLimits,
+        mut add_error: impl FnMut(&mut Self, &[DemTarget]) -> AnalysisResult<()>,
+    ) -> AnalysisResult<Self> {
+        let traversal = FoldedDemTraversal::new(model)?;
+        let full_detector_count = traversal.root().summary().detector_count()?;
+        let full_observable_count = traversal.root().summary().observable_count();
+        let effective_detectors =
+            search_graph_nonzero_error_targets(&traversal, context, policy, limits)?;
         let num_observables = usize::try_from(full_observable_count).map_err(|_| {
             AnalysisError::count_overflow(
                 AnalysisOperation::LogicalErrorSearch,
@@ -339,15 +369,16 @@ impl Graph {
             effective_detectors,
             num_observables,
             full_detector_count > 0,
+            context,
             limits.clone(),
         )?;
         visit_search_graph_errors_with_limits(
             &traversal,
-            "graphlike search",
+            context,
             limits,
             |instruction, detector_offset| {
                 let shifted = shifted_targets(instruction.targets(), detector_offset)?;
-                graph.add_edges_from_separable_targets(&shifted, ignore_ungraphlike_errors)
+                add_error(&mut graph, &shifted)
             },
         )?;
         Ok(graph)

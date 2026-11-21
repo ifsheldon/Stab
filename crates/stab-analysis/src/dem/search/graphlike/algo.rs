@@ -26,23 +26,64 @@ pub fn shortest_graphlike_undetectable_logical_error(
     shortest_graphlike_search(model, options.ungraphlike_errors, &options.limits)
 }
 
-pub(in crate::dem::search) fn shortest_graphlike_search(
+fn shortest_graphlike_search(
     model: &DetectorErrorModel,
     ungraphlike_errors: UngraphlikeErrors,
     limits: &LogicalErrorSearchLimits,
 ) -> AnalysisResult<LogicalErrorSearch> {
     let graph = Graph::from_dem_with_limits(model, ungraphlike_errors.ignored(), limits)?;
+    let mut budget = SearchBudget::new(graph.context(), limits);
+    match shortest_logical_error(&graph, &mut budget)? {
+        Some(found) => Ok(LogicalErrorSearch::Found(found)),
+        None => {
+            no_graphlike_logical_error(model, &graph, &mut budget).map(LogicalErrorSearch::NotFound)
+        }
+    }
+}
+
+/// The hypergraph search with both of its maxima at 2, run as this breadth-first search over the
+/// graph of its edges of at most two detectors.
+///
+/// Both searches start from every edge with an observable and cross, from a state's detection
+/// event, every edge at that event, so each finds a shortest undetectable logical error of these
+/// edges; a shortest one crosses no edge twice, so the hypergraph search's cancellation of
+/// repeated steps never applies. They can still return different errors of that length, since
+/// they move different detection events of a two-event state. `symptom_growth` cannot matter:
+/// crossing an edge at a state's detection event never adds an event.
+pub(in crate::dem::search) fn two_detector_hyperedge_search(
+    model: &DetectorErrorModel,
+    limits: &LogicalErrorSearchLimits,
+) -> AnalysisResult<LogicalErrorSearch> {
+    let graph = Graph::from_dem_as_two_detector_hyperedges(model, limits)?;
+    let mut budget = SearchBudget::new(graph.context(), limits);
+    match shortest_logical_error(&graph, &mut budget)? {
+        Some(found) => Ok(LogicalErrorSearch::Found(found)),
+        None => Ok(LogicalErrorSearch::NotFound(
+            NoLogicalErrorReport::hypergraph(
+                graph.num_observables == 0,
+                !graph.has_declared_detectors,
+                model.count_errors()? == 0,
+            ),
+        )),
+    }
+}
+
+/// Finds a shortest undetectable logical error of `graph`, or `None` once every admissible state
+/// is explored.
+fn shortest_logical_error(
+    graph: &Graph,
+    budget: &mut SearchBudget,
+) -> AnalysisResult<Option<DetectorErrorModel>> {
     let empty = SearchState::new(None, None, ObservableMask::new());
     if !graph.distance_1_error_mask.is_empty() {
         let mut out = DetectorErrorModel::new();
-        SearchState::new(None, None, graph.distance_1_error_mask)
+        SearchState::new(None, None, graph.distance_1_error_mask.clone())
             .append_transition_as_error_instruction_to(&empty, &mut out)?;
-        return Ok(LogicalErrorSearch::Found(out));
+        return Ok(Some(out));
     }
 
     let mut queue = VecDeque::new();
     let mut back_map = BTreeMap::new();
-    let mut budget = SearchBudget::new("graphlike search", limits);
     budget.admit_state(0, 0, false)?;
     back_map.insert(empty.clone(), empty.clone());
 
@@ -116,8 +157,7 @@ pub(in crate::dem::search) fn shortest_graphlike_search(
                 let mut inserted = entry.key().clone();
                 entry.insert(current.clone());
                 if undetected {
-                    return backtrack_path(&back_map, &inserted, &mut budget)
-                        .map(LogicalErrorSearch::Found);
+                    return backtrack_path(&back_map, &inserted, budget).map(Some);
                 }
                 if inserted.detector_active.is_none() {
                     std::mem::swap(&mut inserted.detector_active, &mut inserted.detector_held);
@@ -127,7 +167,7 @@ pub(in crate::dem::search) fn shortest_graphlike_search(
         }
     }
 
-    no_graphlike_logical_error(model, &graph, &mut budget).map(LogicalErrorSearch::NotFound)
+    Ok(None)
 }
 
 fn backtrack_path(

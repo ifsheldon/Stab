@@ -9,12 +9,13 @@ use std::assert_matches;
 use std::collections::BTreeSet;
 
 use stab_analysis::{
-    AnalysisResult, CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions,
-    ErrorDecomposition, GraphlikeSearchOptions, HypergraphSearchOptions, LogicalErrorSearch,
-    LogicalErrorSearchKind, LogicalErrorSearchLimits, LoopFolding, NoLogicalErrorReport,
-    RepetitionCodeTask, RoundCount, SurfaceCodeTask, SymptomGrowth, UngraphlikeErrors,
-    circuit_to_detector_error_model, find_undetectable_logical_error, likeliest_error_sat_problem,
-    shortest_error_sat_problem, shortest_graphlike_undetectable_logical_error,
+    AnalysisResult, CircuitGenerationOptions, CodeCircuitParams, CodeDistance, CodeTask,
+    ErrorAnalyzerOptions, ErrorDecomposition, GraphlikeSearchOptions, HypergraphSearchOptions,
+    LogicalErrorSearch, LogicalErrorSearchKind, LogicalErrorSearchLimits, LoopFolding,
+    NoLogicalErrorReport, RepetitionCodeTask, RoundCount, SurfaceCodeTask, SymptomGrowth,
+    UngraphlikeErrors, circuit_to_detector_error_model, find_undetectable_logical_error,
+    likeliest_error_sat_problem, shortest_error_sat_problem,
+    shortest_graphlike_undetectable_logical_error,
 };
 use stab_model::{
     Circuit, DemInstructionKind, DemItem, DemTarget, DemTargetKind, DetectorErrorModel, Probability,
@@ -621,51 +622,51 @@ fn pf6_direct_dem_hypergraph_search_matches_upstream_distance_cases() {
     }
 }
 
-/// Like Stim, both size maxima at 2 run the graphlike search with ungraphlike errors ignored.
-/// That search drops every error that has a `^` separator, so its witnesses and its not-found
-/// report differ from the hypergraph search's, which toggles the whole error into one edge.
+/// Both size maxima at 2 keep the hypergraph search's edges: an error's targets fold across `^`
+/// separators into one edge, where pinned Stim reroutes to the graphlike search and drops every
+/// error with a separator. The faster search Stab runs there still reports as the hypergraph
+/// search.
 #[test]
-fn hypergraph_search_with_both_maxima_two_runs_the_graphlike_search() {
+fn hypergraph_search_with_both_maxima_two_folds_separated_errors() {
     let options = |max_edge_degree| HypergraphSearchOptions {
         max_detection_event_set_size: 2,
         max_edge_degree,
         symptom_growth: SymptomGrowth::Skip,
         limits: LogicalErrorSearchLimits::default(),
     };
-    let separated = dem("error(0.1) D0 ^ D1 L0\nerror(0.1) D0\nerror(0.1) D1\n");
-    assert_eq!(
-        find_undetectable_logical_error(&separated, &options(3))
+    let found = |model: &DetectorErrorModel, max_edge_degree| {
+        find_undetectable_logical_error(model, &options(max_edge_degree))
             .unwrap()
             .into_found()
-            .expect("the toggled edge D0 D1 L0 closes through D0 and D1")
-            .to_dem_string(),
-        "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n"
+            .expect("the search finds a logical error")
+            .to_dem_string()
+    };
+    let separated = dem("error(0.1) D0 ^ D1 L0\nerror(0.1) D0\nerror(0.1) D1\n");
+    for max_edge_degree in [2, 3] {
+        assert_eq!(
+            found(&separated, max_edge_degree),
+            "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n",
+            "the folded edge D0 D1 L0 closes through D0 and D1 at degree {max_edge_degree}"
+        );
+    }
+    // A detector listed twice cancels, so this error is a distance-1 logical error.
+    assert_eq!(
+        found(&dem("error(0.1) D0 ^ D0 L1\nerror(0.1) D2\n"), 2),
+        "error(1) L1\n"
     );
+
+    let ungraphlike = dem("error(0.1) D0 D1 D2 L0\n");
     assert_report(
-        not_found(find_undetectable_logical_error(&separated, &options(2))),
-        LogicalErrorSearchKind::Graphlike,
+        not_found(find_undetectable_logical_error(&ungraphlike, &options(2))),
+        LogicalErrorSearchKind::Hypergraph,
         &ReportFacts {
             no_observables: false,
             no_detectors: false,
             no_errors: false,
             no_graphlike_errors: false,
         },
-        "Failed to find any graphlike logical errors.",
-        "the rerouted search drops the separated error",
-    );
-
-    let ungraphlike = dem("error(0.1) D0 D1 D2 L0\n");
-    assert_report(
-        not_found(find_undetectable_logical_error(&ungraphlike, &options(2))),
-        LogicalErrorSearchKind::Graphlike,
-        &ReportFacts {
-            no_observables: false,
-            no_detectors: false,
-            no_errors: false,
-            no_graphlike_errors: true,
-        },
-        &format!("Failed to find any graphlike logical errors.{NO_GRAPHLIKE_ERRORS}"),
-        "rerouted search",
+        "Failed to find any logical errors.",
+        "the edge of three detectors is left out",
     );
 }
 
@@ -850,7 +851,7 @@ fn generated_rotated_surface_code_dem_with_options(
     .with_before_measure_flip_probability(probability)
     .with_after_reset_flip_probability(probability)
     .with_before_round_data_depolarization(probability);
-    let generated = params.generate()?;
+    let generated = params.generate(&CircuitGenerationOptions::default())?;
     circuit_to_detector_error_model(generated.circuit(), &options)
 }
 
@@ -861,7 +862,7 @@ fn generated_repetition_code_dem() -> AnalysisResult<DetectorErrorModel> {
         RoundCount::try_new(10)?,
     )?
     .with_before_round_data_depolarization(Probability::try_new(0.01)?);
-    let generated = params.generate()?;
+    let generated = params.generate(&CircuitGenerationOptions::default())?;
     circuit_to_detector_error_model(
         generated.circuit(),
         &ErrorAnalyzerOptions {

@@ -4,8 +4,8 @@ use std::time::Instant;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use stab_analysis::{
-    CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions, RepetitionCodeTask,
-    RoundCount, circuit_to_detector_error_model,
+    CircuitGenerationOptions, CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions,
+    RepetitionCodeTask, RoundCount, circuit_to_detector_error_model,
 };
 use stab_decoder::{DecodeBatchStatus, DecoderInputBatchView, decode_batch};
 use stab_engine::{
@@ -53,7 +53,9 @@ pub(super) fn execute(
     .with_before_measure_flip_probability(probability(0.025)?)
     .with_after_reset_flip_probability(probability(0.0125)?)
     .with_after_clifford_depolarization(probability(0.00625)?);
-    let generated = params.generate().map_err(|source| source.to_string())?;
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .map_err(|source| source.to_string())?;
     let circuit = generated.circuit();
     let model = circuit_to_detector_error_model(circuit, &ErrorAnalyzerOptions::default())
         .map_err(|source| source.to_string())?;

@@ -10,10 +10,10 @@
 //! first cross-checked against exhaustive enumeration on an instance small enough to enumerate.
 
 use stab_analysis::{
-    CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions, ErrorDecomposition,
-    LoopFolding, RepetitionCodeTask, RoundCount, SurfaceCodeTask, circuit_to_detector_error_model,
-    find_undetectable_logical_error, likeliest_error_sat_problem, shortest_error_sat_problem,
-    shortest_graphlike_undetectable_logical_error,
+    CircuitGenerationOptions, CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions,
+    ErrorDecomposition, LoopFolding, RepetitionCodeTask, RoundCount, SurfaceCodeTask,
+    circuit_to_detector_error_model, find_undetectable_logical_error, likeliest_error_sat_problem,
+    shortest_error_sat_problem, shortest_graphlike_undetectable_logical_error,
 };
 use stab_model::{Circuit, DetectorErrorModel, Probability};
 
@@ -37,7 +37,7 @@ fn repetition_code(distance: u32, rounds: u64) -> Circuit {
     .with_before_round_data_depolarization(probability(0.01))
     .with_before_measure_flip_probability(probability(0.02));
     params
-        .generate()
+        .generate(&CircuitGenerationOptions::default())
         .expect("repetition circuit")
         .circuit()
         .clone()
@@ -56,7 +56,7 @@ fn rotated_surface_code(rounds: u64) -> Circuit {
     .with_after_reset_flip_probability(noise)
     .with_before_round_data_depolarization(noise);
     params
-        .generate()
+        .generate(&CircuitGenerationOptions::default())
         .expect("surface circuit")
         .circuit()
         .clone()

@@ -1,9 +1,34 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use stab_model::{DemDetectorId, DemTarget, ObservableId};
+use stab_model::advanced::CancellationCountdown;
+use stab_model::{Cancellation, DemDetectorId, DemTarget, DemTargetKind, ObservableId};
 
 use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisResult};
+
+/// Folds an error's targets into one hyperedge, ignoring `^` separators: a detector or
+/// observable listed an even number of times cancels out.
+pub(super) fn folded_error_targets(
+    targets: &[DemTarget],
+    cancellation: &Cancellation,
+) -> AnalysisResult<(BTreeSet<DemDetectorId>, ObservableMask)> {
+    let mut detectors = BTreeSet::new();
+    let mut observables = ObservableMask::new();
+    let mut countdown = CancellationCountdown::new();
+    for target in targets {
+        countdown.tick(cancellation)?;
+        match target.kind() {
+            DemTargetKind::RelativeDetector(detector) => {
+                if !detectors.insert(detector) {
+                    detectors.remove(&detector);
+                }
+            }
+            DemTargetKind::LogicalObservable(observable) => observables.toggle(observable),
+            DemTargetKind::Separator => {}
+        }
+    }
+    Ok((detectors, observables))
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum SearchGraphKind {

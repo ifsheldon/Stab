@@ -1,8 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use stab_model::{
-    DemDetectorId, DemInstruction, DemItem, DemTarget, DemTargetKind, DetectorErrorModel,
-    Probability,
+    DemDetectorId, DemInstruction, DemItem, DemTarget, DetectorErrorModel, Probability,
 };
 
 use super::{
@@ -12,13 +11,10 @@ use super::{
         SearchGraphTargetPolicy, search_graph_nonzero_error_targets,
         visit_search_graph_errors_with_limits,
     },
-    graphlike::shortest_graphlike_search,
-    outcome::{
-        HypergraphSearchOptions, LogicalErrorSearch, NoLogicalErrorReport, SymptomGrowth,
-        UngraphlikeErrors,
-    },
+    graphlike::two_detector_hyperedge_search,
+    outcome::{HypergraphSearchOptions, LogicalErrorSearch, NoLogicalErrorReport, SymptomGrowth},
     traversal::{FoldedDemTraversal, shifted_targets},
-    values::{DetectorIndex, ObservableMask, SearchGraphKind},
+    values::{DetectorIndex, ObservableMask, SearchGraphKind, folded_error_targets},
 };
 use crate::AnalysisOperation;
 use crate::resources::LogicalErrorSearchResource;
@@ -266,7 +262,7 @@ impl Graph {
         max_weight: usize,
     ) -> AnalysisResult<()> {
         let cancellation = self.construction_budget.limits().cancellation.clone();
-        let (detectors, observables) = toggled_dem_targets(targets, &cancellation)?;
+        let (detectors, observables) = folded_error_targets(targets, &cancellation)?;
         if detectors.is_empty() {
             if !observables.is_empty() {
                 self.distance_1_error_mask = observables;
@@ -467,8 +463,9 @@ impl SearchState {
 ///
 /// This is a heuristic: the size limits and [`SymptomGrowth::Skip`] prune the search, so a
 /// [`LogicalErrorSearch::NotFound`] outcome means none was found within them. When both size
-/// limits are 2 the graphlike search runs instead; [`HypergraphSearchOptions`] says how its
-/// results differ.
+/// limits are 2 a faster breadth-first search over the same edges runs instead and finds an
+/// error exactly when this search would, of the same length; [`HypergraphSearchOptions`] says
+/// how its results relate.
 ///
 /// # Errors
 ///
@@ -479,17 +476,25 @@ pub fn find_undetectable_logical_error(
     model: &DetectorErrorModel,
     options: &HypergraphSearchOptions,
 ) -> AnalysisResult<LogicalErrorSearch> {
+    // Stim reroutes this pair to the graphlike search, which drops every error with a `^`
+    // separator; Stab keeps the hypergraph's folded edges and only swaps in the faster search.
+    if options.max_edge_degree == 2 && options.max_detection_event_set_size == 2 {
+        return two_detector_hyperedge_search(model, &options.limits);
+    }
+    hypergraph_search(model, options)
+}
+
+/// The hypergraph search itself, without the fast path at both maxima 2.
+fn hypergraph_search(
+    model: &DetectorErrorModel,
+    options: &HypergraphSearchOptions,
+) -> AnalysisResult<LogicalErrorSearch> {
     let &HypergraphSearchOptions {
         max_detection_event_set_size,
         max_edge_degree,
         symptom_growth,
         ref limits,
     } = options;
-    // Stim reroutes this pair to the graphlike search, whose witnesses and report differ.
-    if max_edge_degree == 2 && max_detection_event_set_size == 2 {
-        return shortest_graphlike_search(model, UngraphlikeErrors::Ignore, limits);
-    }
-
     let graph = Graph::from_dem_with_limits(model, max_edge_degree, limits)?;
     let empty = SearchState::new(BTreeSet::new(), ObservableMask::new());
     if !graph.distance_1_error_mask.is_empty() {
@@ -687,28 +692,6 @@ fn sorted_error_model_with_cancelled_pairs(
     Ok(sorted)
 }
 
-fn toggled_dem_targets(
-    targets: &[DemTarget],
-    cancellation: &stab_model::Cancellation,
-) -> AnalysisResult<(BTreeSet<DemDetectorId>, ObservableMask)> {
-    let mut detectors = BTreeSet::new();
-    let mut observables = ObservableMask::new();
-    let mut countdown = stab_model::advanced::CancellationCountdown::new();
-    for target in targets {
-        countdown.tick(cancellation)?;
-        match target.kind() {
-            DemTargetKind::RelativeDetector(detector) => {
-                if !detectors.insert(detector) {
-                    detectors.remove(&detector);
-                }
-            }
-            DemTargetKind::LogicalObservable(observable) => observables.toggle(observable),
-            DemTargetKind::Separator => {}
-        }
-    }
-    Ok((detectors, observables))
-}
-
 #[cfg(test)]
 mod limit_policy_tests {
     #![allow(
@@ -801,3 +784,6 @@ mod limit_policy_tests {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod two_detector_fast_path_tests;

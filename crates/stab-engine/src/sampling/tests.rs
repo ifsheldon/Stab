@@ -11,7 +11,10 @@ use super::reference_run::{
     take_reference_execution_stats,
 };
 use super::*;
-use stab_analysis::{CodeCircuitParams, CodeDistance, CodeTask, RoundCount, SurfaceCodeTask};
+use stab_analysis::{
+    CircuitGenerationOptions, CodeCircuitParams, CodeDistance, CodeTask, RoundCount,
+    SurfaceCodeTask,
+};
 use stab_bits::{BitSlice, BitVec};
 use stab_model::{Gate, Probability};
 use stab_records::{BitIndex, MeasurementBatchView, MeasurementSink, ShotIndex};
@@ -138,7 +141,9 @@ fn reference_simulator_matches_generator_baseline_on_noisy_surface_and_feedback(
     .with_before_measure_flip_probability(probability)
     .with_after_reset_flip_probability(probability)
     .with_after_clifford_depolarization(probability);
-    let generated = params.generate().expect("generate surface circuit");
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .expect("generate surface circuit");
     let plan = SamplingCompiler::default()
         .compile(generated.circuit())
         .expect("compile generated surface circuit");

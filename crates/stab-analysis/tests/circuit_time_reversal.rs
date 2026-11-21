@@ -10,9 +10,9 @@ use proptest::prelude::*;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
 use stab_algebra::Flow;
 use stab_analysis::{
-    CodeCircuitParams, CodeDistance, CodeTask, DetectingRegionOptions, RoundCount, SurfaceCodeTask,
-    TimeReversedForFlowsOptions, all_detecting_region_targets, all_detecting_region_ticks,
-    circuit_detecting_regions_for_targets, circuit_flow_generators,
+    CircuitGenerationOptions, CodeCircuitParams, CodeDistance, CodeTask, DetectingRegionOptions,
+    RoundCount, SurfaceCodeTask, TimeReversedForFlowsOptions, all_detecting_region_targets,
+    all_detecting_region_ticks, circuit_detecting_regions_for_targets, circuit_flow_generators,
     circuit_time_reversed_for_flows,
 };
 use stab_model::{Circuit, CircuitTick, DemTarget};
@@ -33,7 +33,9 @@ fn time_reversal_preserves_generated_surface_code_regions() {
         RoundCount::try_new(2).expect("rounds"),
     )
     .expect("surface-code parameters");
-    let generated = params.generate().expect("generate surface code");
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .expect("generate surface code");
     let input = generated.circuit();
 
     let targets = all_detecting_region_targets(input, &Default::default()).expect("input targets");

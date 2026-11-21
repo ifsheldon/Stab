@@ -5,7 +5,10 @@ use std::path::PathBuf;
 
 use clap::Args;
 use clap::builder::{PossibleValuesParser, TypedValueParser as _};
-use stab_analysis::{CodeCircuitParams, CodeDistance, CodeFamily, GeneratedCircuit, RoundCount};
+use stab_analysis::{
+    CircuitGenerationOptions, CodeCircuitParams, CodeDistance, CodeFamily, GeneratedCircuit,
+    RoundCount,
+};
 use stab_model::{ModelResult, Probability};
 
 use crate::io_plan::{FileRole, PendingIo};
@@ -111,8 +114,12 @@ fn generate_circuit(
         .file_buffer(args.output.is_some())
         .admit(ledger)?;
     let stage = ledger.stage();
-    let params = params.with_memory_budget(stage.get());
-    let generated = params.generate().map_err(|error| stage.refusal(error))?;
+    let options = CircuitGenerationOptions {
+        memory_budget: stage.get(),
+    };
+    let generated = params
+        .generate(&options)
+        .map_err(|error| stage.refusal(error))?;
     Ok((params, generated, output_hold))
 }
 

@@ -40,13 +40,26 @@ impl UngraphlikeErrors {
 /// There is no default: the two size limits decide how much of the model the heuristic sees, and
 /// Stim's Python API also requires all three search arguments.
 ///
-/// When both `max_detection_event_set_size` and `max_edge_degree` are 2, the call runs the
-/// graphlike search with [`UngraphlikeErrors::Ignore`] instead, as Stim does. That search leaves
-/// out every error with a `^` separator, where the hypergraph search toggles all of an error's
-/// targets into one edge, so the two can find different witnesses or one can find none; a
-/// [`LogicalErrorSearch::NotFound`] report then names the graphlike search. `symptom_growth` has
-/// no effect at these maxima either way, since crossing an edge of at most two detectors at the
-/// state's first detector never grows the detection-event set.
+/// The hypergraph's edges fold all of an error's targets into one edge across `^` separators, so
+/// a detector or observable listed twice cancels out.
+///
+/// When both `max_detection_event_set_size` and `max_edge_degree` are 2, the call runs a faster
+/// breadth-first search over the same edges, which finds a logical error exactly when the
+/// hypergraph search would and one of the same length, though not always the same one; it keeps
+/// the first error with no detection events and some observable as the distance-1 witness, where
+/// the hypergraph search keeps the last. Its [`LogicalErrorSearch::NotFound`] report names the
+/// hypergraph search. `symptom_growth` has no effect at these maxima, since crossing an edge of at
+/// most two detectors at one of the state's detection events never adds an event. The detector
+/// node, expanded traversal, hyperedge degree, and hyperedge incidence limits apply exactly as in
+/// the hypergraph search; the retained graph and search-state limits count the faster search's
+/// own graph and states.
+///
+/// Pinned Stim instead runs its graphlike search at these maxima, which drops every error with a
+/// `^` separator or more than two listed detectors, does not cancel a detector listed twice, and
+/// reports a graphlike search; Stab diverges to give the hypergraph search's answer. Models in
+/// which no error has a separator or lists a detector twice get Stim's witnesses and outcomes,
+/// except that a not-found report names the hypergraph search and so carries no
+/// no-graphlike-errors fact.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HypergraphSearchOptions {
     /// Search states with more detection events than this are not explored.

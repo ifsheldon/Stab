@@ -820,7 +820,7 @@ name = "pf6_direct_dem_graphlike_search_matches_upstream_distance_cases"
 [[families]]
 id = "search.hypergraph-heuristic"
 area = "search"
-contract = "Hypergraph heuristic search matches Stim undetectable-logical-error witnesses across flat and folded DEMs."
+contract = "Hypergraph heuristic search matches Stim undetectable-logical-error witnesses across flat and folded DEMs, apart from the two-detector maxima that search.hypergraph-two-detector-maxima owns."
 stim_refs = ["src/stim/search/hyper/algo.test.cc", "src/stim/search/hyper/graph.test.cc"]
 status = "done"
 owner = "stab-analysis"
@@ -831,6 +831,23 @@ package = "stab-analysis"
 kind = "test"
 target = "dem_search"
 name = "pf6_direct_dem_hypergraph_search_matches_upstream_distance_cases"
+
+[[families]]
+id = "search.hypergraph-two-detector-maxima"
+area = "search"
+contract = "A hypergraph search whose detection-event-set and edge-degree maxima are both 2 folds each error across separators and answers as the hypergraph search does, including its not-found report."
+stim_refs = ["src/stim/search/hyper/algo.cc", "src/stim/search/hyper/graph.cc", "src/stim/search/graphlike/graph.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "stab-extension"
+rationale = "Pinned Stim reroutes these maxima to its graphlike search with ungraphlike errors ignored, which drops every error containing a separator and so can report no logical error where one within the stated maxima exists. By design Stab keeps the fast two-detector search but uses the hypergraph edge rules, so the result honors the maxima; models without separators or repeated targets return Stim's witness. No Stim command reaches the search, so there is no pinned reproduction."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "dem_search"
+name = "hypergraph_search_with_both_maxima_two_folds_separated_errors"
 
 [[families]]
 id = "search.likeliest-error-wcnf-common"
@@ -887,7 +904,7 @@ name = "parity::tests::pinned_stim::pinned_stim_weighted_wcnf_emits_false_sentin
 [[families]]
 id = "search.no-logical-error-outcome"
 area = "search"
-contract = "A graphlike or hypergraph search that completes without finding a logical error returns a typed not-found outcome whose text is Stim's, while an exhausted search budget or a cancellation is an error."
+contract = "A graphlike or hypergraph search that completes without finding a logical error returns a typed not-found outcome whose text is Stim's for the search that ran, while an exhausted search budget or a cancellation is an error."
 stim_refs = ["src/stim/search/graphlike/algo.cc", "src/stim/search/hyper/algo.cc"]
 status = "divergence"
 owner = "stab-analysis"

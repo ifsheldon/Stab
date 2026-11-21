@@ -153,8 +153,9 @@ It is the only open item where the current API returns something false.
 
 **Outcome, 2026-11-21.** Done as proposed below, with `SymptomGrowth::{Explore, Skip}` and a matching `UngraphlikeErrors::{Ignore, Reject}` for the graphlike search.
 Three statements in the proposal were wrong: the report already held typed facts, no CLI command reaches the searches, and the removed error added an `invalid detector error model: ` prefix that the report does not carry.
-One question is left open: a hypergraph search with both maxima at 2 runs the graphlike search, as in Stim, and that can report "not found" where an error within the stated maxima exists, because the graphlike search drops errors that contain a `^` separator.
-Stab keeps Stim's behavior and documents it on the options; removing the reroute would be a deliberate divergence that trades Stim parity and speed for a search that honors its stated maxima.
+Stim reroutes a hypergraph search with both maxima at 2 to its graphlike search, which can report "not found" where an error within the stated maxima exists, because the graphlike search drops errors that contain a `^` separator.
+Decided on 2026-11-21 as a latent Stim bug: Stab keeps the fast two-detector search but folds each error across separators, so it answers as the hypergraph search does, checked by a 2,048-case differential test against the search run without the fast path.
+The divergence is the ledger family `search.hypergraph-two-detector-maxima`.
 The rest of this section is the proposal as written before the work.
 
 **Today.** `find_undetectable_logical_error(model, usize, usize, bool)` and `shortest_graphlike_undetectable_logical_error(model, bool)`, each with a `_with_limits` twin, return `AnalysisResult<DetectorErrorModel>`.
@@ -215,7 +216,7 @@ With R9 done, the parse disappears and `Option` is the whole truth; without R9 t
 **Outcome for analysis, 2026-11-21.** Done: every `stab-analysis` operation is one function taking its options by reference, with public fields, no builders, and `memory_budget` and `cancellation` under those names.
 `solve_for_flow_measurements` gained a real budget and cancellation, and the dense detecting-region lists gained cancellation.
 Still without a byte budget or cancellation: `tableau_to_circuit` (needs a proven output bound), cancellation in `CodeCircuitParams::generate`, and a byte budget for SAT generation and logical-error search, which have cancellation and count caps.
-`CodeCircuitParams` keeps its budget inside the parameters.
+Moved afterwards on the same day: `CodeCircuitParams::generate` takes `&CircuitGenerationOptions`, and the parameters no longer hold a budget.
 
 **Outcome for the engine, 2026-11-21.** Done: each plan has one `session(&Options)` and one `streaming_run(&Options, shots)`, with per-family options because the knobs differ, and the four compilers have public fields.
 The free functions that compiled a plan only to discard it are removed, except `detection_record_width` and `circuit_reference_signs`, which have distinct uses.

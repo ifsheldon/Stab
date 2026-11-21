@@ -4,8 +4,9 @@
 )]
 
 use stab_analysis::{
-    CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions, ErrorDecomposition,
-    LoopFolding, RemnantEdges, RoundCount, SurfaceCodeTask, circuit_to_detector_error_model,
+    CircuitGenerationOptions, CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions,
+    ErrorDecomposition, LoopFolding, RemnantEdges, RoundCount, SurfaceCodeTask,
+    circuit_to_detector_error_model,
 };
 use stab_model::{CircuitDetectorId, DemItem, Probability};
 
@@ -18,7 +19,9 @@ fn pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit() {
     )
     .expect("surface-code params")
     .with_after_clifford_depolarization(Probability::try_new(0.01).expect("probability"));
-    let generated = params.generate().expect("generate surface-code circuit");
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .expect("generate surface-code circuit");
     let circuit = generated.circuit();
     let circuit_coordinates = circuit
         .detector_coordinates()

@@ -111,6 +111,10 @@ impl GraphConstructionBudget {
         &self.limits
     }
 
+    pub(super) const fn context(&self) -> &'static str {
+        self.context
+    }
+
     pub(super) fn preflight_unique_edge(
         &self,
         edge_terms: usize,

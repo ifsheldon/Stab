@@ -77,7 +77,7 @@ Every admitted workload produces byte-identical output; only workloads that the 
 | `CircuitFlattenLimits` count fields, `DEFAULT_MAX_*` constants, and builders | `CircuitFlattenLimits::{new, memory_budget, with_memory_budget}` |
 | `DemFlattenLimits` repeat-unroll, expanded-instruction, repeat-iteration, target, argument, and byte fields, `DEFAULT_MAX_*` constants, and builders | `DemFlattenLimits::{new, memory_budget, with_memory_budget}` |
 | `CircuitPassLimits` item, target, argument, and payload fields, `DEFAULT_MAX_*` constants, and builders | `CircuitPassLimits::new(memory_budget, repeat_nesting)` with `memory_budget` and `with_memory_budget` |
-| Fixed analyzer, feedback-inlining, Pauli-conjugation, time-reversal, flow-generator, missing-detector, detecting-region, and coordinate-query work caps | Removed; retained storage is admitted against a caller budget: `ErrorAnalyzerOptions::memory_budget`, `circuit_with_inlined_feedback_with_limits`, `DetectorErrorModel::detector_coordinates_with_budget`, the generator parameters' `with_memory_budget`, `TimeReversedForFlowsOptions::memory_budget`, `InverseQecOptions::memory_budget`, `FlowGeneratorOptions::memory_budget`, `MissingDetectorOptions::memory_budget`, `DetectingRegionOptions::memory_budget`, `DetectingRegionTargetOptions::memory_budget`, `all_detecting_region_targets_with_budget`, and `all_detecting_region_ticks_with_budget`; the functions without one use `MemoryBudget::DEFAULT` |
+| Fixed analyzer, feedback-inlining, Pauli-conjugation, time-reversal, flow-generator, missing-detector, detecting-region, and coordinate-query work caps | Removed; retained storage is admitted against a caller budget: `ErrorAnalyzerOptions::memory_budget`, `circuit_with_inlined_feedback_with_limits`, `DetectorErrorModel::detector_coordinates_with_budget`, `CircuitGenerationOptions::memory_budget`, `TimeReversedForFlowsOptions::memory_budget`, `InverseQecOptions::memory_budget`, `FlowGeneratorOptions::memory_budget`, `MissingDetectorOptions::memory_budget`, `DetectingRegionOptions::memory_budget`, `DetectingRegionTargetOptions::memory_budget`, `all_detecting_region_targets_with_budget`, and `all_detecting_region_ticks_with_budget`; the functions without one use `MemoryBudget::DEFAULT` |
 | The generator's 131,072-physical-qubit cap | A projected one mebibyte plus 768 bytes per physical qubit admitted against the generator parameters' budget |
 | Flow checking, Pauli conjugation, and `Flow` text parsing at the default budget only | `check_unsigned_stabilizer_flows` with `UnsignedFlowCheckOptions`, which is the only flow check (see [One Flow Check With A Verdict](#one-flow-check-with-a-verdict)); `pauli_after_circuit_with_options` and `pauli_before_circuit_with_options` with `PauliConjugationOptions`; and `Flow::from_str_with_budget`; the existing Pauli conjugation and parsing functions delegate with the default budget |
 | `sample_if_circuit_has_stabilizer_flows` at the default budget only | `sample_if_circuit_has_stabilizer_flows_with_options` with `SampledFlowOptions`, whose `memory_budget` admits each flow's augmented noiseless witness circuit, compiled sampling plan, witness simulator, and session; the existing function delegates with the default budget |
@@ -341,7 +341,7 @@ These changes come from Phase D of the review fix plan and from its public API r
 | `StabilizerError::AntiCommutingStabilizer`, `RedundantStabilizer`, and `InconsistentStabilizer` holding formatted Pauli strings | They hold input indices; `InvalidFlowProduct` is a unit variant |
 | `stab_algebra::advanced::{pauli_identity_unchecked, pauli_from_bases_unchecked}` | `pauli_identity_unbudgeted` and `pauli_from_bases_unbudgeted`; they skip only the budget admission |
 | `stab_kernels_simd::pauli_right_multiply_words(&mut [u64], &mut [u64], &[u64], &[u64])` and `pauli_right_multiply_words_log_i` | Both take `(PauliPlanesMut, PauliPlanes)`, so the X and Z planes cannot be swapped |
-| `RepetitionCodeParams`, `SurfaceCodeParams`, `ColorCodeParams`, and `generate_{repetition, surface, color}_code_circuit` | `CodeCircuitParams::try_new(CodeTask, CodeDistance, RoundCount)` and `CodeCircuitParams::generate()`; note the argument order, and that color-code distance and round constraints are refused by `try_new` |
+| `RepetitionCodeParams`, `SurfaceCodeParams`, `ColorCodeParams`, and `generate_{repetition, surface, color}_code_circuit` | `CodeCircuitParams::try_new(CodeTask, CodeDistance, RoundCount)` and `CodeCircuitParams::generate(&CircuitGenerationOptions)`; note the argument order, and that color-code distance and round constraints are refused by `try_new` |
 | CLI task-name tables and `CliError::Unsupported{Repetition, Surface, Color}Task` | `stab_analysis::CodeFamily` and the task enums implement `FromStr`, `Display`, `ALL`, and `as_str`; the CLI error is `CliError::UnsupportedGenTask(UnknownCodeTask)` with unchanged text and codes |
 | `stab_model::advanced::probability_from_valid` | Removed; use `Probability::try_new`, or `Probability::ZERO` and `Probability::ONE` |
 | `stab_model::advanced::{dem_model_items_mut, dem_repeat_block_body_mut}` | `DetectorErrorModel::{reverse_items, item_mut, insert_item, try_retain_items_mut}` and the now-public `DemRepeatBlock::body_mut` |
@@ -443,6 +443,13 @@ Refusals that were misreported are now typed:
 - A failed reservation for a detecting region is `AnalysisError::AllocationFailed`, where it was labelled a memory-budget refusal.
 - A budget refusal raised while a sample run is writing reports `resource-limit-exceeded` instead of `sampling-execution-failed`.
 - The JSON `span` of a refusal that has no source position is `null` instead of an empty span at byte zero.
+
+## Generator Budget As An Options Value
+
+`CodeCircuitParams::generate` takes `&CircuitGenerationOptions { memory_budget }`, and `CodeCircuitParams::with_memory_budget` and `memory_budget()` are removed.
+The budget is not a property of the circuit, so two parameter values that describe the same circuit now compare equal.
+Callers that used the default budget pass `&CircuitGenerationOptions::default()`.
+`stab gen` output and its budget refusal are unchanged.
 
 ## Whole-Buffer Record Codecs Removed
 
@@ -624,7 +631,10 @@ Free functions that wrapped a method are inherent methods or associated items on
 `HypergraphSearchOptions` has no default because Stim requires all three search arguments; `GraphlikeSearchOptions::default()` ignores ungraphlike errors, as Stim's Python API does.
 `NoLogicalErrorReport` renders Stim's text exactly; the `invalid detector error model: ` prefix that the removed error added is gone.
 A search budget that runs out is still `AnalysisError::ResourceLimit` and a cancellation is still `AnalysisError::Cancelled`, so neither can read as a completed search that found nothing.
-As in Stim, a hypergraph search whose two maxima are both 2 runs the graphlike search with ungraphlike errors ignored, which can report `NotFound` where larger maxima find an error, because the graphlike search drops every error that contains a `^` separator.
+A hypergraph search whose two maxima are both 2 honors those maxima, which is a deliberate divergence from Stim.
+Stim runs its graphlike search there with ungraphlike errors ignored, which drops every error that contains a `^` separator and so can report no error where one within the maxima exists.
+Stab keeps the fast two-detector search but folds each error's targets across separators, as the hypergraph search does at every other setting, so `error(0.1) D0 ^ D1 L0` is a two-detector edge.
+For a model without separators or repeated targets the witness is the one Stim returns; the not-found report names the hypergraph search and carries no graphlike fact.
 
 ## One Flow Check With A Verdict
 

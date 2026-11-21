@@ -15,21 +15,22 @@ use std::time::{Duration, Instant};
 
 use stab_algebra::{Flow, PauliString};
 use stab_analysis::{
-    AnalysisError, CircuitFlattenOptions, CircuitPass, CircuitPassContext, CircuitPassError,
-    CircuitPassInput, CircuitPassOutput, CircuitPassResources, CodeCircuitParams, CodeDistance,
-    CodeTask, DemFlattenOptions, DetectingRegionListOptions, DetectingRegionOptions,
-    ErrorAnalyzerOptions, ErrorDecomposition, FeedbackInliningOptions, FlowGeneratorOptions,
-    FlowMeasurementOptions, FlowVerdict, GraphlikeSearchOptions, HypergraphSearchOptions,
-    LogicalErrorSearchLimits, MissingDetectorOptions, PauliConjugationOptions, RoundCount,
-    SatMaterializationLimits, SurfaceCodeTask, SymptomGrowth, TimeReversedForFlowsOptions,
-    UngraphlikeErrors, UnsignedFlowCheckOptions, WithoutNoiseOptions, WithoutNoisePass,
-    all_detecting_region_targets, all_detecting_region_ticks, check_unsigned_stabilizer_flows,
-    circuit_detecting_regions, circuit_flow_generators, circuit_time_reversed_for_flows,
-    circuit_to_detector_error_model, circuit_with_inlined_feedback,
-    find_undetectable_logical_error, flattened_circuit, flattened_circuit_operations,
-    flattened_detector_error_model, likeliest_error_sat_problem, missing_detectors,
-    pauli_after_circuit, pauli_before_circuit, run_circuit_pass, shortest_error_sat_problem,
-    shortest_graphlike_undetectable_logical_error, solve_for_flow_measurements,
+    AnalysisError, CircuitFlattenOptions, CircuitGenerationOptions, CircuitPass,
+    CircuitPassContext, CircuitPassError, CircuitPassInput, CircuitPassOutput,
+    CircuitPassResources, CodeCircuitParams, CodeDistance, CodeTask, DemFlattenOptions,
+    DetectingRegionListOptions, DetectingRegionOptions, ErrorAnalyzerOptions, ErrorDecomposition,
+    FeedbackInliningOptions, FlowGeneratorOptions, FlowMeasurementOptions, FlowVerdict,
+    GraphlikeSearchOptions, HypergraphSearchOptions, LogicalErrorSearchLimits,
+    MissingDetectorOptions, PauliConjugationOptions, RoundCount, SatMaterializationLimits,
+    SurfaceCodeTask, SymptomGrowth, TimeReversedForFlowsOptions, UngraphlikeErrors,
+    UnsignedFlowCheckOptions, WithoutNoiseOptions, WithoutNoisePass, all_detecting_region_targets,
+    all_detecting_region_ticks, check_unsigned_stabilizer_flows, circuit_detecting_regions,
+    circuit_flow_generators, circuit_time_reversed_for_flows, circuit_to_detector_error_model,
+    circuit_with_inlined_feedback, find_undetectable_logical_error, flattened_circuit,
+    flattened_circuit_operations, flattened_detector_error_model, likeliest_error_sat_problem,
+    missing_detectors, pauli_after_circuit, pauli_before_circuit, run_circuit_pass,
+    shortest_error_sat_problem, shortest_graphlike_undetectable_logical_error,
+    solve_for_flow_measurements,
 };
 use stab_model::advanced::CancellationCountdown;
 use stab_model::{
@@ -305,7 +306,9 @@ fn surface_code_model(distance: u32) -> DetectorErrorModel {
     .expect("surface code parameters")
     .with_after_clifford_depolarization(noise)
     .with_before_measure_flip_probability(noise);
-    let generated = params.generate().expect("surface code circuit");
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .expect("surface code circuit");
     circuit_to_detector_error_model(
         generated.circuit(),
         &ErrorAnalyzerOptions {

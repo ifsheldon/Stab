@@ -97,11 +97,9 @@ impl RoundCount {
 }
 
 /// A valid request for one of Stim's example circuits: the task (which names its code family),
-/// the code distance and round count, the four noise strengths, and the memory budget its
-/// generation is admitted against.
+/// the code distance and round count, and the four noise strengths.
 ///
-/// Noise strengths default to zero, which emits no noise instruction, and the budget defaults to
-/// [`MemoryBudget::DEFAULT`].
+/// Noise strengths default to zero, which emits no noise instruction.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CodeCircuitParams {
     task: CodeTask,
@@ -111,7 +109,14 @@ pub struct CodeCircuitParams {
     before_measure_flip_probability: Probability,
     after_reset_flip_probability: Probability,
     after_clifford_depolarization: Probability,
-    memory_budget: MemoryBudget,
+}
+
+/// Options of [`CodeCircuitParams::generate`].
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct CircuitGenerationOptions {
+    /// Budget for the generated circuit, admitted from its physical-qubit count before any
+    /// generation work.
+    pub memory_budget: MemoryBudget,
 }
 
 impl CodeCircuitParams {
@@ -146,7 +151,6 @@ impl CodeCircuitParams {
             before_measure_flip_probability: Probability::ZERO,
             after_reset_flip_probability: Probability::ZERO,
             after_clifford_depolarization: Probability::ZERO,
-            memory_budget: MemoryBudget::DEFAULT,
         })
     }
 
@@ -178,10 +182,6 @@ impl CodeCircuitParams {
         self.after_clifford_depolarization
     }
 
-    pub fn memory_budget(&self) -> MemoryBudget {
-        self.memory_budget
-    }
-
     #[must_use]
     pub fn with_before_round_data_depolarization(mut self, value: Probability) -> Self {
         self.before_round_data_depolarization = value;
@@ -203,14 +203,6 @@ impl CodeCircuitParams {
     #[must_use]
     pub fn with_after_clifford_depolarization(mut self, value: Probability) -> Self {
         self.after_clifford_depolarization = value;
-        self
-    }
-
-    /// Budget for the generated circuit, admitted from its physical-qubit count before any
-    /// generation work.
-    #[must_use]
-    pub fn with_memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
-        self.memory_budget = memory_budget;
         self
     }
 
@@ -242,9 +234,9 @@ impl CodeCircuitParams {
     /// Generates the circuit, its layout diagram, and its legend.
     ///
     /// Returns an error before materializing anything if the projected generation exceeds the
-    /// memory budget.
-    pub fn generate(&self) -> AnalysisResult<GeneratedCircuit> {
-        self.admit_generation()?;
+    /// options' memory budget.
+    pub fn generate(&self, options: &CircuitGenerationOptions) -> AnalysisResult<GeneratedCircuit> {
+        self.admit_generation(options.memory_budget)?;
         match self.task {
             CodeTask::Repetition(RepetitionCodeTask::Memory) => repetition::generate(self),
             CodeTask::Surface(task) => surface::generate(self, task),
@@ -252,16 +244,16 @@ impl CodeCircuitParams {
         }
     }
 
-    fn admit_generation(&self) -> AnalysisResult<()> {
+    fn admit_generation(&self, memory_budget: MemoryBudget) -> AnalysisResult<()> {
         let required = self.projected_generation_bytes();
-        if self.memory_budget.admits(u128::from(required)) {
+        if memory_budget.admits(u128::from(required)) {
             return Ok(());
         }
         Err(ResourceLimitError::generated_circuit(
             self.task,
             self.physical_qubit_count(),
             required,
-            self.memory_budget,
+            memory_budget,
         )
         .into())
     }

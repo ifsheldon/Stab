@@ -88,7 +88,7 @@ fn corpus() -> Vec<String> {
             .with_after_clifford_depolarization(probability);
         circuits.push(
             params
-                .generate()
+                .generate(&CircuitGenerationOptions::default())
                 .expect("surface circuit")
                 .circuit()
                 .to_stim_string(),
@@ -100,7 +100,7 @@ fn corpus() -> Vec<String> {
             .with_after_clifford_depolarization(probability);
     circuits.push(
         color
-            .generate()
+            .generate(&CircuitGenerationOptions::default())
             .expect("color circuit")
             .circuit()
             .to_stim_string(),
@@ -114,7 +114,7 @@ fn corpus() -> Vec<String> {
     .with_before_measure_flip_probability(probability);
     circuits.push(
         repetition
-            .generate()
+            .generate(&CircuitGenerationOptions::default())
             .expect("repetition circuit")
             .circuit()
             .to_stim_string(),

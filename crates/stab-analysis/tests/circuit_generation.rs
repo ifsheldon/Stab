@@ -7,8 +7,8 @@
 )]
 
 use stab_analysis::{
-    AnalysisError, CodeCircuitParams, CodeDistance, CodeFamily, CodeTask, ColorCodeTask,
-    GeneratorParameter, RepetitionCodeTask, RoundCount, SurfaceCodeTask,
+    AnalysisError, CircuitGenerationOptions, CodeCircuitParams, CodeDistance, CodeFamily, CodeTask,
+    ColorCodeTask, GeneratorParameter, RepetitionCodeTask, RoundCount, SurfaceCodeTask,
 };
 use stab_model::Probability;
 
@@ -194,7 +194,9 @@ fn cq2_generation_repetition_matches_complete_pinned_stim_case() {
     .with_before_measure_flip_probability(Probability::try_new(0.375).expect("probability"))
     .with_before_round_data_depolarization(Probability::try_new(0.0625).expect("probability"));
 
-    let generated = params.generate().expect("generate repetition code");
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .expect("generate repetition code");
 
     assert_eq!(generated.layout_text(), "# L0 Z1 d2 Z3 d4 Z5 d6\n");
     assert_eq!(
@@ -266,7 +268,9 @@ fn assert_unrotated_surface_code_matches_stim() {
     .with_before_measure_flip_probability(Probability::try_new(0.375).expect("probability"))
     .with_before_round_data_depolarization(Probability::try_new(0.0625).expect("probability"));
 
-    let generated = params.generate().expect("generate surface code");
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .expect("generate surface code");
 
     assert_eq!(
         generated.layout_text(),
@@ -365,7 +369,9 @@ fn assert_unrotated_surface_code_matches_stim() {
     .with_after_reset_flip_probability(probability(0.25))
     .with_before_measure_flip_probability(probability(0.375))
     .with_before_round_data_depolarization(probability(0.0625));
-    let generated = memory_x.generate().expect("generate unrotated memory X");
+    let generated = memory_x
+        .generate(&CircuitGenerationOptions::default())
+        .expect("generate unrotated memory X");
     assert_eq!(
         generated.layout_text(),
         concat!("# L6 X7 d8\n", "# Z3 d4 Z5\n", "# L0 X1 d2\n")
@@ -433,7 +439,9 @@ fn assert_rotated_surface_code_matches_stim() {
     .with_before_measure_flip_probability(Probability::try_new(0.375).expect("probability"))
     .with_before_round_data_depolarization(Probability::try_new(0.0625).expect("probability"));
 
-    let generated = params.generate().expect("generate surface code");
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .expect("generate surface code");
 
     assert_eq!(
         generated.layout_text(),
@@ -530,7 +538,7 @@ fn assert_rotated_surface_code_matches_stim() {
     .with_before_measure_flip_probability(probability(0.375))
     .with_before_round_data_depolarization(probability(0.0625));
     let generated = distance_four
-        .generate()
+        .generate(&CircuitGenerationOptions::default())
         .expect("generate distance-four surface code");
     assert_eq!(
         generated.layout_text(),
@@ -558,7 +566,7 @@ fn assert_rotated_surface_code_matches_stim() {
     .with_before_measure_flip_probability(probability(0.375))
     .with_before_round_data_depolarization(probability(0.0625));
     let generated = distance_five
-        .generate()
+        .generate(&CircuitGenerationOptions::default())
         .expect("generate distance-five surface code");
     assert_eq!(
         generated.layout_text(),
@@ -592,7 +600,7 @@ fn cq2_generation_color_matches_complete_pinned_stim_case() {
     .with_before_measure_flip_probability(probability(0.375))
     .with_before_round_data_depolarization(probability(0.0625));
     let generated = distance_five
-        .generate()
+        .generate(&CircuitGenerationOptions::default())
         .expect("generate distance-five color code");
     assert_eq!(
         generated.layout_text(),
@@ -618,7 +626,9 @@ fn cq2_generation_color_matches_complete_pinned_stim_case() {
     .with_before_measure_flip_probability(Probability::try_new(0.375).expect("probability"))
     .with_before_round_data_depolarization(Probability::try_new(0.0625).expect("probability"));
 
-    let generated = params.generate().expect("generate color code");
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .expect("generate color code");
 
     assert_eq!(
         generated.layout_text(),
@@ -755,7 +765,7 @@ fn cq2_generation_color_rejects_invalid_family_parameters() {
     }
     color(3, 2)
         .expect("minimum color-code shape")
-        .generate()
+        .generate(&CircuitGenerationOptions::default())
         .expect("minimum color-code shape must generate");
     // The other families accept every typed distance and round count.
     for task in [
@@ -768,7 +778,7 @@ fn cq2_generation_color_rejects_invalid_family_parameters() {
             RoundCount::try_new(1).expect("rounds"),
         )
         .expect("non-color shape")
-        .generate()
+        .generate(&CircuitGenerationOptions::default())
         .expect("non-color minimum shape must generate");
     }
 }

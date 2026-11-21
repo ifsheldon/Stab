@@ -8,8 +8,8 @@ use std::assert_matches;
 use std::ops::ControlFlow;
 
 use stab_analysis::{
-    CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions, RepetitionCodeTask,
-    RoundCount, circuit_to_detector_error_model,
+    CircuitGenerationOptions, CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions,
+    RepetitionCodeTask, RoundCount, circuit_to_detector_error_model,
 };
 use stab_model::{
     DemErrorMechanismTraversalLimits, DemErrorMechanismView, DemErrorMechanismVisitor,
@@ -102,7 +102,9 @@ fn generated_repetition_model(distance: u32) -> DetectorErrorModel {
     .with_before_round_data_depolarization(probability(0.03125))
     .with_before_measure_flip_probability(probability(0.015625))
     .with_after_reset_flip_probability(probability(0.0078125));
-    let generated = params.generate().expect("generate repetition circuit");
+    let generated = params
+        .generate(&CircuitGenerationOptions::default())
+        .expect("generate repetition circuit");
     circuit_to_detector_error_model(generated.circuit(), &ErrorAnalyzerOptions::default())
         .expect("lower repetition circuit")
 }
