@@ -9,7 +9,10 @@
 use std::assert_matches;
 
 use super::*;
-use crate::{BitIndex, FormatErrorCode, ShotIndex, read_records, write_records};
+use crate::result_formats::reference::{
+    decode_next_r8_record, read_dets_records, read_records, write_records,
+};
+use crate::{BitIndex, FormatErrorCode, ShotIndex};
 
 const TEST_TEXT_LIMIT: usize = 1024 * 1024;
 
@@ -687,13 +690,7 @@ fn r8_truncation_and_overshoot_at_every_offset_match_whole_buffer_diagnostics() 
             let mut decodable = 0;
             let mut offset = 0;
             while offset < case.len()
-                && crate::result_packed::decode_next_r8_record(
-                    &case,
-                    width,
-                    &mut offset,
-                    |_| Ok(()),
-                )
-                .is_ok()
+                && decode_next_r8_record(&case, width, &mut offset, |_| Ok(())).is_ok()
             {
                 decodable = offset;
             }
@@ -742,4 +739,101 @@ fn r8_failures_inside_a_partly_read_record_are_reported_again() {
         RecordStreamReader::measurements(FailAfter(&[255, 255]), RecordFormat::R8, 600, 0);
     assert_matches!(reader.read_batch(1), Err(RecordStreamReadError::Io(_)));
     assert_matches!(reader.read_batch(1), Err(RecordStreamReadError::Format(_)));
+}
+
+mod hostile_reference {
+    //! Hostile bytes at arbitrary widths, batch sizes, and transport splits: the stream reader
+    //! must accept exactly what the whole-buffer reference codec accepts, decode the same
+    //! records, and report the same diagnostic code, for every format.
+
+    use proptest::prelude::*;
+    use proptest::test_runner::{Config, FileFailurePersistence, RngAlgorithm, RngSeed};
+
+    use super::*;
+
+    fn width() -> BoxedStrategy<usize> {
+        prop_oneof![
+            6 => 0_usize..=300,
+            3 => prop::sample::select(vec![1_usize, 7, 8, 9, 63, 64, 65, 127, 128, 254, 255, 256, 257, 510, 511, 512]),
+            1 => 300_usize..=5000,
+        ]
+        .boxed()
+    }
+
+    fn hostile_bytes() -> BoxedStrategy<Vec<u8>> {
+        let text = prop::sample::select(b"01\n\r \t,MDLshot0123456789-+x\x00\xff".to_vec());
+        let binary = prop_oneof![
+            3 => prop::sample::select(vec![0x00_u8, 0x01, 0x02, 0x07, 0x08, 0x80, 0xfe, 0xff]),
+            1 => any::<u8>(),
+        ];
+        prop_oneof![
+            prop::collection::vec(any::<u8>(), 0..200),
+            prop::collection::vec(text, 0..200),
+            prop::collection::vec(binary, 0..200),
+        ]
+        .boxed()
+    }
+
+    proptest! {
+        #![proptest_config(Config {
+            cases: 2048,
+            rng_algorithm: RngAlgorithm::ChaCha,
+            rng_seed: RngSeed::Fixed(0xc0de_c0de_0003),
+            failure_persistence: Some(Box::new(FileFailurePersistence::Off)),
+            ..Config::default()
+        })]
+
+        #[test]
+        fn hostile_bytes_match_the_whole_buffer_reference_and_its_diagnostic_code(
+            format in prop::sample::select(RecordFormat::all().collect::<Vec<_>>()),
+            width in width(),
+            input in hostile_bytes(),
+            step in 1_usize..40,
+            batch in 1_usize..70,
+        ) {
+            let expected = read_records(&input, format, width);
+            let mut reader = RecordStreamReader::measurements(
+                Trickle::new(&input, step),
+                format,
+                width,
+                usize::MAX,
+            );
+            let (streamed, error) = drain(&mut reader, batch);
+            match (&expected, error) {
+                (Ok(expected), None) => prop_assert_eq!(&streamed, expected),
+                (Err(expected), Some(RecordStreamReadError::Format(error))) => {
+                    prop_assert_eq!(error.code(), expected.code(), "{:?}", error);
+                }
+                (expected, error) => prop_assert!(
+                    false,
+                    "{format:?} width {width}: stream {error:?}, reference {expected:?}"
+                ),
+            }
+        }
+
+        #[test]
+        fn hostile_typed_dets_bytes_match_the_whole_buffer_reference(
+            measurements in 0_usize..40,
+            detectors in 0_usize..40,
+            observables in 0_usize..40,
+            input in hostile_bytes(),
+            step in 1_usize..40,
+        ) {
+            let layout = DetsLayout::try_new(measurements, detectors, observables).unwrap();
+            let expected = read_dets_records(&input, layout);
+            let mut reader =
+                RecordStreamReader::dets(Trickle::new(&input, step), layout, usize::MAX);
+            let (streamed, error) = drain(&mut reader, 1 + input.len() % 5);
+            match (&expected, error) {
+                (Ok(expected), None) => prop_assert_eq!(&streamed, expected),
+                (Err(expected), Some(RecordStreamReadError::Format(error))) => {
+                    prop_assert_eq!(error.code(), expected.code(), "{:?}", error);
+                }
+                (expected, error) => prop_assert!(
+                    false,
+                    "{layout:?}: stream {error:?}, reference {expected:?}"
+                ),
+            }
+        }
+    }
 }

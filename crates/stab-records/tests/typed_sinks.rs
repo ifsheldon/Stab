@@ -6,13 +6,47 @@
     reason = "contract tests use compact deterministic fixtures"
 )]
 
+//! The typed sinks route each semantic column group to the record encoder: their bytes equal
+//! those of one encoder fed the same records as namespace-tagged parts, whose own encoding is
+//! checked against an independent reference in `record_encoder.rs`.
+
 use stab_records::{
     BitPlaneBatch, DemSampleBatchView, DemSampleCodecSink, DemSampleSink, DetectionBatchView,
     DetectionCodecSink, DetectionSink, DetectorWidth, DetsResultType, FormatErrorCode,
-    MeasureRecordWriter, MeasurementBatchView, MeasurementCodecSink, MeasurementSink,
-    MeasurementWidth, ObservableWidth, PackedShotBatch, RecordFormat, RecordResult,
-    SampledErrorWidth, write_ptb64_records_checked, write_records,
+    MeasurementBatchView, MeasurementCodecSink, MeasurementSink, MeasurementWidth, ObservableWidth,
+    PackedShotBatch, RecordBatchPart, RecordEncoder, RecordFormat, RecordResult, SampledErrorWidth,
 };
+
+/// Encodes complete records whose columns are split into namespace-tagged groups.
+fn encode_parts(
+    format: RecordFormat,
+    parts: &[(DetsResultType, &[Vec<bool>])],
+) -> RecordResult<Vec<u8>> {
+    let batches = parts
+        .iter()
+        .map(|(_, records)| {
+            let width = records.first().map_or(0, Vec::len);
+            PackedShotBatch::from_records(records, width)
+        })
+        .collect::<RecordResult<Vec<_>>>()?;
+    let parts = parts
+        .iter()
+        .zip(&batches)
+        .map(|((namespace, _), batch)| RecordBatchPart::new(*namespace, batch.view()))
+        .collect::<Vec<_>>();
+    let width = batches.iter().map(PackedShotBatch::bits_per_shot).sum();
+    let mut encoder = RecordEncoder::try_new(format, width)?;
+    let mut out = Vec::new();
+    encoder
+        .write_batch(&parts, &mut out)
+        .expect("in-memory record encoding");
+    assert_eq!(encoder.pending_group_records(), 0, "complete PTB64 groups");
+    Ok(out)
+}
+
+fn encode(records: &[Vec<bool>], format: RecordFormat) -> RecordResult<Vec<u8>> {
+    encode_parts(format, &[(DetsResultType::Measurement, records)])
+}
 
 #[test]
 fn measurement_codec_sinks_match_every_legacy_encoding() -> RecordResult<()> {
@@ -27,7 +61,7 @@ fn measurement_codec_sinks_match_every_legacy_encoding() -> RecordResult<()> {
         let batch = PackedShotBatch::from_records(&records, 17)?;
         let mut sink = MeasurementCodecSink::try_new(format, MeasurementWidth::new(17))?;
         sink.write_batch(MeasurementBatchView::new(batch.view()))?;
-        let expected = write_records(&records, format)?;
+        let expected = encode(&records, format)?;
         assert_eq!(sink.into_bytes()?, expected);
 
         let planes = BitPlaneBatch::from_shot_major(batch.view())?;
@@ -41,7 +75,7 @@ fn measurement_codec_sinks_match_every_legacy_encoding() -> RecordResult<()> {
     let mut sink = MeasurementCodecSink::try_new(RecordFormat::Ptb64, MeasurementWidth::new(17))?;
     sink.write_batch(MeasurementBatchView::new(first.view()))?;
     sink.write_batch(MeasurementBatchView::new(second.view()))?;
-    assert_eq!(sink.into_bytes()?, write_ptb64_records_checked(&records)?);
+    assert_eq!(sink.into_bytes()?, encode(&records, RecordFormat::Ptb64)?);
 
     let planes =
         BitPlaneBatch::from_shot_major(PackedShotBatch::from_records(&records, 17)?.view())?;
@@ -50,61 +84,9 @@ fn measurement_codec_sinks_match_every_legacy_encoding() -> RecordResult<()> {
     plane_sink.write_batch(MeasurementBatchView::from_bit_planes(planes.view()))?;
     assert_eq!(
         plane_sink.into_bytes()?,
-        write_ptb64_records_checked(&records)?
+        encode(&records, RecordFormat::Ptb64)?
     );
     Ok(())
-}
-
-#[test]
-fn compatibility_writer_matches_stim_byte_layouts() {
-    let bytes = [0xF8];
-
-    let mut writer =
-        MeasureRecordWriter::try_new(RecordFormat::ZeroOne).expect("per-record format");
-    writer.write_bytes(&bytes);
-    writer.write_bit(false);
-    writer.write_bytes(&bytes);
-    writer.write_bit(true);
-    writer.write_end();
-    assert_eq!(writer.into_bytes(), b"000111110000111111\n");
-
-    let mut writer = MeasureRecordWriter::try_new(RecordFormat::B8).expect("per-record format");
-    writer.write_bytes(&bytes);
-    writer.write_bit(false);
-    writer.write_bytes(&bytes);
-    writer.write_bit(true);
-    writer.write_end();
-    assert_eq!(writer.into_bytes(), [0xF8, 0xF0, 0x03]);
-
-    let mut writer = MeasureRecordWriter::try_new(RecordFormat::Hits).expect("per-record format");
-    writer.write_bytes(&bytes);
-    writer.write_bit(false);
-    writer.write_bytes(&bytes);
-    writer.write_bit(true);
-    writer.write_end();
-    assert_eq!(writer.into_bytes(), b"3,4,5,6,7,12,13,14,15,16,17\n");
-
-    let mut writer = MeasureRecordWriter::try_new(RecordFormat::Dets).expect("per-record format");
-    writer.begin_dets_result_type(DetsResultType::Detector);
-    writer.write_bytes(&bytes);
-    writer.write_bit(false);
-    writer.write_bytes(&bytes);
-    writer.begin_dets_result_type(DetsResultType::Observable);
-    writer.write_bit(false);
-    writer.write_bit(true);
-    writer.write_end();
-    assert_eq!(
-        writer.into_bytes(),
-        b"shot D3 D4 D5 D6 D7 D12 D13 D14 D15 D16 L1\n"
-    );
-
-    let mut writer = MeasureRecordWriter::try_new(RecordFormat::R8).expect("per-record format");
-    writer.write_bytes(&bytes);
-    writer.write_bit(false);
-    writer.write_bytes(&bytes);
-    writer.write_bit(true);
-    writer.write_end();
-    assert_eq!(writer.into_bytes(), [3, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0]);
 }
 
 #[test]
@@ -116,10 +98,7 @@ fn measurement_codec_reserves_known_record_counts_without_changing_bytes() -> Re
     sink.write_batch(MeasurementBatchView::new(batch.view()))?;
     sink.finish()?;
     assert!(sink.reserve_records(1).is_err());
-    assert_eq!(
-        sink.into_bytes()?,
-        write_records(&records, RecordFormat::ZeroOne)?
-    );
+    assert_eq!(sink.into_bytes()?, encode(&records, RecordFormat::ZeroOne)?);
     Ok(())
 }
 
@@ -152,11 +131,7 @@ fn detection_codec_keeps_dets_namespaces_until_encoding() -> RecordResult<()> {
         let mut sink =
             DetectionCodecSink::try_new(format, DetectorWidth::new(5), ObservableWidth::new(3))?;
         sink.write_batch(batch)?;
-        let expected = if format == RecordFormat::Ptb64 {
-            write_ptb64_records_checked(&expected_merged)?
-        } else {
-            write_records(&expected_merged, format)?
-        };
+        let expected = encode(&expected_merged, format)?;
         assert_eq!(sink.into_bytes()?, expected);
     }
 
@@ -170,15 +145,14 @@ fn detection_codec_keeps_dets_namespaces_until_encoding() -> RecordResult<()> {
     )?;
     sink.write_batch(batch)?;
 
-    let mut expected = MeasureRecordWriter::try_new(RecordFormat::Dets).expect("per-record format");
-    for (detectors, observables) in detector_records[..2].iter().zip(&observable_records[..2]) {
-        expected.begin_dets_result_type(stab_records::DetsResultType::Detector);
-        expected.write_bits(detectors);
-        expected.begin_dets_result_type(stab_records::DetsResultType::Observable);
-        expected.write_bits(observables);
-        expected.write_end();
-    }
-    assert_eq!(sink.into_bytes()?, expected.into_bytes());
+    let expected = encode_parts(
+        RecordFormat::Dets,
+        &[
+            (DetsResultType::Detector, &detector_records[..2]),
+            (DetsResultType::Observable, &observable_records[..2]),
+        ],
+    )?;
+    assert_eq!(sink.into_bytes()?, expected);
     Ok(())
 }
 
@@ -266,7 +240,7 @@ fn ptb64_finish_is_bounded_recoverable_and_final() -> RecordResult<()> {
             .message()
             .contains("after sink finalization")
     );
-    assert_eq!(sink.into_bytes()?, write_ptb64_records_checked(&records)?);
+    assert_eq!(sink.into_bytes()?, encode(&records, RecordFormat::Ptb64)?);
 
     let zero_width = vec![Vec::new(); 64];
     let empty = PackedShotBatch::from_records(&zero_width, 0)?;

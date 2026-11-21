@@ -247,7 +247,7 @@ Larger redesigns the API review proposed and this batch did not do:
 - Done on 2026-11-21: the engine's run progress, status, summary, and error types are written once.
 - Done on 2026-11-21: `CircuitInstruction::gate_arguments()` and `gate_targets()` are typed, infallible views, which removed about 120 impossible branches in analysis and the engine.
 - Done on 2026-11-21: `ErrorAnalyzerOptions` uses nested option types instead of five independent booleans.
-- Budget or remove the `Vec<Vec<bool>>` record codec family, which only CLI tests use outside `stab-records`.
+- Done on 2026-11-21: the `Vec<Vec<bool>>` record codec family is a test-only reference inside `stab-records`.
 - Done on 2026-11-21: gate flow and decomposition metadata are typed tables in `stab-model`, checked against the vendored Stim gate data, and no product crate parses gate text at run time.
 - Done on 2026-11-21: `stab_model::advanced` went from 57 exports to 27, with dead items deleted and free wrappers turned into methods.
 

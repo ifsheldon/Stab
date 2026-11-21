@@ -7,22 +7,20 @@
 
 //! Generated properties for every result-record codec.
 //!
-//! Hostile bytes at arbitrary widths must decode to records or a typed error through every
-//! reader. The materialized readers and the packed streaming reader, under both framings and at
-//! arbitrary batch sizes and transport splits, must agree with a simple per-bit reference decoder
-//! on acceptance and content, and the streaming reader must report the same diagnostic code as
-//! the materialized reader. Written records must match independent reference encoders and decode
-//! back unchanged.
+//! Hostile bytes at arbitrary widths must decode to records or a typed error. The packed
+//! streaming reader, under both framings and at arbitrary batch sizes and transport splits, must
+//! agree with a simple per-bit reference decoder on acceptance and content. Records written by
+//! the record encoder must match independent reference encoders and decode back unchanged. The
+//! crate's unit tests additionally pin the streaming reader's diagnostic codes to a whole-buffer
+//! reference codec.
 
 use std::io::Read;
 
 use proptest::prelude::*;
 use proptest::test_runner::{Config, FileFailurePersistence, RngAlgorithm, RngSeed};
 use stab_records::{
-    DetsLayout, DetsResultType, FormatErrorCode, PackedShotBatch, RecordBatchPart, RecordEncoder,
-    RecordFormat, RecordFraming, RecordStreamReadError, RecordStreamReader, read_dets_records,
-    read_measurement_records, read_ptb64_records, read_ptb64_records_all, read_records,
-    write_records,
+    DetsLayout, DetsResultType, PackedShotBatch, RecordBatchPart, RecordEncoder, RecordFormat,
+    RecordFraming, RecordStreamReadError, RecordStreamReader,
 };
 
 const FORMATS: [RecordFormat; 6] = [
@@ -129,15 +127,6 @@ fn stream_all<R: Read>(
     Ok(records)
 }
 
-fn error_code(error: &RecordStreamReadError) -> Option<FormatErrorCode> {
-    match error {
-        RecordStreamReadError::Format(error)
-        | RecordStreamReadError::Record { source: error, .. }
-        | RecordStreamReadError::UnterminatedRecord { source: error, .. } => Some(error.code()),
-        _ => None,
-    }
-}
-
 /// A deliberately simple per-bit decoder for one whole input, written from the format grammar
 /// rather than from the product decoders. `None` means the input is malformed.
 fn reference_decode(input: &[u8], format: RecordFormat, width: usize) -> Option<Vec<Vec<bool>>> {
@@ -161,7 +150,7 @@ fn reference_decode(input: &[u8], format: RecordFormat, width: usize) -> Option<
         }
         RecordFormat::R8 => reference_r8_decode(input, width),
         RecordFormat::Hits => reference_hits(input, width),
-        RecordFormat::Dets => reference_dets(input, width),
+        RecordFormat::Dets => reference_dets(input, DetsLayout::measurement_only(width)),
         RecordFormat::Ptb64 => {
             if width == 0 || !input.len().is_multiple_of(8 * width) {
                 return None;
@@ -288,7 +277,9 @@ fn reference_hits(input: &[u8], width: usize) -> Option<Vec<Vec<bool>>> {
     Some(records)
 }
 
-fn reference_dets(input: &[u8], width: usize) -> Option<Vec<Vec<bool>>> {
+/// DETS records resolved against a typed layout: `M`, `D`, and `L` tokens index their own
+/// namespace, laid out in that order, and a repeated token sets its bit.
+fn reference_dets(input: &[u8], layout: DetsLayout) -> Option<Vec<Vec<bool>>> {
     let mut records = Vec::new();
     let mut offset = 0;
     loop {
@@ -302,7 +293,7 @@ fn reference_dets(input: &[u8], width: usize) -> Option<Vec<Vec<bool>>> {
             return None;
         }
         offset += 4;
-        let mut record = vec![false; width];
+        let mut record = vec![false; layout.total_bits()];
         loop {
             let mut next = input.get(offset).copied();
             if next == Some(b'\r') {
@@ -318,10 +309,22 @@ fn reference_dets(input: &[u8], width: usize) -> Option<Vec<Vec<bool>>> {
                     offset += 1;
                     break;
                 }
-                Some(b' ') if input.get(offset + 1) == Some(&b'M') => {
+                Some(b' ') => {
+                    let (start, count) = match input.get(offset + 1)? {
+                        b'M' => (0, layout.measurements()),
+                        b'D' => (layout.measurements(), layout.detectors()),
+                        b'L' => (
+                            layout.measurements() + layout.detectors(),
+                            layout.observables(),
+                        ),
+                        _ => return None,
+                    };
                     offset += 2;
                     let index = usize::try_from(reference_unsigned(input, &mut offset)?).ok()?;
-                    *record.get_mut(index)? = true;
+                    if index >= count {
+                        return None;
+                    }
+                    record[start + index] = true;
                 }
                 _ => return None,
             }
@@ -330,7 +333,7 @@ fn reference_dets(input: &[u8], width: usize) -> Option<Vec<Vec<bool>>> {
     }
 }
 
-/// Checks the materialized readers and the packed streaming reader against the reference.
+/// Checks the packed streaming reader against the reference under both framings.
 fn check_generic_readers(format: RecordFormat, width: usize, input: &[u8]) {
     let context = format!(
         "format={} width={width} input_len={}",
@@ -338,20 +341,6 @@ fn check_generic_readers(format: RecordFormat, width: usize, input: &[u8]) {
         input.len()
     );
     let reference = reference_decode(input, format, width);
-    let expected = read_records(input, format, width);
-    match (&reference, &expected) {
-        (Some(reference), Ok(expected)) => assert_eq!(reference, expected, "{context}"),
-        (None, Err(_)) => {}
-        _ => panic!(
-            "read_records disagreed with the reference decoder: {context}\n{expected:?}\n{reference:?}"
-        ),
-    }
-    assert_eq!(
-        read_measurement_records(input, format, width).ok(),
-        expected.as_ref().ok().cloned(),
-        "read_measurement_records: {context}"
-    );
-
     for framing in [RecordFraming::Stream, RecordFraming::Records] {
         let batch = 1 + (input.len() + width) % 70;
         let reader = RecordStreamReader::measurements(
@@ -361,19 +350,13 @@ fn check_generic_readers(format: RecordFormat, width: usize, input: &[u8]) {
             usize::MAX,
         )
         .with_framing(framing);
-        let streamed = stream_all(reader, batch);
-        match (&streamed, &expected) {
-            (Ok(streamed), Ok(expected)) => {
-                assert_eq!(streamed, expected, "{framing:?} batch={batch}: {context}");
+        match (stream_all(reader, batch), &reference) {
+            (Ok(streamed), Some(reference)) => {
+                assert_eq!(&streamed, reference, "{framing:?} batch={batch}: {context}");
             }
-            (Err(error), Err(expected)) if framing == RecordFraming::Stream => assert_eq!(
-                error_code(error),
-                Some(expected.code()),
-                "streamed diagnostic differs: {context}\n{error:?}\n{expected:?}"
-            ),
-            (Err(_), Err(_)) => {}
-            (streamed, expected) => panic!(
-                "{framing:?} streaming disagreed on acceptance: {context}\n{streamed:?}\n{expected:?}"
+            (Err(_), None) => {}
+            (streamed, reference) => panic!(
+                "{framing:?} streaming disagreed with the reference decoder: {context}\n{streamed:?}\n{reference:?}"
             ),
         }
     }
@@ -381,19 +364,17 @@ fn check_generic_readers(format: RecordFormat, width: usize, input: &[u8]) {
 
 fn check_dets_layout_readers(layout: DetsLayout, input: &[u8]) {
     let context = format!("layout={layout:?} input_len={}", input.len());
-    let expected = read_dets_records(input, layout);
+    let reference = reference_dets(input, layout);
     let reader = RecordStreamReader::dets(
         Chunked::new(input, input.len() * 13 + layout.total_bits()),
         layout,
         usize::MAX,
     );
-    match (stream_all(reader, 1 + input.len() % 5), &expected) {
-        (Ok(streamed), Ok(expected)) => assert_eq!(&streamed, expected, "{context}"),
-        (Err(error), Err(expected)) => {
-            assert_eq!(error_code(&error), Some(expected.code()), "{context}");
-        }
-        (streamed, expected) => {
-            panic!("typed DETS streaming disagreed: {context}\n{streamed:?}\n{expected:?}")
+    match (stream_all(reader, 1 + input.len() % 5), &reference) {
+        (Ok(streamed), Some(reference)) => assert_eq!(&streamed, reference, "{context}"),
+        (Err(_), None) => {}
+        (streamed, reference) => {
+            panic!("typed DETS streaming disagreed: {context}\n{streamed:?}\n{reference:?}")
         }
     }
 }
@@ -422,21 +403,10 @@ proptest! {
     }
 
     #[test]
-    fn hostile_ptb64_groups_agree_across_shot_bounded_readers(
+    fn hostile_ptb64_groups_agree_with_the_reference_decoder(
         (width, input) in ptb64_shaped(),
-        max_shots in prop_oneof![0_usize..=200, Just(64), Just(128), Just(192)],
     ) {
         check_generic_readers(RecordFormat::Ptb64, width, &input);
-        let context = format!("width={width} max_shots={max_shots} input_len={}", input.len());
-        let bounded = read_ptb64_records(&input, width, max_shots);
-        if let Ok(records) = &bounded {
-            prop_assert_eq!(records.len(), max_shots, "{}", context);
-            let whole_groups = input
-                .get(..input.len() - input.len() % (8 * width))
-                .expect("prefix within input");
-            let all = read_ptb64_records_all(whole_groups, width).expect("whole groups decode");
-            prop_assert_eq!(all.get(..max_shots), Some(records.as_slice()), "{}", context);
-        }
     }
 }
 
@@ -565,16 +535,7 @@ proptest! {
         (format, width, records) in round_trip_case(),
     ) {
         let context = format!("format={} width={width} records={}", format.as_str(), records.len());
-        let encoded = write_records(&records, format).expect("records encode");
-        let reference = match format {
-            RecordFormat::B8 => reference_b8(&records),
-            RecordFormat::R8 => reference_r8(&records),
-            RecordFormat::Ptb64 => reference_ptb64(&records, width),
-            _ => reference_text(&records, format),
-        };
-        prop_assert_eq!(&encoded, &reference, "{}", context);
-
-        let batch_encoded = {
+        let encoded = {
             let packed = PackedShotBatch::from_records(&records, width).expect("packed batch");
             let mut encoder = RecordEncoder::try_new(format, width).expect("record encoder");
             let mut out = Vec::new();
@@ -584,21 +545,28 @@ proptest! {
                     &mut out,
                 )
                 .expect("packed encode");
+            prop_assert_eq!(encoder.pending_group_records(), 0, "{}", context);
             out
         };
-        prop_assert_eq!(&batch_encoded, &encoded, "record encoder differs: {}", context);
+        let reference = match format {
+            RecordFormat::B8 => reference_b8(&records),
+            RecordFormat::R8 => reference_r8(&records),
+            RecordFormat::Ptb64 => reference_ptb64(&records, width),
+            _ => reference_text(&records, format),
+        };
+        prop_assert_eq!(&encoded, &reference, "{}", context);
 
         // Zero-width b8 and ptb64 records carry no bytes, so their count is not recoverable.
         if width == 0 && matches!(format, RecordFormat::B8 | RecordFormat::Ptb64) {
-            prop_assert!(read_records(&encoded, format, width).is_err(), "{}", context);
+            prop_assert!(reference_decode(&encoded, format, width).is_none(), "{}", context);
+            prop_assert!(
+                stream_all(RecordStreamReader::measurements(&encoded[..], format, width, 0), 1)
+                    .is_err(),
+                "{}",
+                context
+            );
             return Ok(());
         }
-        prop_assert_eq!(
-            &read_records(&encoded, format, width).expect("decode"),
-            &records,
-            "{}",
-            context
-        );
         prop_assert_eq!(
             reference_decode(&encoded, format, width).expect("reference decode"),
             records.clone(),

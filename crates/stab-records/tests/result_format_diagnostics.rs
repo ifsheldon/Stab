@@ -4,10 +4,14 @@
     reason = "diagnostic contract tests must extract the exact expected failure"
 )]
 
+//! Exact diagnostics (code, span, typed context, and message) the packed stream reader reports
+//! for malformed input in every format.
+
+use std::io::Read;
+
 use stab_records::{
     ByteSpan, DetsLayout, DetsResultType, FormatError, FormatErrorCode, FormatErrorContext,
-    RecordFormat, RecordStreamReadError, RecordStreamReader, read_dets_records, read_ptb64_records,
-    read_ptb64_records_all, read_records,
+    RecordFormat, RecordStreamReadError, RecordStreamReader,
 };
 
 #[test]
@@ -64,8 +68,7 @@ fn zero_one_reports_exact_width_byte_and_terminator_diagnostics() {
             ),
         ),
     ] {
-        let error = read_records(input, RecordFormat::ZeroOne, 2).expect_err("invalid 01 input");
-        assert_diagnostic(&error, diagnostic);
+        assert_record_views(input, RecordFormat::ZeroOne, 2, diagnostic);
     }
 }
 
@@ -112,8 +115,7 @@ fn hits_reports_exact_separator_integer_and_bounds_diagnostics() {
             ),
         ),
     ] {
-        let error = read_records(input, RecordFormat::Hits, 4).expect_err("invalid HITS input");
-        assert_diagnostic(&error, diagnostic);
+        assert_record_views(input, RecordFormat::Hits, 4, diagnostic);
     }
 }
 
@@ -162,7 +164,7 @@ fn dets_reports_exact_prefix_namespace_and_index_diagnostics() {
             ),
         ),
     ] {
-        let error = read_dets_records(input, layout).expect_err("invalid DETS input");
+        let error = first_format_error(RecordStreamReader::dets(input, layout, usize::MAX));
         assert_diagnostic(&error, diagnostic);
     }
 }
@@ -232,41 +234,25 @@ fn r8_reports_exact_eof_and_overshoot_diagnostics_across_record_views() {
 }
 
 #[test]
-fn ptb64_reports_exact_whole_input_prefix_and_width_diagnostics() {
-    let partial_group = [0_u8; 7];
-    let whole_input = expected(
-        FormatErrorCode::InvalidPackedLength,
-        Some(span(0, 7)),
-        FormatErrorContext::InputLengthMultiple {
-            actual_bytes: 7,
-            byte_multiple: 8,
-        },
-        "ptb64 input length 7 is not a multiple of shot-group byte width 8",
+fn ptb64_reports_exact_partial_group_and_width_overflow_diagnostics() {
+    assert_record_views(
+        &[0_u8; 7],
+        RecordFormat::Ptb64,
+        1,
+        expected(
+            FormatErrorCode::InvalidPackedLength,
+            Some(span(0, 7)),
+            FormatErrorContext::InputLengthMultiple {
+                actual_bytes: 7,
+                byte_multiple: 8,
+            },
+            "ptb64 input length 7 is not a multiple of shot-group byte width 8",
+        ),
     );
-    for error in [
-        read_ptb64_records_all(&partial_group, 1).expect_err("materialized whole input"),
-        streamed_error(&partial_group, RecordFormat::Ptb64, 1),
-    ] {
-        assert_diagnostic(&error, whole_input);
-    }
-
-    let prefix = expected(
-        FormatErrorCode::UnexpectedEndOfInput,
-        Some(span(7, 0)),
-        FormatErrorContext::MinimumInputLength {
-            actual_bytes: 7,
-            minimum_bytes: 8,
-        },
-        "ptb64 input expected at least 8 bytes for 64 records with 1 bits each, got 7",
-    );
-    assert_diagnostic(
-        &read_ptb64_records(&partial_group, 1, 64).expect_err("materialized prefix"),
-        prefix,
-    );
-
-    let overflow = read_ptb64_records_all(b"", usize::MAX).expect_err("record width overflow");
-    assert_diagnostic(
-        &overflow,
+    assert_record_views(
+        b"",
+        RecordFormat::Ptb64,
+        usize::MAX,
         expected(
             FormatErrorCode::ArithmeticOverflow,
             None,
@@ -304,24 +290,23 @@ fn assert_record_views(
     bits_per_record: usize,
     expected: ExpectedDiagnostic,
 ) {
-    let errors = [
-        read_records(input, format, bits_per_record).expect_err("materialized reader"),
-        streamed_error(input, format, bits_per_record),
-    ];
-    for error in errors {
-        assert_diagnostic(&error, expected);
-    }
+    let error = first_format_error(RecordStreamReader::measurements(
+        input,
+        format,
+        bits_per_record,
+        usize::MAX,
+    ));
+    assert_diagnostic(&error, expected);
 }
 
-/// Drains the packed streaming reader one record at a time and returns its format failure.
-fn streamed_error(input: &[u8], format: RecordFormat, bits_per_record: usize) -> FormatError {
-    let mut reader = RecordStreamReader::measurements(input, format, bits_per_record, usize::MAX);
+/// Drains a packed stream reader one record at a time and returns its format failure.
+fn first_format_error<R: Read>(mut reader: RecordStreamReader<R>) -> FormatError {
     loop {
         match reader.read_batch(1) {
             Ok(Some(_)) => {}
-            Ok(None) => panic!("streamed {format:?} input unexpectedly ended cleanly"),
+            Ok(None) => panic!("streamed input unexpectedly ended cleanly"),
             Err(RecordStreamReadError::Format(error)) => return error,
-            Err(error) => panic!("streamed {format:?} input failed outside its grammar: {error}"),
+            Err(error) => panic!("streamed input failed outside its grammar: {error}"),
         }
     }
 }

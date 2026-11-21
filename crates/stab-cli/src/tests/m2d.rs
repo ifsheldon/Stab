@@ -4,9 +4,9 @@ use stab_engine::{
     DetectionConversionLimits, MeasurementToDetectionCompiler, detection_record_width,
 };
 use stab_model::Circuit;
-use stab_records::{RecordFormat, read_records, write_records};
+use stab_records::RecordFormat;
 
-use super::support::{CliRun, Scratch, ptb64_words, run};
+use super::support::{CliRun, Scratch, decode_records, encode_records, ptb64_words, run};
 
 const SWEEP_CX: &str = "CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n";
 
@@ -291,10 +291,9 @@ fn m2d_converts_the_same_generated_measurements_in_text_and_bitpacked_formats() 
             circuit.as_bytes(),
         );
         assert_eq!(sampled.status, 0, "{task}: {}", sampled.stderr_text());
-        let measurements = read_records(&sampled.stdout, RecordFormat::ZeroOne, measurement_width)
-            .expect("decode sampled measurements");
-        let b8_measurements =
-            write_records(&measurements, RecordFormat::B8).expect("encode sampled measurements");
+        let measurements =
+            decode_records(&sampled.stdout, RecordFormat::ZeroOne, measurement_width);
+        let b8_measurements = encode_records(&measurements, RecordFormat::B8);
 
         let convert = |format: &str, input: &[u8]| {
             let result = m2d(
@@ -321,9 +320,8 @@ fn m2d_converts_the_same_generated_measurements_in_text_and_bitpacked_formats() 
         let zero_one = convert("01", &sampled.stdout);
         let b8 = convert("b8", &b8_measurements);
         assert_eq!(
-            read_records(&zero_one, RecordFormat::ZeroOne, detection_width)
-                .expect("decode 01 detections"),
-            read_records(&b8, RecordFormat::B8, detection_width).expect("decode b8 detections"),
+            decode_records(&zero_one, RecordFormat::ZeroOne, detection_width),
+            decode_records(&b8, RecordFormat::B8, detection_width),
             "{task} m2d format equivalence"
         );
     }

@@ -10,8 +10,27 @@ use std::hint::black_box;
 use stab_records::{
     BitPlaneBatch, DetsLayout, DetsResultType, PackedShotBatch, RecordBatchPart, RecordEncoder,
     RecordFormat, RecordFraming, RecordResult, RecordStreamReadError, RecordStreamReader,
-    RecordStreamStorage, write_ptb64_records_checked, write_records,
+    RecordStreamStorage,
 };
+
+/// Encodes complete records of one width through the record encoder.
+fn encode(records: &[Vec<bool>], format: RecordFormat) -> Vec<u8> {
+    let width = records.first().map_or(0, Vec::len);
+    let batch = PackedShotBatch::from_records(records, width).expect("fixture records");
+    let mut encoder = RecordEncoder::try_new(format, width).expect("fixture encoder");
+    let mut out = Vec::new();
+    encoder
+        .write_batch(
+            &[RecordBatchPart::new(
+                DetsResultType::Measurement,
+                batch.view(),
+            )],
+            &mut out,
+        )
+        .expect("in-memory record encoding");
+    assert_eq!(encoder.pending_group_records(), 0, "complete PTB64 groups");
+    out
+}
 
 /// The packed reader's initial transport buffer.
 const BUFFER_BYTES: u64 = 64 * 1024;
@@ -53,7 +72,7 @@ fn packed_streaming_allocations_follow_width_not_record_count() -> RecordResult<
         RecordFormat::Hits,
         RecordFormat::Dets,
     ] {
-        let one = write_records(std::slice::from_ref(&record), format)?;
+        let one = encode(std::slice::from_ref(&record), format);
         let many = one.repeat(RECORDS);
         assert_width_bounded(
             &format!("{format:?}"),
@@ -100,7 +119,7 @@ fn packed_streaming_allocations_follow_width_not_record_count() -> RecordResult<
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>();
-    let ptb64 = write_ptb64_records_checked(&ptb64_records)?;
+    let ptb64 = encode(&ptb64_records, RecordFormat::Ptb64);
     let one_ptb64_group = ptb64
         .get(..WIDTH * 8)
         .expect("four PTB64 groups contain a complete first group");
@@ -195,7 +214,7 @@ fn reader_and_encoder_storage_bounds_cover_peak_allocation() {
             RecordFormat::Hits,
             RecordFormat::Dets,
         ] {
-            let input = write_records(&records, in_format).expect("encode input");
+            let input = encode(&records, in_format);
             for out_format in [
                 RecordFormat::ZeroOne,
                 RecordFormat::B8,
@@ -316,7 +335,7 @@ fn wide_r8_records_decode_through_a_fixed_transport_buffer() {
     const WIDTH: usize = 2_000_000;
     // Every bit set (a 2 MB frame), then no bit set (about 7.8 KB of 255 runs).
     let records = vec![vec![true; WIDTH], vec![false; WIDTH]];
-    let input = write_records(&records, RecordFormat::R8).expect("encode r8");
+    let input = encode(&records, RecordFormat::R8);
     assert!(input.len() > 2_000_000);
     for step in [65_536, 4_093] {
         let read = || {

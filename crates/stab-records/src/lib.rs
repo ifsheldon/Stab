@@ -23,10 +23,8 @@ pub use record_stream::{
     HitsDuplicates, RecordFraming, RecordStreamReadError, RecordStreamReader, RecordStreamStorage,
 };
 pub use result_formats::{
-    CodecCapability, DetsLayout, DetsResultType, MeasureRecordWriter, RecordEncoding, RecordFormat,
-    codec_capabilities, ptb64_record_count, read_dets_records, read_measurement_records,
-    read_ptb64_records, read_ptb64_records_all, read_records, validate_ptb64_shot_count,
-    write_ptb64_records_checked, write_records,
+    CodecCapability, DetsLayout, DetsResultType, RecordEncoding, RecordFormat, codec_capabilities,
+    validate_ptb64_shot_count,
 };
 pub use sinks::{
     DemSampleCodecSink, DemSampleEncodedRecords, DemSampleSink, DetectionCodecSink, DetectionSink,

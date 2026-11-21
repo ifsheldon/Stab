@@ -1,8 +1,8 @@
 //! `stab sample_dem` output-role and replay behavior beyond the pinned-Stim manifest rows.
 
-use stab_records::{RecordFormat, write_ptb64_records_checked};
+use stab_records::RecordFormat;
 
-use super::support::{CliRun, Scratch, ptb64_words, run};
+use super::support::{CliRun, Scratch, encode_records, ptb64_words, run};
 
 const TWO_ERRORS: &[u8] = b"error(0.25) D0 L0\nerror(0.25) D1\n";
 
@@ -163,8 +163,7 @@ fn sample_dem_hits_replay_sets_duplicate_error_indices() {
 #[test]
 fn sample_dem_replays_ptb64_error_records() {
     let scratch = Scratch::new();
-    let mut replay_input =
-        write_ptb64_records_checked(&vec![vec![true, false]; 64]).expect("ptb64 replay fixture");
+    let mut replay_input = encode_records(&vec![vec![true, false]; 64], RecordFormat::Ptb64);
     replay_input.push(0xA5);
     let replay = scratch.file("errors.ptb64", replay_input);
     let obs = scratch.path("obs.01");

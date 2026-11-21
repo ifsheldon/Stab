@@ -2,11 +2,21 @@ use std::fmt::Write as _;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
-use stab_records::{RecordFormat as StabRecordFormat, read_records, write_records};
+use stab_records::{
+    BitIndex, DetsResultType, PackedShotBatch, RecordBatchPart, RecordEncoder,
+    RecordFormat as StabRecordFormat, RecordStreamReader, RecordStreamStorage, ShotIndex,
+};
 
 use super::model::{
     DataRecipe, OutputContract, RecordFormat, RecordPattern, SemanticWork, WorkUnit,
 };
+
+/// Records decoded or encoded per step, so record fixtures and output validation hold one bounded
+/// batch rather than every record.
+const RECORD_BATCH: usize = 1024;
+
+/// Budget for the transport buffer that frames one text output record during validation.
+const TEXT_RECORD_BUFFER_BYTES: u128 = 256 * 1024 * 1024;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -114,21 +124,12 @@ pub(super) fn validate_output(
             minimum_one_bits,
             maximum_one_fraction,
         } => {
-            let decoded = read_records(bytes, stab_format(*format)?, *bits)
-                .map_err(|source| format!("record output is invalid: {source}"))?;
-            if decoded.len() != *records {
+            let (decoded, ones) = record_census(bytes, stab_format(*format)?, *bits)?;
+            if decoded != *records {
                 return Err(format!(
-                    "record output has {} records, expected {records}",
-                    decoded.len()
+                    "record output has {decoded} records, expected {records}"
                 ));
             }
-            let ones = decoded.iter().try_fold(0_u64, |total, record| {
-                let record_ones = u64::try_from(record.iter().filter(|bit| **bit).count())
-                    .map_err(|_| "record one-bit count does not fit in u64".to_string())?;
-                total
-                    .checked_add(record_ones)
-                    .ok_or_else(|| "record one-bit count overflow".to_string())
-            })?;
             if ones < *minimum_one_bits {
                 return Err(format!(
                     "record output has {ones} one bits, expected at least {minimum_one_bits}"
@@ -167,6 +168,43 @@ pub(super) fn validate_output(
     })
 }
 
+/// Streams record output through the bounded packed reader, returning its record and one-bit
+/// counts.
+fn record_census(
+    bytes: &[u8],
+    format: StabRecordFormat,
+    bits: usize,
+) -> Result<(usize, u64), String> {
+    let invalid = |source: &dyn std::fmt::Display| format!("record output is invalid: {source}");
+    let mut reader = RecordStreamReader::measurements(
+        bytes,
+        format,
+        bits,
+        RecordStreamStorage::max_text_record_bytes(TEXT_RECORD_BUFFER_BYTES),
+    );
+    let mut records = 0_usize;
+    let mut ones = 0_u64;
+    while let Some(batch) = reader
+        .read_batch(RECORD_BATCH)
+        .map_err(|source| invalid(&source))?
+    {
+        records = records
+            .checked_add(batch.shot_count())
+            .ok_or_else(|| "record count overflow".to_string())?;
+        for shot in 0..batch.shot_count() {
+            let record_ones = batch
+                .shot(shot)
+                .map_err(|source| invalid(&source))?
+                .popcount();
+            ones = u64::try_from(record_ones)
+                .ok()
+                .and_then(|record_ones| ones.checked_add(record_ones))
+                .ok_or_else(|| "record one-bit count overflow".to_string())?;
+        }
+    }
+    Ok((records, ones))
+}
+
 fn records(
     format: RecordFormat,
     record_count: usize,
@@ -176,36 +214,51 @@ fn records(
     if record_count == 0 || bits == 0 {
         return Err("record recipes require positive records and bits".to_string());
     }
-    let mut records = Vec::new();
-    records
-        .try_reserve_exact(record_count)
-        .map_err(|source| format!("cannot reserve record fixture: {source}"))?;
-    for record_index in 0..record_count {
-        let mut record = Vec::new();
-        record
-            .try_reserve_exact(bits)
-            .map_err(|source| format!("cannot reserve record bits: {source}"))?;
-        record.resize_with(bits, || false);
-        match pattern {
-            RecordPattern::Alternating => {
-                for (bit_index, bit) in record.iter_mut().enumerate() {
-                    *bit = (record_index + bit_index * 3).is_multiple_of(7);
-                }
+    let encode_error =
+        |source: &dyn std::fmt::Display| format!("cannot encode record fixture: {source}");
+    let mut encoder = RecordEncoder::try_new(stab_format(format)?, bits)
+        .map_err(|source| encode_error(&source))?;
+    let mut batch = PackedShotBatch::zeros(RECORD_BATCH.min(record_count), bits)
+        .map_err(|source| format!("cannot reserve record fixture batch: {source}"))?;
+    let mut output = Vec::new();
+    for batch_start in (0..record_count).step_by(RECORD_BATCH) {
+        let batch_records = RECORD_BATCH.min(record_count - batch_start);
+        for shot in 0..batch_records {
+            let record_index = batch_start + shot;
+            for bit_index in 0..bits {
+                let bit = match pattern {
+                    RecordPattern::Alternating => (record_index + bit_index * 3).is_multiple_of(7),
+                    RecordPattern::Sparse => false,
+                };
+                batch
+                    .set(ShotIndex(shot), BitIndex(bit_index), bit)
+                    .map_err(|source| encode_error(&source))?;
             }
-            RecordPattern::Sparse => {
-                let hit_count = bits.min(4);
-                for hit in 0..hit_count {
+            if pattern == RecordPattern::Sparse {
+                for hit in 0..bits.min(4) {
                     let index = (record_index * 17 + hit * 97) % bits;
-                    if let Some(bit) = record.get_mut(index) {
-                        *bit = true;
-                    }
+                    batch
+                        .set(ShotIndex(shot), BitIndex(index), true)
+                        .map_err(|source| encode_error(&source))?;
                 }
             }
         }
-        records.push(record);
+        let view = batch
+            .view_prefix(batch_records)
+            .map_err(|source| encode_error(&source))?;
+        encoder
+            .write_batch(
+                &[RecordBatchPart::new(DetsResultType::Measurement, view)],
+                &mut output,
+            )
+            .map_err(|source| encode_error(&source))?;
     }
-    write_records(&records, stab_format(format)?)
-        .map_err(|source| format!("cannot encode record fixture: {source}"))
+    if encoder.pending_group_records() != 0 {
+        return Err(encode_error(
+            &"ptb64 record recipes require a multiple of 64 records",
+        ));
+    }
+    Ok(output)
 }
 
 fn typed_dets(
@@ -351,10 +404,10 @@ mod tests {
             let record_count = if format == RecordFormat::Ptb64 { 64 } else { 7 };
             let bytes =
                 records(format, record_count, 65, RecordPattern::Alternating).expect("fixture");
-            let decoded =
-                read_records(&bytes, stab_format(format).expect("format"), 65).expect("round trip");
-            assert_eq!(decoded.len(), record_count);
-            assert!(decoded.iter().flatten().any(|bit| *bit));
+            let (decoded, ones) = record_census(&bytes, stab_format(format).expect("format"), 65)
+                .expect("round trip");
+            assert_eq!(decoded, record_count);
+            assert!(ones > 0);
         }
     }
 

@@ -23,7 +23,7 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 | R5 | Engine run progress, status, summary, and error written once | M | Done on 2026-11-21. |
 | R6 | Typed gate-argument and target-group views in `stab-model` | L | Done on 2026-11-21. |
 | R7 | Nested option types for `ErrorAnalyzerOptions` | M | Done on 2026-11-21. |
-| R8 | The `Vec<Vec<bool>>` record codec family | M | Remove from the public surface; keep as a test oracle. |
+| R8 | The `Vec<Vec<bool>>` record codec family | M | Done on 2026-11-21. |
 | R9 | Typed gate flow and decomposition metadata | M to L | Done on 2026-11-21. |
 | R10 | Trim `stab_model::advanced` | S to M | Done on 2026-11-21. |
 | S1 | `--fold_loops` circuits with a long transient are slower than Stim | M | Do as a measured performance task. |
@@ -33,7 +33,7 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 | S5 | Fixed caps in `stab-model` reported an invalid detector error model | S | Done with D2. |
 | N1 | Areas the review did not read | M | Run a second review pass before the next release. |
 
-Remaining: R8, with S1 as an independent performance task at any point.
+Every R item is done; S1 to S4 and N1 remain, with S1 as an independent performance task.
 R4 goes late on purpose: R1, R2, R3, and R7 each delete or reshape functions that R4 would otherwise rewrite twice.
 
 ## Decided And Done
@@ -346,6 +346,12 @@ The CLI mapping keeps that, checked against the oracle.
 On its own it is the lowest-value redesign here: the meaningless combinations are harmless today.
 
 ### R8. The `Vec<Vec<bool>>` record codec family
+
+**Outcome, 2026-11-21.** Done: the nine functions and types, including `read_dets_records`, which the list below omits, and `MeasureRecordWriter`, are a test-only reference inside `stab-records`.
+The reader that allocated from caller-supplied counts is deleted outright.
+Every outside caller, including the `ops/bench` data helper, uses `RecordStreamReader` and `RecordEncoder`, and Stim's writer tests were ported onto `RecordEncoder`.
+A one-call `decode_all` was not added: no product caller wanted one, and a budgeted version needs a budget-refusal error in `stab-records` first.
+The rest of this section is the proposal as written before the work.
 
 **Today.** `stab-records/src/result_formats.rs` exports `write_records`, `read_records`, `read_measurement_records`, `write_ptb64_records_checked`, `read_ptb64_records`, `read_ptb64_records_all`, `ptb64_record_count`, and `MeasureRecordWriter`.
 They use one byte per bit, take no memory budget, and `read_ptb64_records` allocates `bits_per_record × max_shots` booleans from caller integers before it looks at the input.

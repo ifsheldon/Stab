@@ -31,56 +31,6 @@ pub(crate) fn b8_length_multiple_error(input_len: usize, bytes_per_record: usize
     )
 }
 
-pub(crate) fn b8_bytes_per_record(input_len: usize, bits_per_record: usize) -> RecordResult<usize> {
-    let bytes_per_record = b8_record_byte_width(bits_per_record)?;
-    if !input_len.is_multiple_of(bytes_per_record) {
-        return Err(b8_length_multiple_error(input_len, bytes_per_record));
-    }
-    Ok(bytes_per_record)
-}
-
-pub(crate) fn ptb64_prefix_layout(
-    input_len: usize,
-    bits_per_record: usize,
-    max_shots: usize,
-) -> RecordResult<(usize, usize)> {
-    if bits_per_record == 0 {
-        return Err(format_error(
-            FormatErrorCode::InvalidRecordWidth,
-            "ptb64 input cannot represent a nonzero number of zero-width records",
-            None,
-            FormatErrorContext::MinimumRecordWidth {
-                actual_bits: 0,
-                minimum_bits: 1,
-            },
-        ));
-    }
-    let bytes_per_group = ptb64_bytes_per_group(bits_per_record)?;
-    let shot_groups = max_shots / 64;
-    let expected_bytes = shot_groups.checked_mul(bytes_per_group).ok_or_else(|| {
-        format_error(
-            FormatErrorCode::ArithmeticOverflow,
-            "ptb64 expected byte count overflowed",
-            None,
-            FormatErrorContext::None,
-        )
-    })?;
-    if input_len < expected_bytes {
-        return Err(format_error(
-            FormatErrorCode::UnexpectedEndOfInput,
-            format!(
-                "ptb64 input expected at least {expected_bytes} bytes for {max_shots} records with {bits_per_record} bits each, got {input_len}"
-            ),
-            ByteSpan::try_new(input_len, 0),
-            FormatErrorContext::MinimumInputLength {
-                actual_bytes: input_len,
-                minimum_bytes: expected_bytes,
-            },
-        ));
-    }
-    Ok((bytes_per_group, expected_bytes))
-}
-
 pub(crate) fn ptb64_zero_width_count_error() -> FormatError {
     format_error(
         FormatErrorCode::InvalidRecordWidth,
@@ -108,25 +58,6 @@ pub(crate) fn ptb64_length_multiple_error(input_len: usize, bytes_per_group: usi
     )
 }
 
-pub(crate) fn ptb64_record_count(input_len: usize, bits_per_record: usize) -> RecordResult<usize> {
-    if bits_per_record == 0 {
-        return Err(ptb64_zero_width_count_error());
-    }
-    let bytes_per_group = ptb64_bytes_per_group(bits_per_record)?;
-    if !input_len.is_multiple_of(bytes_per_group) {
-        return Err(ptb64_length_multiple_error(input_len, bytes_per_group));
-    }
-    let shot_groups = input_len / bytes_per_group;
-    shot_groups.checked_mul(64).ok_or_else(|| {
-        format_error(
-            FormatErrorCode::ArithmeticOverflow,
-            "ptb64 shot count overflowed",
-            None,
-            FormatErrorContext::None,
-        )
-    })
-}
-
 pub(crate) fn ptb64_bytes_per_group(bits_per_record: usize) -> RecordResult<usize> {
     bits_per_record.checked_mul(8).ok_or_else(|| {
         format_error(
@@ -136,26 +67,6 @@ pub(crate) fn ptb64_bytes_per_group(bits_per_record: usize) -> RecordResult<usiz
             FormatErrorContext::None,
         )
     })
-}
-
-#[inline]
-pub(crate) fn decode_next_r8_record<F>(
-    input: &[u8],
-    bits_per_record: usize,
-    offset: &mut usize,
-    record_hit: F,
-) -> RecordResult<bool>
-where
-    F: FnMut(usize) -> RecordResult<()>,
-{
-    if *offset == input.len() {
-        return Ok(false);
-    }
-    let mut bit_index = 0usize;
-    if resume_r8_record(input, bits_per_record, &mut bit_index, offset, record_hit)? {
-        return Ok(true);
-    }
-    Err(r8_truncated_error(*offset, bit_index, bits_per_record))
 }
 
 /// Decodes run bytes of one `r8` record from `input[*offset..]`, continuing a record whose

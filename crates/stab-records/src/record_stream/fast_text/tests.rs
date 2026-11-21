@@ -15,7 +15,8 @@ use proptest::prelude::*;
 use proptest::test_runner::{Config as ProptestConfig, RngAlgorithm, RngSeed};
 
 use super::super::{HitsDuplicates, RecordFraming, RecordStreamReader};
-use crate::{DetsLayout, RecordFormat, read_dets_records, read_records, write_records};
+use crate::result_formats::reference::{read_dets_records, read_records, write_records};
+use crate::{DetsLayout, RecordFormat};
 
 const WIDTHS: [usize; 6] = [0, 1, 63, 64, 65, 1000];
 

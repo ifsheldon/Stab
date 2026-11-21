@@ -2,8 +2,8 @@
 //!
 //! Every decoder clears or overwrites the whole row; the caller's row guard masks bits beyond the
 //! declared width. Text grammar is delegated to the shared text decoders, so diagnostics match the
-//! whole-buffer readers exactly; the `01` fast path only accepts lines that grammar would accept
-//! unchanged and defers everything else to it.
+//! test-only whole-buffer reference codec exactly; the `01` fast path only accepts lines that
+//! grammar would accept unchanged and defers everything else to it.
 
 use super::{HitsDuplicates, Ptb64Group};
 use crate::{

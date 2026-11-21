@@ -1,7 +1,4 @@
-use crate::{
-    DetectorWidth, FormatError, MeasurementWidth, ObservableWidth, RecordResult,
-    result_text::DetsEvent,
-};
+use crate::{DetectorWidth, FormatError, MeasurementWidth, ObservableWidth, RecordResult};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum DetsResultType {
@@ -138,35 +135,4 @@ impl DetsLayout {
             FormatError::invalid_result_format("DETS token offset overflowed layout width")
         })
     }
-}
-
-pub fn read_dets_records(input: &[u8], layout: DetsLayout) -> RecordResult<Vec<Vec<bool>>> {
-    let mut records = Vec::new();
-    let mut record = None;
-    crate::result_text::for_each_dets_event(input, layout, |event| match event {
-        DetsEvent::RecordStart => {
-            record = Some(vec![false; layout.total_bits()]);
-            Ok(())
-        }
-        DetsEvent::Token(token) => {
-            let index = layout.resolve(token.result_type(), token.index())?;
-            let bit = record
-                .as_mut()
-                .and_then(|record| record.get_mut(index))
-                .ok_or_else(|| {
-                    FormatError::invalid_result_format(
-                        "DETS token resolved beyond the layout's total width",
-                    )
-                })?;
-            *bit = true;
-            Ok(())
-        }
-        DetsEvent::RecordEnd => {
-            records.push(record.take().ok_or_else(|| {
-                FormatError::invalid_result_format("DETS record ended before it started")
-            })?);
-            Ok(())
-        }
-    })?;
-    Ok(records)
 }

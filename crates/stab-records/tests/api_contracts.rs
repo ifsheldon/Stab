@@ -1,5 +1,6 @@
 #![allow(
     clippy::expect_used,
+    clippy::panic,
     reason = "contract tests use compact deterministic fixtures"
 )]
 
@@ -7,7 +8,7 @@ use std::collections::HashSet;
 
 use stab_records::{
     ByteSpan, DiagnosticSeverity, Estimate, FormatError, FormatErrorCode, FormatErrorContext,
-    RecordEncoding, RecordFormat, codec_capabilities, read_records,
+    RecordEncoding, RecordFormat, RecordStreamReadError, RecordStreamReader, codec_capabilities,
 };
 
 #[test]
@@ -18,8 +19,10 @@ fn record_diagnostics_preserve_machine_readable_failure_context() {
     assert_eq!(span.byte_end(), 7);
     assert!(ByteSpan::try_new(usize::MAX, 1).is_none());
 
-    let error = read_records(b"0x\n", RecordFormat::ZeroOne, 2)
-        .expect_err("invalid byte must be diagnosed");
+    let mut reader = RecordStreamReader::measurements(&b"0x\n"[..], RecordFormat::ZeroOne, 2, 64);
+    let Err(RecordStreamReadError::Format(error)) = reader.read_batch(1) else {
+        panic!("invalid byte must be diagnosed");
+    };
     assert_eq!(error.code(), FormatErrorCode::InvalidByte);
     assert_eq!(error.severity(), DiagnosticSeverity::Error);
     assert_eq!(error.span(), ByteSpan::try_new(1, 1));

@@ -8,10 +8,7 @@
 use std::io::Read;
 
 use stab_compat_corpus::{Acceptance, CheckedCase, CheckedCorpus, ResultFormat};
-use stab_records::{
-    DetsLayout, RecordFormat, RecordFraming, RecordStreamReader, read_dets_records,
-    read_measurement_records, read_records,
-};
+use stab_records::{DetsLayout, RecordFormat, RecordFraming, RecordStreamReader};
 
 const fn sample_format(format: ResultFormat) -> RecordFormat {
     match format {
@@ -74,18 +71,6 @@ fn check_width_readers(
     expected: Option<&[Vec<bool>]>,
 ) {
     let format = sample_format(case.format());
-    assert_records(
-        case.id(),
-        "materialized",
-        read_records(input, format, width),
-        expected,
-    );
-    assert_records(
-        case.id(),
-        "measurement-only",
-        read_measurement_records(input, format, width),
-        expected,
-    );
 
     for framing in [RecordFraming::Stream, RecordFraming::Records] {
         for batch in [1, 64] {
@@ -112,13 +97,6 @@ fn check_typed_dets_readers(
         corpus_layout.detectors(),
         corpus_layout.observables(),
     )?;
-    assert_records(
-        case.id(),
-        "typed materialized",
-        read_dets_records(input, layout),
-        expected,
-    );
-
     for batch in [1, 64] {
         assert_records(
             case.id(),

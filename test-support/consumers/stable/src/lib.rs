@@ -13,7 +13,7 @@ use stab_engine::SamplingCompiler;
 use stab_model::{Cancellation, Circuit, CircuitItem, DetectorErrorModel, TargetKind};
 use stab_records::{
     BitPlaneBatch, MeasurementBatchView, MeasurementCodecSink, MeasurementSink, MeasurementWidth,
-    ObservablePredictionBatch, PackedShotBatch, RecordFormat, read_measurement_records,
+    ObservablePredictionBatch, PackedShotBatch, RecordFormat, RecordStreamReader,
 };
 
 const STRICT_ZERO_ONE_FIXTURE: &[u8] = b"101001\n010110\n111000\n";
@@ -44,8 +44,8 @@ pub fn exercise_stable_components(
     let _plan = compiler.compile(&stripped)?;
     let _identity = compiler.plan_fingerprint(&stripped);
 
-    let records = read_measurement_records(STRICT_ZERO_ONE_FIXTURE, RecordFormat::ZeroOne, 6)?;
-    let shot_major = PackedShotBatch::from_records(&records, 6)?;
+    let shot_major = read_zero_one_records(STRICT_ZERO_ONE_FIXTURE, 6)?;
+    let records = shot_major.to_records()?;
     let bit_planes = BitPlaneBatch::from_shot_major(shot_major.view())?;
     let round_trip = bit_planes.to_shot_major()?.to_records()?;
     if round_trip != records {
@@ -74,6 +74,19 @@ pub fn exercise_stable_components(
     let predictions = predictions.records().to_records()?;
 
     Ok((left.len(), shot_major.shot_count(), encoded, predictions))
+}
+
+/// Decodes strict `01` records through the bounded streaming reader into one owned batch.
+fn read_zero_one_records(input: &[u8], width: usize) -> Result<PackedShotBatch, Box<dyn Error>> {
+    let mut reader = RecordStreamReader::measurements(input, RecordFormat::ZeroOne, width, 1024);
+    let mut records = Vec::new();
+    while let Some(batch) = reader.read_batch(64)? {
+        for shot in 0..batch.shot_count() {
+            let row = batch.shot(shot)?;
+            records.push((0..width).map(|bit| row.get(bit) == Some(true)).collect());
+        }
+    }
+    Ok(PackedShotBatch::from_records(&records, width)?)
 }
 
 #[derive(Debug)]
@@ -118,8 +131,7 @@ impl DecoderSession for FirstDetectorSession {
 
 #[cfg(test)]
 mod tests {
-    use super::{STRICT_ZERO_ONE_FIXTURE, exercise_stable_components};
-    use stab_records::{RecordFormat, read_measurement_records};
+    use super::{STRICT_ZERO_ONE_FIXTURE, exercise_stable_components, read_zero_one_records};
 
     #[test]
     fn stable_records_parse_convert_and_encode_without_the_facade()
@@ -133,7 +145,7 @@ mod tests {
 
         let unterminated = &STRICT_ZERO_ONE_FIXTURE[..STRICT_ZERO_ONE_FIXTURE.len() - 1];
         assert!(
-            read_measurement_records(unterminated, RecordFormat::ZeroOne, 6).is_err(),
+            read_zero_one_records(unterminated, 6).is_err(),
             "strict 01 parsing must reject an unterminated final record"
         );
         Ok(())

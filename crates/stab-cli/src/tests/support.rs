@@ -5,6 +5,10 @@ use std::ffi::OsString;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
+use stab_records::{
+    DetsResultType, PackedShotBatch, RecordBatchPart, RecordEncoder, RecordFormat,
+    RecordStreamReader,
+};
 use tempfile::TempDir;
 
 use crate::run_from;
@@ -147,6 +151,42 @@ impl Scratch {
 
 pub(super) fn ptb64_words(words: &[u64]) -> Vec<u8> {
     words.iter().flat_map(|word| word.to_le_bytes()).collect()
+}
+
+/// Encodes complete measurement records of one width, as a fixture or an expected output.
+pub(super) fn encode_records(records: &[Vec<bool>], format: RecordFormat) -> Vec<u8> {
+    let width = records.first().map_or(0, Vec::len);
+    let batch = PackedShotBatch::from_records(records, width).expect("fixture records");
+    let mut encoder = RecordEncoder::try_new(format, width).expect("fixture encoder");
+    let mut out = Vec::new();
+    encoder
+        .write_batch(
+            &[RecordBatchPart::new(
+                DetsResultType::Measurement,
+                batch.view(),
+            )],
+            &mut out,
+        )
+        .expect("encode fixture records");
+    assert_eq!(encoder.pending_group_records(), 0, "complete PTB64 groups");
+    out
+}
+
+/// Decodes every measurement record of a CLI output.
+pub(super) fn decode_records(input: &[u8], format: RecordFormat, width: usize) -> Vec<Vec<bool>> {
+    let mut reader = RecordStreamReader::measurements(input, format, width, usize::MAX);
+    let mut records = Vec::new();
+    while let Some(view) = reader.read_batch(64).expect("decode CLI records") {
+        for shot in 0..view.shot_count() {
+            let row = view.shot(shot).expect("decoded shot");
+            records.push(
+                (0..row.len())
+                    .map(|bit| row.get(bit) == Some(true))
+                    .collect(),
+            );
+        }
+    }
+    records
 }
 
 /// Fails every write. Deliberately not `BrokenPipe`: pipe-rooted failures take the silent

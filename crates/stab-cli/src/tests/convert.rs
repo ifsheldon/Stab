@@ -3,7 +3,7 @@
 
 use tempfile::tempdir;
 
-use super::support::{Scratch, run};
+use super::support::{Scratch, encode_records, run};
 use crate::run_from;
 
 /// The whole-input cap that streaming conversion retired.
@@ -810,9 +810,8 @@ fn convert_admits_packed_record_storage_against_the_memory_budget_before_allocat
         ("r8", stab_records::RecordFormat::R8),
         ("ptb64", stab_records::RecordFormat::Ptb64),
     ] {
-        let input = stab_records::write_records(&records, record_format).expect("encode input");
-        let expected = stab_records::write_records(&records, stab_records::RecordFormat::B8)
-            .expect("encode expected output");
+        let input = encode_records(&records, record_format);
+        let expected = encode_records(&records, stab_records::RecordFormat::B8);
 
         let (refused, required) = convert_with_budget(&input, format, WIDTH, 1024);
         assert_eq!(refused.status, 1, "{format}");
@@ -911,9 +910,7 @@ fn convert_charges_each_named_output_file_buffer_against_the_memory_budget() {
         .lines()
         .map(|line| line.bytes().map(|bit| bit == b'1').collect::<Vec<_>>())
         .collect::<Vec<_>>();
-    let b8 = |records: &[Vec<bool>]| {
-        stab_records::write_records(records, stab_records::RecordFormat::B8).expect("encode")
-    };
+    let b8 = |records: &[Vec<bool>]| encode_records(records, stab_records::RecordFormat::B8);
     let input = b8(&records);
     let detectors = records
         .iter()

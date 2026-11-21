@@ -3,8 +3,9 @@
 //! [`RecordStreamReader`] frames records out of an [`std::io::Read`] transport and decodes them
 //! straight into the words of a reusable [`PackedShotBatch`]: sparse formats set only their hit
 //! bits, `01` packs eight bytes per step, `b8` copies bytes, and PTB64 transposes whole groups.
-//! Grammar diagnostics come from the same component decoders the whole-buffer readers use, so
-//! streaming and materialized decoding cannot drift.
+//! Grammar diagnostics come from the shared text decoders, which the test-only whole-buffer
+//! reference codec also drives, so the streaming diagnostics are checked against an independent
+//! framing of the same grammar.
 //!
 //! Input is read through one reusable buffer that grows only while a single record frame spans
 //! it, and record storage is allocated fallibly, and only once input has proven that a record
