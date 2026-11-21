@@ -100,7 +100,7 @@ pub fn circuit_detecting_regions_for_targets(
     validate_ticks(&ticks, tick_count)?;
 
     let represented_qubits = represented_qubit_ids(circuit, &mut budget)?;
-    let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
+    let qubit_count = circuit.simulated_qubit_count();
     let mut regions = DetectingRegionTargetMap::new();
     let mut tracker = SparseReverseFrameTracker::new(
         qubit_count,

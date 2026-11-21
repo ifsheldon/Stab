@@ -30,8 +30,7 @@ pub use target::{DemDetectorId, DemTarget, DemTargetKind};
 pub(crate) mod advanced {
     pub use super::traversal::{
         DemBlockSummary, DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem,
-        FoldedDemTraversal, FoldedDemVisitor, shifted_coordinates, shifted_detector,
-        shifted_targets,
+        FoldedDemTraversal, FoldedDemVisitor, shifted_targets,
     };
 }
 
@@ -49,7 +48,7 @@ use tag::DemTag;
 type DemArgVec = SmallVec<[f64; 3]>;
 type DemTargetVec = SmallVec<[DemTarget; 5]>;
 
-pub const MAX_DEM_REPEAT_NESTING: usize = RepeatNestingLimit::HARD_MAX;
+pub(crate) const MAX_DEM_REPEAT_NESTING: usize = RepeatNestingLimit::HARD_MAX;
 
 #[derive(Default)]
 pub struct DetectorErrorModel {
@@ -133,7 +132,12 @@ impl DetectorErrorModel {
         self.items.push(DemItem::RepeatBlock(repeat));
     }
 
-    pub(crate) fn try_reserve_items_exact(&mut self, additional: usize) -> ModelResult<()> {
+    /// Reserves exact item storage for `additional` more items.
+    ///
+    /// # Errors
+    ///
+    /// Fails with a DEM allocation error when the reservation cannot be satisfied.
+    pub fn try_reserve_items_exact(&mut self, additional: usize) -> ModelResult<()> {
         self.items.try_reserve_exact(additional).map_err(|error| {
             ModelError::dem_allocation_failed(format!(
                 "unable to reserve {additional} flattened instruction slots: {error}"

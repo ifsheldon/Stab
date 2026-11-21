@@ -30,7 +30,7 @@ pub(super) fn static_reference_sample(
     budget: MemoryBudget,
     cancellation: &Cancellation,
 ) -> DetectionResult<ReferenceSample> {
-    let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
+    let qubit_count = circuit.simulated_qubit_count();
     let loop_policy = ReferenceSampleLoopPolicy::Fold;
     let estimated_bytes = reference_work_storage_bytes(program, qubit_count, loop_policy, budget);
     if !budget.admits(estimated_bytes) {

@@ -78,7 +78,7 @@ impl<'c> ReverseFoldAnalyzer<'c> {
         })?;
         let detector_count = circuit.count_detectors()?;
         let mut tracker = SparseReverseFrameTracker::new_for_error_analysis(
-            stab_model::advanced::circuit_simulated_qubit_count(circuit),
+            circuit.simulated_qubit_count(),
             measurement_count,
             detector_count,
             options.allow_gauge_detectors,

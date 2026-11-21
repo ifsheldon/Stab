@@ -1,4 +1,4 @@
-use stab_model::advanced::{CircuitBuilder, circuit_instruction_without_tag};
+use stab_model::advanced::CircuitBuilder;
 use stab_model::{Circuit, CircuitItem, RepeatBlock};
 
 /// Returns a compact copy of `circuit` with every instruction and repeat-block tag removed.
@@ -12,7 +12,7 @@ pub fn circuit_without_tags(circuit: &Circuit) -> Circuit {
             .iter()
             .map(|item| match item {
                 CircuitItem::Instruction(instruction) => {
-                    CircuitItem::Instruction(circuit_instruction_without_tag(instruction))
+                    CircuitItem::Instruction(instruction.without_tag())
                 }
                 CircuitItem::RepeatBlock(repeat) => CircuitItem::RepeatBlock(RepeatBlock::new(
                     repeat.repeat_count(),

@@ -57,7 +57,7 @@ A stage refused while earlier stages hold bytes keeps its error class, code, exi
 
 | Constant | Owner | Kind | Justification |
 | --- | --- | --- | --- |
-| `STIM_TARGET_VALUE_LIMIT` (two definitions) | `stab-model/src/ids.rs`, `lib.rs` | Invariant | Stim's target values are below $2^{24}$. |
+| `STIM_TARGET_VALUE_LIMIT` | `stab-model/src/ids.rs` | Invariant | Stim's target values are below $2^{24}$; the public form is `QubitId::MAX`. |
 | `MAX_STIM_NUMBER_TOKEN_BYTES` (two definitions) | `stab-model` circuit and DEM parsers | Invariant | Pinned Stim's numeric lexer accepts at most 63 bytes. |
 | `MAX_CIRCUIT_REPEAT_COUNT_EXCLUSIVE` | `stab-model/src/circuit/parser.rs` | Invariant | Circuit repeat counts are below $2^{63}$ in pinned Stim. |
 | `MAX_DEM_TEXT_INTEGER` | `stab-model/src/dem/parser.rs` | Invariant | DEM textual integers are bounded as in pinned Stim. |
@@ -67,7 +67,7 @@ A stage refused while earlier stages hold bytes keeps its error class, code, exi
 | `MAX_LOCAL_DETECTORS` | `stab-analysis/.../local_decomposition.rs` | Invariant | Stim's local decomposition has a 16-symptom mask. |
 | `MAX_COMBINATION_BASES` | `stab-analysis/src/circuit_to_dem/reverse_fold.rs` | Invariant | A composite channel combines at most four basis errors. |
 | `RepeatNestingLimit::HARD_MAX` | `stab-model/src/parse_limits.rs` | Nesting | The shared 256-level envelope that callers may tighten but not raise. |
-| `MAX_DEM_REPEAT_NESTING` | `stab-model/src/dem.rs` | Nesting | Re-export of the shared envelope for DEM consumers. |
+| `MAX_DEM_REPEAT_NESTING` | `stab-model/src/dem.rs` | Nesting | Crate-private name of the shared envelope; consumers read `RepeatNestingLimit::HARD_MAX`. |
 | `ReferenceSampleTree::MAX_NESTING` | `stab-engine/src/reference_sample_tree.rs` | Nesting | The shared envelope. |
 | `ParseLimits::DEFAULT_REPEAT_NESTING` | `stab-model/src/parse_limits.rs` | Nesting | The shared envelope as a `RepeatNestingLimit`. The circuit and DEM parsers keep one heap frame per open repeat block instead of recursing, so the envelope bounds those frame stacks. The DEM visitor traversal (`FoldedDemTraversal::try_visit`) keeps a heap stack too and accepts any programmatic depth; `FoldedDemTraversal::validate_repeat_depth` and `advanced::MAX_DEM_REPEAT_NESTING` apply the envelope for DEM consumers that still recurse per level, namely sampling-plan compilation, flattening, and the logical-error and SAT searches. The model's folded circuit walk (`stab_model::advanced::visit_folded_circuit` and `FoldedCircuitSummary`) enforces it for the analyzer with and without loop folding, the whole-circuit counts of detecting-region extraction, flattening, feedback inlining, flow generation, missing-detector discovery, measurement-rich time reversal, the CLI herald count, and the sampling request estimate, and detecting-region validation enforces the same `RepeatNestingLimit::HARD_MAX`, each reporting its own nesting error. |
 | `ParseLimits::DEFAULT_MEMORY_BUDGET` | `stab-model/src/parse_limits.rs` | Byte budget | The parse budget for source bytes plus the conservative retained model. |

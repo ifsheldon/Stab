@@ -30,6 +30,18 @@ impl DemDetectorId {
         self.0
     }
 
+    /// Returns this id raised by `detector_offset`.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the shifted id overflows or exceeds the DEM detector id range.
+    pub fn shifted(self, detector_offset: u64) -> ModelResult<Self> {
+        let shifted = self.0.checked_add(detector_offset).ok_or_else(|| {
+            ModelError::invalid_detector_error_model("relative detector id overflowed")
+        })?;
+        Self::try_new(shifted)
+    }
+
     /// Returns this id lowered by `base`, or `None` when it is below `base`.
     pub(crate) const fn checked_sub(self, base: u64) -> Option<Self> {
         match self.0.checked_sub(base) {
@@ -136,10 +148,7 @@ impl DemTarget {
         let Some(detector) = self.detector() else {
             return Ok(self);
         };
-        let shifted = detector.get().checked_add(detector_offset).ok_or_else(|| {
-            ModelError::invalid_detector_error_model("relative detector id overflowed")
-        })?;
-        DemDetectorId::try_new(shifted).map(Self::from_detector)
+        detector.shifted(detector_offset).map(Self::from_detector)
     }
 
     /// The low bits of an observable target, which hold its `u32` id.

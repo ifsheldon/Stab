@@ -1,6 +1,6 @@
-use stab_model::advanced::MAX_DEM_REPEAT_NESTING;
 use stab_model::{
     Cancellation, DemInstruction, DemItem, DemTarget, DetectorErrorModel, MemoryBudget,
+    RepeatNestingLimit,
 };
 
 use crate::{AnalysisError, AnalysisOperation, AnalysisResult, ResourceKind, ResourceLimitError};
@@ -71,11 +71,12 @@ fn validate_flattening_budget_items(
     context: &'static str,
     budget: &mut DemFlatteningBudget,
 ) -> AnalysisResult<()> {
-    if depth > MAX_DEM_REPEAT_NESTING {
+    let limit = RepeatNestingLimit::HARD_MAX;
+    if depth > limit {
         return Err(AnalysisError::unsupported(
             AnalysisOperation::DetectorErrorModelFlatten,
             None,
-            format!("DEM {context} repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"),
+            format!("DEM {context} repeat nesting exceeds current limit {limit}"),
         ));
     }
     for item in model.items() {

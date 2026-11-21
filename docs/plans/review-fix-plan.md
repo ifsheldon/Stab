@@ -249,7 +249,7 @@ Larger redesigns the API review proposed and this batch did not do:
 - Replace `ErrorAnalyzerOptions`' five independent booleans with nested option types.
 - Budget or remove the `Vec<Vec<bool>>` record codec family, which only CLI tests use outside `stab-records`.
 - Publish gate flow and decomposition metadata as typed values instead of strings that are parsed again at run time.
-- Trim `stab_model::advanced`, which has about sixteen items with no caller outside the crate.
+- Done on 2026-11-21: `stab_model::advanced` went from 57 exports to 27, with dead items deleted and free wrappers turned into methods.
 
 Smaller items noticed and left:
 

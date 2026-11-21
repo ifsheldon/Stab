@@ -31,7 +31,7 @@ pub struct UnsignedFlowCheckOptions {
 }
 
 /// The exclusive upper bound of the qubits a circuit target, and so the sparse tracker, can name.
-const TRACKED_QUBIT_LIMIT: usize = stab_model::advanced::STIM_TARGET_VALUE_LIMIT as usize;
+const TRACKED_QUBIT_LIMIT: usize = stab_model::QubitId::MAX.get() as usize + 1;
 
 /// Checks unsigned stabilizer flows, returning one verdict per flow in order.
 ///
@@ -47,9 +47,9 @@ const TRACKED_QUBIT_LIMIT: usize = stab_model::advanced::STIM_TARGET_VALUE_LIMIT
 /// [`FlowViolation::InputMismatch`]. A flow measurement term naming a record the circuit does not
 /// have is [`FlowViolation::MeasurementRecordOutOfRange`], and a collapse that anticommutes with
 /// the tracked region is [`FlowViolation::CollapseAnticommutation`]. Every flow of a valid circuit
-/// is decided, however wide: no circuit target names a qubit at or beyond
-/// [`stab_model::advanced::STIM_TARGET_VALUE_LIMIT`], so the circuit is the identity there and
-/// the reported mismatch strings carry the flow's own terms at those qubits.
+/// is decided, however wide: no circuit target names a qubit beyond [`stab_model::QubitId::MAX`],
+/// so the circuit is the identity there and the reported mismatch strings carry the flow's own
+/// terms at those qubits.
 ///
 /// # Errors
 ///
@@ -91,7 +91,7 @@ fn select_flow_check_algorithm(circuit: &Circuit, flows: &[Flow]) -> FlowCheckAl
 /// Pauli-only flows as a unitary, and every flow is a Pauli-only flow no wider than the circuit.
 /// Repeat blocks stay on the sparse tracker, which folds them without raising a Tableau to a power.
 fn dense_tableau_can_check(circuit: &Circuit, flows: &[Flow]) -> bool {
-    let circuit_qubits = stab_model::advanced::circuit_simulated_qubit_count(circuit);
+    let circuit_qubits = circuit.simulated_qubit_count();
     circuit
         .items()
         .iter()
@@ -299,7 +299,7 @@ fn report_unitary_mismatches_as_outputs(
             "sparse reverse tracking returned fewer images than flows",
         ));
     }
-    let circuit_qubits = stab_model::advanced::circuit_simulated_qubit_count(circuit);
+    let circuit_qubits = circuit.simulated_qubit_count();
     for ((index, flow), image) in failing.into_iter().zip(images) {
         let width = circuit_qubits
             .max(flow.input().len())
@@ -327,10 +327,10 @@ fn pull_back_paulis_with_sparse_tracker(
     paulis: &[PauliString],
     options: &UnsignedFlowCheckOptions,
 ) -> AnalysisResult<Vec<PauliString>> {
-    let qubit_count = paulis.iter().map(PauliString::len).fold(
-        stab_model::advanced::circuit_simulated_qubit_count(circuit),
-        usize::max,
-    );
+    let qubit_count = paulis
+        .iter()
+        .map(PauliString::len)
+        .fold(circuit.simulated_qubit_count(), usize::max);
     let mut tracker =
         SparseReverseFrameTracker::new(qubit_count, 0, 0, AnticommutationPolicy::Record);
     tracker.set_cancellation(options.cancellation.clone());
@@ -381,8 +381,7 @@ pub(crate) fn sparse_flow_verdicts(
         .flat_map(|flow| [flow.input().len(), flow.output().len()])
         .max()
         .unwrap_or(0);
-    let qubit_count =
-        stab_model::advanced::circuit_simulated_qubit_count(circuit).max(flow_qubit_count);
+    let qubit_count = circuit.simulated_qubit_count().max(flow_qubit_count);
     let mut tracker = SparseReverseFrameTracker::new(
         qubit_count,
         measurement_count,

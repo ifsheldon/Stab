@@ -2,9 +2,7 @@
 
 use stab_model::{
     CircuitInstruction, Gate, GateKind, Target,
-    advanced::{
-        ClassicalControl, ControlledPauliTargetPair, classify_controlled_pauli_target_pair,
-    },
+    advanced::{ClassicalControl, ControlledPauliTargetPair},
 };
 
 use super::super::super::helpers::{
@@ -223,7 +221,7 @@ fn controlled_pairs(
 ) -> DetectionResult<ArenaSpan<ControlledPair>> {
     let start = arena.mark::<ControlledPair>();
     for target_group in instruction.targets().chunks(2) {
-        let pair = match classify_controlled_pauli_target_pair(instruction.gate(), target_group) {
+        let pair = match ControlledPauliTargetPair::classify(instruction.gate(), target_group) {
             ControlledPauliTargetPair::Quantum { .. } => {
                 let [control, target] = target_group else {
                     return Err(unsupported_frame_instruction(instruction));

@@ -62,7 +62,7 @@ fn solve_with_generator_rows(
             };
             eliminate_implicit_idle_suffix(
                 &mut row.vector,
-                stab_model::advanced::circuit_simulated_qubit_count(circuit),
+                circuit.simulated_qubit_count(),
                 qubit_count,
             );
             reduce_row(&mut row, &basis);
@@ -147,10 +147,11 @@ fn reduce_measurements_with_zero_rows(
 }
 
 fn solved_qubit_count(circuit: &Circuit, flows: &[Flow], generators: &[Flow]) -> usize {
-    let count = flows.iter().fold(
-        stab_model::advanced::circuit_simulated_qubit_count(circuit),
-        |count, flow| count.max(flow.input().len()).max(flow.output().len()),
-    );
+    let count = flows
+        .iter()
+        .fold(circuit.simulated_qubit_count(), |count, flow| {
+            count.max(flow.input().len()).max(flow.output().len())
+        });
     generators.iter().fold(count, |count, flow| {
         count.max(flow.input().len()).max(flow.output().len())
     })

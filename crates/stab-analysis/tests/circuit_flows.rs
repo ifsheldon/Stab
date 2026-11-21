@@ -161,7 +161,7 @@ fn unsigned_checker_decides_flows_beyond_the_target_range_as_idle() {
     // No circuit target names qubit 2^24 or above, so every circuit is the identity there: a flow
     // holds only if its input and output agree on those qubits, and the reported mismatch strings
     // carry the flow's own terms at those positions.
-    let limit = stab_model::advanced::STIM_TARGET_VALUE_LIMIT;
+    let limit = stab_model::QubitId::MAX.get() + 1;
     let unitary = circuit("H 0\n");
     assert_eq!(
         verdicts(

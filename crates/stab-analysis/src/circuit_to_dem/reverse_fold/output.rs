@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use stab_model::advanced::dem_instruction_rebase_detectors;
 use stab_model::{DemInstruction, DemInstructionView, DemItem, DemTarget, DetectorErrorModel};
 
 use crate::AnalysisOperation;
@@ -101,10 +100,15 @@ fn unreverse_instruction(
 }
 
 fn rebase(instruction: &mut DemInstruction, base_detector_id: u64) -> AnalysisResult<()> {
-    dem_instruction_rebase_detectors(instruction, base_detector_id).map_err(|detector| {
-        AnalysisError::internal(
-            AnalysisOperation::CircuitToDetectorErrorModel,
-            format!("folded analyzer detector D{detector} precedes base D{base_detector_id}"),
-        )
-    })
+    instruction
+        .rebase_detectors(base_detector_id)
+        .map_err(|detector| {
+            AnalysisError::internal(
+                AnalysisOperation::CircuitToDetectorErrorModel,
+                format!(
+                    "folded analyzer detector D{} precedes base D{base_detector_id}",
+                    detector.get()
+                ),
+            )
+        })
 }

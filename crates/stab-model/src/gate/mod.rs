@@ -106,7 +106,13 @@ impl Gate {
         self.info.category
     }
 
-    pub(crate) fn validate(self, args: &[f64], targets: &[Target]) -> ModelResult<()> {
+    /// Validates arguments and targets against this gate's closed syntax descriptor.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the gate is block-only control flow, or when the arguments or targets break
+    /// the gate's argument or target rule.
+    pub fn validate(self, args: &[f64], targets: &[Target]) -> ModelResult<()> {
         // Block-only control-flow gates such as REPEAT exist in the gate table for name
         // resolution but must never become ordinary instructions; pinned Stim rejects a
         // braceless REPEAT at parse time and blocks never validate as instructions.
@@ -120,7 +126,12 @@ impl Gate {
         self.info.target_rule.validate(self.info.name, targets)
     }
 
-    pub(crate) fn validate_targets(self, targets: &[Target]) -> ModelResult<()> {
+    /// Validates only targets against this gate's closed syntax descriptor.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the targets break the gate's target rule.
+    pub fn validate_targets(self, targets: &[Target]) -> ModelResult<()> {
         self.info.target_rule.validate(self.info.name, targets)
     }
 }

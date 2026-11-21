@@ -20,7 +20,8 @@ impl ModelDialect {
         }
     }
 
-    pub(crate) const fn fingerprint_discriminator(self) -> u8 {
+    /// Returns the schema-one model fingerprint discriminator for this dialect.
+    pub const fn fingerprint_discriminator(self) -> u8 {
         match self {
             Self::StimCircuit => 1,
             Self::DetectorErrorModel => 2,

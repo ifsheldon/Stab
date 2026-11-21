@@ -6,7 +6,11 @@ impl Circuit {
         self.count_qubits_with(|_| true)
     }
 
-    pub(crate) fn simulated_qubit_count(&self) -> usize {
+    /// Returns the qubit width required to simulate this circuit, excluding `MPAD` values.
+    ///
+    /// Stim-compatible [`Circuit::count_qubits`] remains target-based and therefore counts an
+    /// `MPAD 1` value as width two. Execution owners use this narrower semantic width instead.
+    pub fn simulated_qubit_count(&self) -> usize {
         self.count_qubits_with(|instruction| !instruction.gate.targets_are_pad_values())
     }
 
@@ -38,7 +42,8 @@ impl Circuit {
 }
 
 impl CircuitInstruction {
-    pub(crate) fn measurement_result_count(&self) -> usize {
+    /// Returns the number of measurement results this instruction produces.
+    pub fn measurement_result_count(&self) -> usize {
         if self.gate.produces_measurements() {
             self.target_group_count()
         } else {

@@ -1,6 +1,6 @@
 use crate::{
-    ByteSpan, ModelDialect, ModelError, ParseErrorCode, ParseErrorContext, ValidationError,
-    advanced::parse_error_with_human_message,
+    ByteSpan, ModelDialect, ModelError, ParseError, ParseErrorCode, ParseErrorContext,
+    ValidationError,
 };
 
 pub(crate) fn line_error(
@@ -13,7 +13,7 @@ pub(crate) fn line_error(
     context: ParseErrorContext,
 ) -> ModelError {
     debug_assert_eq!(context.dialect(), dialect);
-    parse_error_with_human_message(
+    ParseError::with_human_message(
         code,
         message,
         format!(
@@ -33,7 +33,7 @@ pub(crate) fn plain_error(
     span: ByteSpan,
     context: ParseErrorContext,
 ) -> ModelError {
-    parse_error_with_human_message(code, message, human_message, span, context).into()
+    ParseError::with_human_message(code, message, human_message, span, context).into()
 }
 
 pub(crate) fn validation_error(
@@ -113,7 +113,7 @@ pub(crate) fn validation_error(
             instruction: instruction.to_string(),
         },
     };
-    parse_error_with_human_message(code, message, human_message, span, context).into()
+    ParseError::with_human_message(code, message, human_message, span, context).into()
 }
 
 pub(crate) fn unexpected_repeat_terminator(dialect: ModelDialect, span: ByteSpan) -> ModelError {

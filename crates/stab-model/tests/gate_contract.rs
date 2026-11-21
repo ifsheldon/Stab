@@ -8,10 +8,7 @@ use std::assert_matches;
 use stab_model::{
     Gate, GateArgumentRule, GateCategory, GateTargetGroupKind, GateTargetRule, ModelError, QubitId,
     Target, ValidationError,
-    advanced::{
-        gate_decomposition, gate_flow_descriptors, gate_unitary_rows, validate_gate,
-        validate_gate_targets,
-    },
+    advanced::{gate_decomposition, gate_flow_descriptors, gate_unitary_rows},
 };
 
 #[test]
@@ -64,18 +61,18 @@ fn gate_validation_reports_model_owned_errors() {
     let h = Gate::from_name("H").expect("H");
     let q0 = Target::qubit(QubitId::new(0).expect("q0"), false);
     let q1 = Target::qubit(QubitId::new(1).expect("q1"), false);
-    validate_gate(h, &[], std::slice::from_ref(&q0)).expect("valid H");
+    h.validate(&[], std::slice::from_ref(&q0)).expect("valid H");
     assert_matches!(
-        validate_gate(h, &[0.5], std::slice::from_ref(&q0)),
+        h.validate(&[0.5], std::slice::from_ref(&q0)),
         Err(ModelError::Validation(
             ValidationError::InvalidArgumentCount { gate: "H", .. }
         ))
     );
 
     let cx = Gate::from_name("CX").expect("CX");
-    validate_gate_targets(cx, &[q0, q1]).expect("valid CX");
+    cx.validate_targets(&[q0, q1]).expect("valid CX");
     assert_matches!(
-        validate_gate_targets(cx, std::slice::from_ref(&q0)),
+        cx.validate_targets(std::slice::from_ref(&q0)),
         Err(ModelError::Validation(
             ValidationError::InvalidTargetCount {
                 gate: "CX",
@@ -84,7 +81,7 @@ fn gate_validation_reports_model_owned_errors() {
         ))
     );
     assert_matches!(
-        validate_gate_targets(cx, &[q0, q0]),
+        cx.validate_targets(&[q0, q0]),
         Err(ModelError::Validation(ValidationError::InvalidTarget {
             gate: "CX",
             ..
@@ -93,7 +90,7 @@ fn gate_validation_reports_model_owned_errors() {
 
     let channel = Gate::from_name("PAULI_CHANNEL_1").expect("channel");
     assert_matches!(
-        validate_gate(channel, &[0.6, 0.6, 0.0], &[]),
+        channel.validate(&[0.6, 0.6, 0.0], &[]),
         Err(ModelError::Validation(
             ValidationError::InvalidArgument { .. }
         ))

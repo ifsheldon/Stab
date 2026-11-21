@@ -102,7 +102,5 @@ pub use tableau_circuit::tableau_to_circuit;
 /// Low-level lowering operations shared with compilation engines.
 pub mod advanced {
     pub use crate::circuit_flow::flow_record_index;
-    pub use crate::circuit_simplify::{
-        decomposed_single_instruction, visit_decomposed_spp_instructions,
-    };
+    pub use crate::circuit_simplify::visit_decomposed_spp_instructions;
 }

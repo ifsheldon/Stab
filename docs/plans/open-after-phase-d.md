@@ -25,7 +25,7 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 | R7 | Nested option types for `ErrorAnalyzerOptions` | M | Do, in the same pass as R4 so call sites change once. |
 | R8 | The `Vec<Vec<bool>>` record codec family | M | Remove from the public surface; keep as a test oracle. |
 | R9 | Typed gate flow and decomposition metadata | M to L | Do after R6. |
-| R10 | Trim `stab_model::advanced` | S to M | Do now. The dead items are free to delete. |
+| R10 | Trim `stab_model::advanced` | S to M | Done on 2026-11-21. |
 | S1 | `--fold_loops` circuits with a long transient are slower than Stim | M | Do as a measured performance task. |
 | S2 | `ConversionOperation` is 40 bytes | S | Try it; keep only if `m2d` does not slow down. |
 | S3 | `circuit_reference_signs` computes a byte per bit before packing | S | Do when that module is next touched. |
@@ -33,7 +33,7 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 | S5 | Fixed caps in `stab-model` reported an invalid detector error model | S | Done with D2. |
 | N1 | Areas the review did not read | M | Run a second review pass before the next release. |
 
-Suggested order after R1 and R2: R10, then R6 with R3 and R9, then R4 with R5 and R7, then R8, with S1 as an independent performance task at any point.
+Suggested order after R1, R2, and R10: R6 with R3 and R9, then R4 with R5 and R7, then R8, with S1 as an independent performance task at any point.
 R4 goes late on purpose: R1, R2, R3, and R7 each delete or reshape functions that R4 would otherwise rewrite twice.
 
 ## Decided And Done
@@ -362,6 +362,12 @@ The string forms stay as `Display` output and as a test oracle that checks the t
 **Recommendation: do after R6**, and land R3 with it.
 
 ### R10. Trim `stab_model::advanced`
+
+**Outcome, 2026-11-21.** Done: the module went from 57 exports to 27.
+Seventeen items were deleted or made crate-private and thirteen became inherent methods or associated items, as the migration guide lists.
+`STIM_TARGET_VALUE_LIMIT` was not dead, since the flow checker reads it, and is now `QubitId::MAX`.
+Left as proposals: splitting what remains into `traversal`, `tagged`, `gate_tables`, and `admission` submodules, and giving the two free wrappers in `stab_algebra::advanced` the same treatment.
+The rest of this section is the proposal as written before the work.
 
 **Today.** `stab_model::advanced` exports about sixteen items that have no caller outside `stab-model`: the `plain_*_gate` helpers, `lookup_gate`, `lookup_simple_plain_gate`, three `measure_record_offset_*` functions, `bounded_parse_diagnostic_text`, `parse_error_with_human_message`, `invalid_utf8_parse_error`, two hidden retained-bytes functions, and `STIM_TARGET_VALUE_LIMIT`.
 Several live items are free functions that wrap a method, such as `advanced::circuit_simulated_qubit_count(&circuit)`, used in 13 files.

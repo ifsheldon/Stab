@@ -52,7 +52,7 @@ pub fn missing_detectors(
     circuit: &Circuit,
     options: MissingDetectorOptions,
 ) -> AnalysisResult<Circuit> {
-    let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
+    let qubit_count = circuit.simulated_qubit_count();
     if declaration_scan(circuit)?.instructions > FOLDED_FINAL_REPEAT_THRESHOLD
         && let Some(output) =
             final_repeat::try_missing_detectors_folded_final_repeat(circuit, &options, qubit_count)?

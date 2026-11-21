@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::{
     ByteSpan, ModelDialect, ModelError, ModelResult, ParseError, ParseLimits, ResourceLimitError,
-    advanced::invalid_utf8_parse_error, parse_limits::ParseAdmission,
+    parse_limits::ParseAdmission,
 };
 
 pub(crate) struct PreparedModelText<'a> {
@@ -105,7 +105,7 @@ impl<'a> PreparedModelText<'a> {
         let mut invalid_utf8 = None;
         replace_invalid_utf8(&mut sanitized, 0, |byte_start, byte_length, error_len| {
             invalid_utf8.get_or_insert_with(|| {
-                invalid_utf8_parse_error(dialect, byte_start, byte_length, error_len)
+                ParseError::invalid_utf8_at(dialect, byte_start, byte_length, error_len)
             });
         })?;
 

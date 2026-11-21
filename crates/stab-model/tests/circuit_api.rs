@@ -47,25 +47,16 @@ fn qubit(id: u32) -> QubitId {
 fn circuit_public_and_simulated_qubit_counts_distinguish_stim_mpad_behavior() {
     let circuit = Circuit::from_stim_str("H 0\nMPAD 1\n").expect("parse MPAD circuit");
     assert_eq!(circuit.count_qubits(), 2);
-    assert_eq!(
-        stab_model::advanced::circuit_simulated_qubit_count(&circuit),
-        1
-    );
+    assert_eq!(circuit.simulated_qubit_count(), 1);
 
     let pad_only = Circuit::from_stim_str("MPAD 0 1 0\n").expect("parse pad-only circuit");
     assert_eq!(pad_only.count_qubits(), 2);
-    assert_eq!(
-        stab_model::advanced::circuit_simulated_qubit_count(&pad_only),
-        0
-    );
+    assert_eq!(pad_only.simulated_qubit_count(), 0);
 
     let nested = Circuit::from_stim_str("REPEAT 3 {\n    MPAD 1\n    M 4\n}\n")
         .expect("parse repeat-nested MPAD circuit");
     assert_eq!(nested.count_qubits(), 5);
-    assert_eq!(
-        stab_model::advanced::circuit_simulated_qubit_count(&nested),
-        5
-    );
+    assert_eq!(nested.simulated_qubit_count(), 5);
 }
 
 #[test]

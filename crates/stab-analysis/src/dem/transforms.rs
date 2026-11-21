@@ -16,7 +16,7 @@ pub fn detector_error_model_without_tags(model: &DetectorErrorModel) -> Detector
     let transformed: Result<DetectorErrorModel, Infallible> =
         transform_compact_dem(model, false, |instruction| {
             let mut instruction = instruction.clone();
-            stab_model::advanced::dem_instruction_clear_tag(&mut instruction);
+            instruction.clear_tag();
             Ok(instruction)
         });
     match transformed {
@@ -49,10 +49,7 @@ pub fn flattened_detector_error_model_with_limits(
 ) -> AnalysisResult<DetectorErrorModel> {
     let budget = validate_flattening_budget_with_limits(model, "flattened", &limits)?;
     let mut flattened = DetectorErrorModel::new();
-    stab_model::advanced::dem_try_reserve_items_exact(
-        &mut flattened,
-        budget.materialized_capacity()?,
-    )?;
+    flattened.try_reserve_items_exact(budget.materialized_capacity()?)?;
     for instruction in model
         .iter_flattened_instructions()
         .with_cancellation(limits.cancellation().clone())

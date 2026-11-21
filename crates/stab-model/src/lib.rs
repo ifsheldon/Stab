@@ -55,29 +55,23 @@ pub use target::{Pauli, Target, TargetKind};
 pub use validation::{ValidationError, ValidationErrorCode};
 
 /// Low-level model operations for parsers and admitted algorithms.
+///
+/// Every item here relies on an invariant the caller has already established, or exposes raw
+/// pinned table data whose typed interpretation belongs to a higher layer.
 pub mod advanced {
-    use std::fmt::Display;
-
     use super::{
-        ByteSpan, Circuit, CircuitInstruction, DemDetectorId, DemInstruction, DemRepeatBlock,
-        DemTarget, DetectorErrorModel, Gate, GateDecomposition, MeasureRecordOffset, ModelDialect,
-        ModelResult, ObservableId, ParseError, ParseErrorCode, ParseErrorContext, Probability,
-        RepeatBlock, RepeatCount, Target,
+        Circuit, CircuitInstruction, DemDetectorId, DemInstruction, DemRepeatBlock, DemTarget,
+        DetectorErrorModel, Gate, GateDecomposition, ModelDialect, ModelResult, ObservableId,
+        Probability, RepeatBlock, RepeatCount, Target,
     };
     pub use crate::circuit::{FoldedCircuitEvent, FoldedVisitError, visit_folded_circuit};
-    pub use crate::controlled_pauli::{
-        ClassicalControl, ControlledPauliTargetPair, classify_controlled_pauli_target_pair,
-    };
-    pub use crate::dem::MAX_DEM_REPEAT_NESTING;
+    pub use crate::controlled_pauli::{ClassicalControl, ControlledPauliTargetPair};
     pub use crate::dem::advanced::{
         DemBlockSummary, DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem,
-        FoldedDemTraversal, FoldedDemVisitor, shifted_coordinates, shifted_detector,
-        shifted_targets,
+        FoldedDemTraversal, FoldedDemVisitor, shifted_targets,
     };
     pub use crate::gate::GateUnitaryRows;
     pub use stab_foundation::CancellationCountdown;
-    /// Stim's exclusive upper bound for encoded target values.
-    pub const STIM_TARGET_VALUE_LIMIT: u32 = crate::ids::STIM_TARGET_VALUE_LIMIT;
 
     /// Conservative retained bytes of one circuit declaration under [`crate::ParseLimits`].
     pub const fn circuit_declaration_admitted_bytes(
@@ -153,48 +147,6 @@ pub mod advanced {
         RepeatBlock::new_with_tag_bytes(repeat_count, body, tag)
     }
 
-    /// Clones an instruction without its tag.
-    pub fn circuit_instruction_without_tag(instruction: &CircuitInstruction) -> CircuitInstruction {
-        instruction.without_tag()
-    }
-
-    /// Returns the qubit width required to simulate a circuit, excluding `MPAD` values.
-    ///
-    /// Stim-compatible [`Circuit::count_qubits`] remains target-based and therefore counts an
-    /// `MPAD 1` value as width two. Execution owners use this narrower semantic width instead.
-    pub fn circuit_simulated_qubit_count(circuit: &Circuit) -> usize {
-        circuit.simulated_qubit_count()
-    }
-
-    /// Returns the number of measurement results produced by one instruction.
-    pub fn circuit_instruction_measurement_result_count(instruction: &CircuitInstruction) -> usize {
-        instruction.measurement_result_count()
-    }
-
-    /// Returns the minimum heap bytes needed by an untagged clone of an instruction.
-    #[doc(hidden)]
-    pub fn circuit_instruction_minimum_retained_heap_bytes(
-        instruction: &CircuitInstruction,
-    ) -> Option<usize> {
-        instruction.minimum_retained_heap_bytes()
-    }
-
-    /// Returns heap bytes retained by an instruction's actual vector capacities.
-    #[doc(hidden)]
-    pub fn circuit_instruction_retained_heap_bytes(
-        instruction: &CircuitInstruction,
-    ) -> Option<usize> {
-        instruction.retained_heap_bytes()
-    }
-
-    /// Reserves exact model storage for a bounded materializing consumer.
-    pub fn dem_try_reserve_items_exact(
-        model: &mut DetectorErrorModel,
-        additional: usize,
-    ) -> ModelResult<()> {
-        model.try_reserve_items_exact(additional)
-    }
-
     /// Constructs a DEM `detector` instruction while preserving opaque tag bytes.
     pub fn dem_detector_instruction_with_tag_bytes(
         coordinates: Vec<f64>,
@@ -237,129 +189,6 @@ pub mod advanced {
         tag: Option<&[u8]>,
     ) -> ModelResult<DemInstruction> {
         DemInstruction::error_from_targets(probability, targets, tag)
-    }
-
-    /// Subtracts `base` from every relative detector target of an instruction in place.
-    ///
-    /// # Errors
-    ///
-    /// Returns the first detector id below `base` and leaves the instruction unchanged.
-    pub fn dem_instruction_rebase_detectors(
-        instruction: &mut DemInstruction,
-        base: u64,
-    ) -> Result<(), u64> {
-        instruction.rebase_detectors(base)
-    }
-
-    /// Removes the tag from a DEM instruction in place.
-    pub fn dem_instruction_clear_tag(instruction: &mut DemInstruction) {
-        instruction.clear_tag();
-    }
-
-    /// Bounds attacker-controlled text using the model diagnostic contract.
-    pub fn bounded_parse_diagnostic_text(value: &str) -> String {
-        crate::diagnostics::bounded_parse_diagnostic_text(value)
-    }
-
-    /// Constructs a model parse diagnostic with separate machine and compatibility messages.
-    pub fn parse_error_with_human_message(
-        code: ParseErrorCode,
-        message: impl Into<String>,
-        human_message: impl Into<String>,
-        span: ByteSpan,
-        context: ParseErrorContext,
-    ) -> ParseError {
-        ParseError::with_human_message(code, message, human_message, span, context)
-    }
-
-    /// Constructs the UTF-8 diagnostic recorded by the byte-oriented admission scanner.
-    pub fn invalid_utf8_parse_error(
-        dialect: ModelDialect,
-        byte_start: usize,
-        byte_length: usize,
-        error_length: Option<usize>,
-    ) -> ParseError {
-        ParseError::invalid_utf8_at(dialect, byte_start, byte_length, error_length)
-    }
-
-    /// Returns the schema-one fingerprint discriminator for a model dialect.
-    pub const fn model_dialect_fingerprint_discriminator(dialect: ModelDialect) -> u8 {
-        dialect.fingerprint_discriminator()
-    }
-
-    /// Preserves Stim's parsed `rec[-0]` spelling.
-    pub fn measure_record_offset_from_stim_text(value: i32) -> ModelResult<MeasureRecordOffset> {
-        MeasureRecordOffset::from_stim_text(value)
-    }
-
-    /// Reports whether an offset preserves Stim's parsed `rec[-0]` spelling.
-    pub fn measure_record_offset_is_negative_zero(offset: MeasureRecordOffset) -> bool {
-        offset.is_negative_zero()
-    }
-
-    /// Formats an offset using Stim target syntax.
-    pub fn measure_record_offset_stim_text(offset: MeasureRecordOffset) -> impl Display {
-        offset.stim_text()
-    }
-
-    /// Looks up any canonical or aliased Stim v1.16.0 gate name.
-    #[inline]
-    pub fn lookup_gate(name: &str) -> Option<Gate> {
-        Gate::lookup_name(name)
-    }
-
-    /// Looks up the parser's small common-gate fast path.
-    #[inline]
-    pub fn lookup_simple_plain_gate(name: &str) -> Option<Gate> {
-        Gate::from_simple_plain_name(name)
-    }
-
-    /// Validates arguments and targets against a gate's closed syntax descriptor.
-    #[inline]
-    pub fn validate_gate(gate: Gate, args: &[f64], targets: &[Target]) -> ModelResult<()> {
-        gate.validate(args, targets)
-    }
-
-    /// Validates only targets against a gate's closed syntax descriptor.
-    #[inline]
-    pub fn validate_gate_targets(gate: Gate, targets: &[Target]) -> ModelResult<()> {
-        gate.validate_targets(targets)
-    }
-
-    /// Returns the common parser fast-path `H` gate.
-    #[inline]
-    pub fn plain_h_gate() -> Gate {
-        Gate::H
-    }
-
-    /// Returns the common parser fast-path `M` gate.
-    #[inline]
-    pub fn plain_m_gate() -> Gate {
-        Gate::M
-    }
-
-    /// Returns the common parser fast-path `CX` gate.
-    #[inline]
-    pub fn plain_cx_gate() -> Gate {
-        Gate::CX
-    }
-
-    /// Returns the common parser fast-path `S` gate.
-    #[inline]
-    pub fn plain_s_gate() -> Gate {
-        Gate::S
-    }
-
-    /// Returns the common parser fast-path `DETECTOR` gate.
-    #[inline]
-    pub fn plain_detector_gate() -> Gate {
-        Gate::DETECTOR
-    }
-
-    /// Returns the common parser fast-path `TICK` gate.
-    #[inline]
-    pub fn plain_tick_gate() -> Gate {
-        Gate::TICK
     }
 
     /// Returns the raw pinned flow descriptors for a gate.

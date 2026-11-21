@@ -4,10 +4,7 @@ use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, DemTargetKind, FoldedCircuitSummary,
     FoldedWalkError, Gate, GateCategory, GateKind, MeasureRecordOffset, MemoryBudget, ObservableId,
     ParseLimits, Pauli, QubitId, RepeatBlock, RepeatCount, Target,
-    advanced::{
-        CircuitBuilder, ClassicalControl, ControlledPauliTargetPair, FoldedCircuitEvent,
-        classify_controlled_pauli_target_pair,
-    },
+    advanced::{CircuitBuilder, ClassicalControl, ControlledPauliTargetPair, FoldedCircuitEvent},
 };
 
 use crate::folded_walk::walk_folded;
@@ -78,7 +75,7 @@ pub fn circuit_with_inlined_feedback_with_limits(
     })?;
     let detector_count = detector_count(circuit)?;
     let mut tracker = SparseReverseFrameTracker::new(
-        stab_model::advanced::circuit_simulated_qubit_count(circuit),
+        circuit.simulated_qubit_count(),
         measurement_count,
         detector_count,
         AnticommutationPolicy::Fail,
@@ -172,7 +169,7 @@ impl WithoutFeedbackHelper {
     ) -> AnalysisResult<()> {
         for group in instruction.target_groups().into_iter().rev() {
             let piece = instruction_with_targets(instruction, group.to_vec())?;
-            match classify_controlled_pauli_target_pair(instruction.gate(), group) {
+            match ControlledPauliTargetPair::classify(instruction.gate(), group) {
                 ControlledPauliTargetPair::Quantum { .. } => {
                     self.reversed_output
                         .push(CircuitItem::Instruction(piece.clone()));
@@ -290,11 +287,7 @@ impl WithoutFeedbackHelper {
             match item {
                 CircuitItem::Instruction(instruction) => {
                     *measurements_in_past = measurements_in_past
-                        .checked_add(
-                            stab_model::advanced::circuit_instruction_measurement_result_count(
-                                instruction,
-                            ),
-                        )
+                        .checked_add(instruction.measurement_result_count())
                         .ok_or_else(|| {
                             AnalysisError::count_overflow(
                                 AnalysisOperation::FeedbackInlining,

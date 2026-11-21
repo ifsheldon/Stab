@@ -794,7 +794,7 @@ fn flow_aware_qubit_count(circuit: &Circuit, flows: &[Flow]) -> AnalysisResult<u
         .flat_map(|flow| [flow.input().len(), flow.output().len()])
         .max()
         .unwrap_or(0);
-    let count = stab_model::advanced::circuit_simulated_qubit_count(circuit).max(flow_qubits);
+    let count = circuit.simulated_qubit_count().max(flow_qubits);
     if count > u32::MAX as usize {
         return Err(AnalysisError::count_overflow(
             AnalysisOperation::TimeReversal,

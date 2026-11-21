@@ -3,7 +3,6 @@ use std::ops::ControlFlow;
 
 use super::traversal::{
     DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemTraversal, FoldedDemVisitor,
-    shifted_detector,
 };
 use super::{
     DemDetectorId, DemInstruction, DemInstructionView, DemRepeatBlock, DemTarget, DemTargetKind,
@@ -55,9 +54,9 @@ impl Iterator for DemErrorTargetIter<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.targets.next().map(|target| match target.kind() {
-            DemTargetKind::RelativeDetector(detector) => {
-                shifted_detector(detector, self.detector_offset).map(DemErrorTarget::Detector)
-            }
+            DemTargetKind::RelativeDetector(detector) => detector
+                .shifted(self.detector_offset)
+                .map(DemErrorTarget::Detector),
             DemTargetKind::LogicalObservable(observable) => {
                 Ok(DemErrorTarget::Observable(observable))
             }

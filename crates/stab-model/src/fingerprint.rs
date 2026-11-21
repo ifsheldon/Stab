@@ -75,9 +75,7 @@ impl StructuralEncoder {
         let mut hasher = Sha256::new();
         hasher.update(MODEL_FINGERPRINT_DOMAIN);
         hasher.update(ModelFingerprint::SCHEMA_VERSION.to_be_bytes());
-        hasher.update([crate::advanced::model_dialect_fingerprint_discriminator(
-            dialect,
-        )]);
+        hasher.update([dialect.fingerprint_discriminator()]);
         Self { dialect, hasher }
     }
 

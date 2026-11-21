@@ -365,7 +365,7 @@ fn time_reversal_uses_sparse_validation_above_dense_tableau_width() {
 fn time_reversal_validates_flows_beyond_the_target_range() {
     // Every circuit is the identity on qubits no target can name, so the sparse validation of
     // the reversed flows accepts a flow that is idle there instead of failing as a Stab bug.
-    let limit = stab_model::advanced::STIM_TARGET_VALUE_LIMIT;
+    let limit = stab_model::QubitId::MAX.get() + 1;
     let wide = flow(&format!("X{limit} -> X{limit}"));
     let input = circuit("H 0\n");
     let (inverse, flows) = circuit_time_reversed_for_flows(&input, &[flow("X -> Z"), wide.clone()])

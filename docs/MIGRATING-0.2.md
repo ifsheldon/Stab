@@ -257,7 +257,7 @@ Every `.stim` text, printed circuit, diagnostic, and fingerprint byte is unchang
 Printing, counting, folded walking, and coordinate queries of a `Circuit`, and printing and counting of a `DetectorErrorModel`, no longer recurse per repeat level, so a model built through the API deeper than the parser's 256-level envelope can be printed and counted on a small stack.
 The DEM parser and the folded DEM traversal (`FoldedDemTraversal::try_visit` and `try_visit_with_coordinates`) also keep explicit heap stacks, so `try_visit`, `try_visit_with_coordinates`, `DetectorErrorModel::try_visit_error_mechanisms`, `detector_coordinates`, `detector_coordinates_for`, and `coordinates_of_detector` accept a model built through the API at any nesting depth instead of refusing one deeper than 256 levels with `DEM traversal repeat nesting exceeds current limit 256` or `DEM error-mechanism repeat nesting exceeds current limit 256`.
 The parser's `ParseLimits` repeat-nesting limit and its 256-level `RepeatNestingLimit::HARD_MAX` are unchanged, so every accepted and rejected `.dem` text parses, prints, and reports errors as before.
-`FoldedDemTraversal::validate_repeat_depth` and `advanced::MAX_DEM_REPEAT_NESTING` remain for consumers whose own processing recurses per repeat level: DEM sampling-plan compilation, DEM flattening, and the logical-error and SAT searches still refuse a model nested deeper than 256 levels.
+`FoldedDemTraversal::validate_repeat_depth` and `RepeatNestingLimit::HARD_MAX` remain for consumers whose own processing recurses per repeat level: DEM sampling-plan compilation, DEM flattening, and the logical-error and SAT searches still refuse a model nested deeper than 256 levels.
 Circuit and DEM coordinate queries compute each repeat body's coordinate shift, and circuit detector-coordinate queries each body's detector count, once per query instead of once per enclosing level, so their time grows linearly with nesting depth instead of quadratically; results and errors are unchanged.
 Parsing a circuit from bytes that are not valid UTF-8 charges the display text and record of each opaque tag, so such an input needs a larger `ParseLimits` memory budget than before and `Circuit::admitted_bytes` reports the larger hold.
 Parsing a detector error model from such bytes charges the same display text and record for each opaque tag, so `DetectorErrorModel::from_dem_bytes`, `from_dem_bytes_with_limits`, and `from_dem_bytes_admitted` can refuse a budget that was accepted before, and `DetectorErrorModel::admitted_bytes` and the hold `from_dem_bytes_admitted` returns report the larger value.
@@ -442,6 +442,32 @@ Refusals that were misreported are now typed:
 - A failed reservation for a detecting region is `AnalysisError::AllocationFailed`, where it was labelled a memory-budget refusal.
 - A budget refusal raised while a sample run is writing reports `resource-limit-exceeded` instead of `sampling-execution-failed`.
 - The JSON `span` of a refusal that has no source position is `null` instead of an empty span at byte zero.
+
+## Trimmed `stab_model::advanced`
+
+`stab_model::advanced` keeps only operations that rely on an invariant the caller has already established: `CircuitBuilder`, the folded circuit and DEM traversals, the tag-byte constructors, the controlled-Pauli pair classification, the raw gate tables, and the admission formula the engine shares.
+Free functions that wrapped a method are inherent methods or associated items on their type.
+
+| Removed from `stab_model::advanced` | Replacement |
+| --- | --- |
+| `circuit_simulated_qubit_count(&circuit)` | `Circuit::simulated_qubit_count()` |
+| `circuit_instruction_measurement_result_count(&instruction)` | `CircuitInstruction::measurement_result_count()` |
+| `circuit_instruction_without_tag(&instruction)` | `CircuitInstruction::without_tag()` |
+| `dem_try_reserve_items_exact(&mut model, n)` | `DetectorErrorModel::try_reserve_items_exact(n)` |
+| `dem_instruction_rebase_detectors(&mut instruction, base)` | `DemInstruction::rebase_detectors(base)`, whose error is a `DemDetectorId` instead of a `u64` |
+| `dem_instruction_clear_tag(&mut instruction)` | `DemInstruction::clear_tag()` |
+| `model_dialect_fingerprint_discriminator(dialect)` | `ModelDialect::fingerprint_discriminator()` |
+| `validate_gate(gate, args, targets)` and `validate_gate_targets(gate, targets)` | `Gate::validate(args, targets)` and `Gate::validate_targets(targets)` |
+| `classify_controlled_pauli_target_pair(gate, targets)` | `advanced::ControlledPauliTargetPair::classify(gate, targets)` |
+| `shifted_detector(detector, offset)` | `DemDetectorId::shifted(offset)` |
+| `STIM_TARGET_VALUE_LIMIT` | `QubitId::MAX`, the largest qubit id, which is the limit minus one |
+| `MAX_DEM_REPEAT_NESTING` | `RepeatNestingLimit::HARD_MAX` |
+| `plain_h_gate`, `plain_m_gate`, `plain_cx_gate`, `plain_s_gate`, `plain_detector_gate`, `plain_tick_gate`, `lookup_gate`, `lookup_simple_plain_gate` | Removed; use `Gate::lookup_name` or the `GateKind` |
+| `measure_record_offset_from_stim_text`, `measure_record_offset_is_negative_zero`, `measure_record_offset_stim_text` | Removed; no caller |
+| `bounded_parse_diagnostic_text`, `parse_error_with_human_message`, `invalid_utf8_parse_error` | Removed; no caller |
+| `shifted_coordinates` | Removed; no caller |
+
+`stab_analysis::advanced::decomposed_single_instruction` is removed as well; it had no caller outside the crate.
 
 ## Logical Error Search Outcome
 

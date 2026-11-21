@@ -7,12 +7,11 @@ use std::ops::ControlFlow;
 
 use stab_model::advanced::{
     DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem, FoldedDemTraversal,
-    FoldedDemVisitor, MAX_DEM_REPEAT_NESTING, shifted_coordinates, shifted_detector,
-    shifted_targets,
+    FoldedDemVisitor, shifted_targets,
 };
 use stab_model::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemRepeatBlock, DemTarget,
-    DetectorErrorModel, ModelError, RepeatNestingLimit, ValidationError,
+    DetectorErrorModel, ModelError, ValidationError,
 };
 
 #[derive(Debug)]
@@ -117,7 +116,9 @@ fn assert_compact_structure_and_semantic_state() {
         ]
     );
 
-    let detector = shifted_detector(DemDetectorId::try_new(7).expect("detector id"), 5)
+    let detector = DemDetectorId::try_new(7)
+        .expect("detector id")
+        .shifted(5)
         .expect("shifted detector");
     assert_eq!(detector.get(), 12);
     assert_eq!(
@@ -135,10 +136,6 @@ fn assert_compact_structure_and_semantic_state() {
             DemTarget::logical_observable(3).expect("preserved observable target"),
             DemTarget::separator(),
         ]
-    );
-    assert_eq!(
-        shifted_coordinates(&[1.0, 2.0, 3.0], &[0.5, -1.0]).expect("shifted coordinates"),
-        vec![1.5, 1.0, 3.0]
     );
 }
 
@@ -276,11 +273,6 @@ impl FoldedDemVisitor for ExpansionLimitVisitor {
 
 #[test]
 fn folded_dem_traversal_enforces_exact_expansion_limit_before_callbacks() {
-    assert_eq!(
-        MAX_DEM_REPEAT_NESTING,
-        RepeatNestingLimit::HARD_MAX,
-        "the advanced traversal limit must stay aligned with the model parser limit"
-    );
     let model = DetectorErrorModel::from_dem_str(
         "repeat 3 {\n\
              error(0.25) D0\n\

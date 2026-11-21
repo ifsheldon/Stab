@@ -1,7 +1,5 @@
 use stab_algebra::PauliBasis;
-use stab_model::advanced::{
-    ClassicalControl, ControlledPauliTargetPair, classify_controlled_pauli_target_pair,
-};
+use stab_model::advanced::{ClassicalControl, ControlledPauliTargetPair};
 use stab_model::{CircuitInstruction, GateKind, Pauli};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -150,7 +148,7 @@ pub(crate) fn sweep_controlled_pauli_is_sign_only_noop(instruction: &CircuitInst
     !groups.is_empty()
         && groups.iter().all(|group| {
             matches!(
-                classify_controlled_pauli_target_pair(instruction.gate(), group),
+                ControlledPauliTargetPair::classify(instruction.gate(), group),
                 ControlledPauliTargetPair::Classical {
                     control: ClassicalControl::Sweep(_),
                     ..

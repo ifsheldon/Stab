@@ -442,10 +442,7 @@ fn detecting_regions_target_shape_supports_measurement_pads() {
     )
     .unwrap();
     assert_eq!(circuit.count_qubits(), 2);
-    assert_eq!(
-        stab_model::advanced::circuit_simulated_qubit_count(&circuit),
-        1
-    );
+    assert_eq!(circuit.simulated_qubit_count(), 1);
     let detector_target = DemTarget::relative_detector(0).unwrap();
     let observable = DemTarget::logical_observable(0).unwrap();
     let actual = circuit_detecting_regions_for_targets(

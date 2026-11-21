@@ -52,7 +52,7 @@ pub fn circuit_flow_generators_with_options(
     options.cancellation.check()?;
     let budget = options.memory_budget;
     if circuit_is_ignored_only(circuit) {
-        let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
+        let qubit_count = circuit.simulated_qubit_count();
         admit_flow_generator_rows(qubit_count, 0, budget)?;
         return Ok(reverse_ordered_identity_flow_rows(qubit_count));
     }
@@ -67,7 +67,7 @@ fn unitary_flow_generators(
     circuit: &Circuit,
     options: &FlowGeneratorOptions,
 ) -> AnalysisResult<Vec<Flow>> {
-    let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
+    let qubit_count = circuit.simulated_qubit_count();
     admit_flow_generator_rows(qubit_count, 0, options.memory_budget)?;
     let tableau = crate::circuit_to_tableau_with_options(
         circuit,

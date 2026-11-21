@@ -6,9 +6,7 @@ use arrayvec::ArrayVec;
 use stab_algebra::PauliBasis;
 use stab_model::{
     Circuit, CircuitInstruction, Gate, GateKind, RepeatNestingLimit, Target,
-    advanced::{
-        ClassicalControl, ControlledPauliTargetPair, classify_controlled_pauli_target_pair,
-    },
+    advanced::{ClassicalControl, ControlledPauliTargetPair},
 };
 
 use super::super::clifford::{FrameCliffordAction, FrameCliffordActionCache, TwoQubitFrameMap};
@@ -879,7 +877,7 @@ const fn measure(basis: PauliBasis, reset: bool) -> EntryKind {
 fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> DetectionResult<()> {
     for target_group in instruction.targets().chunks(2) {
         if matches!(
-            classify_controlled_pauli_target_pair(instruction.gate(), target_group),
+            ControlledPauliTargetPair::classify(instruction.gate(), target_group),
             ControlledPauliTargetPair::Unsupported
         ) {
             return Err(DetectionError::invalid_sampler_compilation(format!(
@@ -966,7 +964,7 @@ fn record_controls(
 ) -> DetectionResult<usize> {
     let mut operations = 0_usize;
     for target_group in instruction.targets().chunks(2) {
-        match classify_controlled_pauli_target_pair(instruction.gate(), target_group) {
+        match ControlledPauliTargetPair::classify(instruction.gate(), target_group) {
             ControlledPauliTargetPair::Quantum { .. } => operations += 1,
             ControlledPauliTargetPair::Classical { control, .. } => {
                 admit_control(instruction, counts, control)?;

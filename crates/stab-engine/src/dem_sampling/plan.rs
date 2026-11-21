@@ -1,8 +1,8 @@
 use std::fmt;
 use std::sync::Arc;
 
-use stab_model::advanced::{FoldedDemTraversal, MAX_DEM_REPEAT_NESTING};
-use stab_model::{Cancellation, DetectorErrorModel, MemoryBudget};
+use stab_model::advanced::FoldedDemTraversal;
+use stab_model::{Cancellation, DetectorErrorModel, MemoryBudget, RepeatNestingLimit};
 use stab_records::{DetectorWidth, ObservableWidth, SampledErrorWidth};
 
 use super::bit_plane::{SampledErrorPlanes, sample_into_planes};
@@ -46,9 +46,10 @@ impl DemSamplingCompiler {
         self.limits.cancellation().check()?;
         let traversal = FoldedDemTraversal::new(model)?;
         let repeat_depth = traversal.root().summary().max_repeat_depth();
-        if repeat_depth > MAX_DEM_REPEAT_NESTING {
+        let limit = RepeatNestingLimit::HARD_MAX;
+        if repeat_depth > limit {
             return Err(DemError::invalid_sampler_compilation(format!(
-                "DEM repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}, got {repeat_depth}"
+                "DEM repeat nesting exceeds current limit {limit}, got {repeat_depth}"
             )));
         }
         let mut meter =

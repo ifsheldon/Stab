@@ -441,24 +441,26 @@ impl DemInstruction {
 
     /// Removes this instruction's tag without changing its validated semantic fields.
     ///
-    /// This is a crate-private model primitive used by analysis transforms. Recursive tag
-    /// stripping remains owned by the analysis layer.
-    pub(crate) fn clear_tag(&mut self) {
+    /// Recursive tag stripping of a whole model remains owned by the analysis layer.
+    pub fn clear_tag(&mut self) {
         self.tag = None;
     }
 
     /// Subtracts `base` from every relative detector target in place.
     ///
-    /// Fails with the first detector id below `base` and leaves the instruction unchanged.
     /// Lowering detector ids keeps every validated instruction shape valid.
-    pub(crate) fn rebase_detectors(&mut self, base: u64) -> Result<(), u64> {
+    ///
+    /// # Errors
+    ///
+    /// Returns the first detector id below `base` and leaves the instruction unchanged.
+    pub fn rebase_detectors(&mut self, base: u64) -> Result<(), DemDetectorId> {
         if let Some(detector) = self
             .targets()
             .iter()
             .filter_map(|target| target.detector())
             .find(|detector| detector.get() < base)
         {
-            return Err(detector.get());
+            return Err(detector);
         }
         match &mut self.payload {
             DemPayload::Error { targets, .. } => {

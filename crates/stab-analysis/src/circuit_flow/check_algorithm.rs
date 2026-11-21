@@ -99,7 +99,7 @@ impl FlowCheckCost {
                     )
                 });
         Self {
-            qubits: stab_model::advanced::circuit_simulated_qubit_count(circuit) as f64,
+            qubits: circuit.simulated_qubit_count() as f64,
             instructions: instructions as f64,
             gate_targets: gate_targets as f64,
             flows: flows.len() as f64,

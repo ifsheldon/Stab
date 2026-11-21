@@ -2,9 +2,7 @@ use stab_algebra::{PauliBasis, PauliString, StabilizerError, Tableau};
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, GateCategory, GateKind, MemoryBudget,
     Pauli, QubitId, Target, TargetKind,
-    advanced::{
-        CancellationCountdown, ControlledPauliTargetPair, classify_controlled_pauli_target_pair,
-    },
+    advanced::{CancellationCountdown, ControlledPauliTargetPair},
 };
 
 use crate::{
@@ -436,8 +434,8 @@ fn apply_unitary_instruction(
     inverse: bool,
 ) -> AnalysisResult<()> {
     if instruction.gate().category() == GateCategory::PauliProduct {
-        let decomposed =
-            crate::advanced::decomposed_single_instruction(instruction).map_err(|error| {
+        let decomposed = crate::circuit_simplify::decomposed_single_instruction(instruction)
+            .map_err(|error| {
                 error.into_nested_pauli_product_error(AnalysisOperation::PauliConjugation)
             })?;
         if inverse {
@@ -462,7 +460,7 @@ fn apply_unitary_instruction(
     let mut output_sign = pauli.sign();
     for group in instruction.target_groups() {
         if let Some(conditional_pauli) = instruction.gate().controlled_pauli() {
-            match classify_controlled_pauli_target_pair(instruction.gate(), group) {
+            match ControlledPauliTargetPair::classify(instruction.gate(), group) {
                 ControlledPauliTargetPair::Quantum { first, second } => {
                     apply_local_tableau_group(pauli, &local, &[first, second], &mut output_sign)?;
                 }

@@ -29,7 +29,7 @@ pub(super) fn composed_measurement_flow_generators(
     budget: MemoryBudget,
     cancellation: &Cancellation,
 ) -> AnalysisResult<Option<Vec<Flow>>> {
-    let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
+    let qubit_count = circuit.simulated_qubit_count();
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
         AnalysisError::count_overflow(
             AnalysisOperation::FlowGeneration,

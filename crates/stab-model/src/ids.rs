@@ -7,6 +7,9 @@ const MIN_MEASUREMENT_RECORD_OFFSET: i32 = -(1 << 24) + 1;
 pub struct QubitId(u32);
 
 impl QubitId {
+    /// The largest qubit id a Stim target can name.
+    pub const MAX: Self = Self(STIM_TARGET_VALUE_LIMIT - 1);
+
     pub fn new(value: u32) -> ModelResult<Self> {
         if value >= STIM_TARGET_VALUE_LIMIT {
             return Err(ModelError::invalid_domain_value("qubit id", value));
@@ -14,7 +17,7 @@ impl QubitId {
         Ok(Self(value))
     }
 
-    pub fn get(self) -> u32 {
+    pub const fn get(self) -> u32 {
         self.0
     }
 

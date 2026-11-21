@@ -18,7 +18,9 @@ pub fn decomposed_circuit(circuit: &Circuit) -> AnalysisResult<Circuit> {
 
 /// Decomposes one instruction for execution and higher-level analysis lowering.
 #[doc(hidden)]
-pub fn decomposed_single_instruction(instruction: &CircuitInstruction) -> AnalysisResult<Circuit> {
+pub(crate) fn decomposed_single_instruction(
+    instruction: &CircuitInstruction,
+) -> AnalysisResult<Circuit> {
     let mut result = Circuit::new();
     append_decomposed_instruction(instruction, &mut result)?;
     Ok(result)

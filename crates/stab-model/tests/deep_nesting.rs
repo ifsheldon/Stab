@@ -296,7 +296,7 @@ fn maximally_nested_dem_text_parses_and_round_trips_on_a_small_stack() {
 #[test]
 fn a_traversal_repeat_depth_cap_is_a_typed_fixed_limit_not_a_budget_refusal() {
     on_small_stack(|| {
-        let depth = stab_model::advanced::MAX_DEM_REPEAT_NESTING + 1;
+        let depth = stab_model::RepeatNestingLimit::HARD_MAX + 1;
         let model = nested_dem(depth);
         let traversal =
             stab_model::advanced::FoldedDemTraversal::new(&model).expect("compact traversal");

@@ -13,8 +13,8 @@
 use std::ops::ControlFlow;
 
 use super::{
-    DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DemTarget,
-    DetectorErrorModel, MAX_DEM_REPEAT_NESTING,
+    DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DemTarget, DetectorErrorModel,
+    MAX_DEM_REPEAT_NESTING,
 };
 use crate::{ModelError, ModelResult, ResourceLimitError};
 
@@ -135,7 +135,7 @@ impl<'a> FoldedDemTraversal<'a> {
         visit::visit(&self.root, visitor, DemTraversalState::with_coordinates())
     }
 
-    /// Refuses a model nested deeper than [`MAX_DEM_REPEAT_NESTING`].
+    /// Refuses a model nested deeper than [`crate::RepeatNestingLimit::HARD_MAX`].
     ///
     /// Traversal itself accepts any depth. Consumers whose own processing recurses once per
     /// repeat level call this before they start; depth validation is not part of construction
@@ -804,18 +804,11 @@ fn include_bound(bounds: &mut Option<DemDetectorBounds>, detector: u64) {
     }
 }
 
-pub fn shifted_detector(
-    detector: DemDetectorId,
-    detector_offset: u64,
-) -> ModelResult<DemDetectorId> {
-    DemDetectorId::try_new(
-        detector
-            .get()
-            .checked_add(detector_offset)
-            .ok_or_else(|| detector_summary_error("relative detector id overflowed"))?,
-    )
-}
-
+/// Shifts every detector target of a borrowed slice, with a fallible exact allocation.
+///
+/// # Errors
+///
+/// Fails when the allocation fails or a shifted detector id leaves the DEM detector id range.
 pub fn shifted_targets(targets: &[DemTarget], detector_offset: u64) -> ModelResult<Vec<DemTarget>> {
     let mut shifted = Vec::new();
     shifted
@@ -827,7 +820,10 @@ pub fn shifted_targets(targets: &[DemTarget], detector_offset: u64) -> ModelResu
     Ok(shifted)
 }
 
-pub fn shifted_coordinates(coordinates: &[f64], coordinate_shift: &[f64]) -> ModelResult<Vec<f64>> {
+pub(crate) fn shifted_coordinates(
+    coordinates: &[f64],
+    coordinate_shift: &[f64],
+) -> ModelResult<Vec<f64>> {
     let mut shifted = Vec::new();
     shifted
         .try_reserve_exact(coordinates.len())

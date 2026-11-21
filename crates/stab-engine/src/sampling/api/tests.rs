@@ -406,7 +406,7 @@ fn plan_qubit_count_matches_the_circuit_simulated_qubit_count() {
         let plan = SamplingCompiler::new().compile(&circuit).expect("compile");
         assert_eq!(
             plan.qubit_count(),
-            stab_model::advanced::circuit_simulated_qubit_count(&circuit),
+            circuit.simulated_qubit_count(),
             "{text}"
         );
     }

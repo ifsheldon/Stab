@@ -6,7 +6,7 @@ use crate::resources::SatMaterializationResource;
 use crate::{AnalysisError, AnalysisRequestError, AnalysisResult, ResourceLimitError};
 use stab_model::advanced::{
     CancellationCountdown, DemRepeatSelection, DemTraversalState, FoldedDemBlock,
-    FoldedDemTraversal, FoldedDemVisitor, shifted_detector, shifted_targets,
+    FoldedDemTraversal, FoldedDemVisitor, shifted_targets,
 };
 use stab_model::{
     Cancellation, DemDetectorId, DemInstruction, DemInstructionView, DemRepeatBlock, DemTarget,
@@ -577,7 +577,7 @@ impl SatErrorVisitor<'_> {
 fn validate_shifted_target_ids(targets: &[DemTarget], detector_offset: u64) -> AnalysisResult<()> {
     for target in targets {
         if let Some(detector) = target.detector() {
-            let _ = shifted_detector(detector, detector_offset)?;
+            let _ = detector.shifted(detector_offset)?;
         }
     }
     Ok(())

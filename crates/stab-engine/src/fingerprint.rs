@@ -65,9 +65,7 @@ impl CompilationRequestFingerprint {
         hasher.update([operation.discriminator()]);
         hasher.update(Self::SAMPLING_COMPILER_SCHEMA_VERSION.to_be_bytes());
         hasher.update(model.schema_version().to_be_bytes());
-        hasher.update([
-            stab_model::advanced::model_dialect_fingerprint_discriminator(model.dialect()),
-        ]);
+        hasher.update([model.dialect().fingerprint_discriminator()]);
         hasher.update(model.digest());
 
         // Classical-control lowering is fixed compiler behavior, not a caller option.

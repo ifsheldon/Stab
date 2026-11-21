@@ -626,7 +626,7 @@ impl ConversionPlan {
     }
 
     fn add_measurements(&mut self, instruction: &CircuitInstruction) -> DetectionResult<()> {
-        let count = stab_model::advanced::circuit_instruction_measurement_result_count(instruction);
+        let count = instruction.measurement_result_count();
         if count == 0 {
             return Ok(());
         }

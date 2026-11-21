@@ -188,7 +188,7 @@ fn gate_surface_contract_target_patterns_are_accepted_and_classified() {
             // Block-only control-flow gates never validate as instructions since the WS3
             // grammar repair; their patterns stay classified for surface-contract coverage.
             if gate.category() != crate::GateCategory::ControlFlow {
-                super::super::validate_gate(gate, &args, &targets).unwrap_or_else(|error| {
+                gate.validate(&args, &targets).unwrap_or_else(|error| {
                     panic!(
                         "{} pattern {pattern:?} must satisfy its canonical parser rule: {error}",
                         gate.canonical_name()

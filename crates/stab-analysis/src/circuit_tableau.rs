@@ -57,7 +57,7 @@ pub fn circuit_to_tableau_with_options(
     options: &CircuitToTableauOptions,
 ) -> AnalysisResult<Tableau> {
     options.cancellation.check()?;
-    let num_qubits = stab_model::advanced::circuit_simulated_qubit_count(circuit);
+    let num_qubits = circuit.simulated_qubit_count();
     let budget = options.memory_budget;
     let result =
         TableauAppender::identity_with_budget(num_qubits, budget).map_err(map_tableau_error)?;
@@ -202,10 +202,12 @@ impl Conversion<'_> {
             }
             GateCategory::PauliProduct if !gate.is_unitary() => Ok(result),
             GateCategory::PauliProduct => {
-                let decomposed = crate::advanced::decomposed_single_instruction(instruction)
-                    .map_err(|error| {
-                        error.into_nested_pauli_product_error(AnalysisOperation::TableauConversion)
-                    })?;
+                let decomposed = crate::circuit_simplify::decomposed_single_instruction(
+                    instruction,
+                )
+                .map_err(|error| {
+                    error.into_nested_pauli_product_error(AnalysisOperation::TableauConversion)
+                })?;
                 self.apply_circuit(&decomposed, result)
             }
         }
